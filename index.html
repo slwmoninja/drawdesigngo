@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+ef3f2912';
+  const APP_VERSION = '1.0+cf8ee8e6';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3553,18 +3553,33 @@
     return fpFileToBase64(blob);
   }
 
+  // Shows just enough of a saved key (prefix + last 4 chars) for the user
+  // to visually confirm it matches what they actually copied, without this
+  // app (or us) ever needing to see/ask for the full value.
+  function fpMaskKey(key){
+    if(!key) return '';
+    if(key.length <= 14) return key.slice(0,4)+'…';
+    return key.slice(0,10)+'…'+key.slice(-4);
+  }
+  // type="text" (not "password") deliberately -- on mobile, password-type
+  // fields are prone to browser/OS password-manager autofill silently
+  // overwriting a pasted value, which is indistinguishable from "the key is
+  // just wrong" when debugging a rejected key. autocomplete/autocorrect/
+  // autocapitalize are all disabled so mobile keyboards can't mangle a
+  // paste either.
+  const FP_KEY_INPUT_ATTRS = `type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"`;
   function fpKeyRowHtml(provider){
     if(provider === 'openai'){
-      const hasKey = !!fpGetOpenAiKey();
+      const key = fpGetOpenAiKey();
       const proxyUrl = fpGetOpenAiProxyUrl();
       return `
         <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL (deployed 2026-09-04; see cloudflare-worker/README.md if you ever need to redeploy)
           <input type="text" id="fpProxyInput" placeholder="https://floorplanner-openai-proxy.your-subdomain.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
         </label>
         <div class="fp-key-row" style="margin-top:.4rem;">
-          ${hasKey
-            ? `<span>OpenAI API key is set (this device only).</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-            : `<span>Needs your own OpenAI API key &mdash;</span><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">get one</a><input type="password" id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
+          ${key
+            ? `<span>OpenAI API key is set: <code>${fpEscapeHtml(fpMaskKey(key))}</code> (this device only) &mdash; check this matches what you copied.</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
+            : `<span>Needs your own OpenAI API key &mdash;</span><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">get one</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
         </div>
         <p class="fp-hint">Requests go from this browser through your own proxy Worker to OpenAI's API with that key &mdash; not through us.</p>
         <label class="mini" style="display:flex; align-items:flex-start; gap:.4rem; margin-top:.3rem; color:var(--dim);">
@@ -3574,12 +3589,12 @@
         <p class="fp-hint" id="fpDataSharingStatus">${fpGetDataSharingAck() ? 'Recorded: data-sharing acknowledged.' : 'Not yet acknowledged.'}</p>
       `;
     }
-    const hasKey = !!fpGetApiKey();
+    const key = fpGetApiKey();
     return `
       <div class="fp-key-row">
-        ${hasKey
-          ? `<span>Anthropic API key is set (this device only).</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-          : `<span>Needs your own Anthropic API key &mdash;</span><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">get one</a><input type="password" id="fpKeyInput" placeholder="sk-ant-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
+        ${key
+          ? `<span>Anthropic API key is set: <code>${fpEscapeHtml(fpMaskKey(key))}</code> (this device only) &mdash; check this matches what you copied.</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
+          : `<span>Needs your own Anthropic API key &mdash;</span><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">get one</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-ant-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
       </div>
       <p class="fp-hint">Photos and notes go straight from this browser to Anthropic's API with that key &mdash; not through us, not stored anywhere but here.</p>
     `;
