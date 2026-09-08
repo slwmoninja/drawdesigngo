@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+95b0b9fc';
+  const APP_VERSION = '1.0+ef3f2912';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2842,7 +2842,6 @@
   infoBtn.addEventListener('click', ()=>{
     const showResetLink = !isStandaloneApp() && getInstallFlag();
     const wrap = openModal('About FloorPlanner',
-      '<div style="margin-bottom:.6rem;">Isolate objects from photos, erase things with on-device inpainting, and compose cutouts onto other photos. Everything runs on this device — your photo is never uploaded anywhere.</div>' +
       '<div class="about-row"><span class="k">Version</span><span>'+APP_VERSION+'</span></div>' +
       aboutInstallRowHtml() +
       (showResetLink ?
