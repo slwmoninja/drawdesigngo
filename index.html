@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+24cb413c';
+  const APP_VERSION = '1.0+50a0cdd9';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3618,6 +3618,8 @@
       <p class="fp-hint" style="margin-top:0;">Take 3&ndash;4 photos of the room from different corners, so every wall shows in at least one shot, and/or just describe the room's dimensions below &mdash; photos are optional if you give exact measurements.</p>
       <div class="fp-photo-drop" id="fpPhotoDrop">Tap to choose photos, or drag them here</div>
       <input type="file" id="fpPhotoInput" accept="image/*" multiple style="display:none;">
+      <button class="btn" type="button" id="fpCameraBtn" style="margin-top:.4rem; width:100%;">&#128247; Take a photo instead</button>
+      <input type="file" id="fpCameraInput" accept="image/*" capture="environment" style="display:none;">
       <div id="fpPhotoThumbs" class="fp-photo-thumbs"></div>
       <label class="mini" style="display:block; margin-top:.7rem; color:var(--dim);">Known dimensions or notes (required if no photos)
         <textarea id="fpKnownDims" rows="3" placeholder="e.g. back wall is about 22 feet, ceilings are 9 feet"></textarea>
@@ -3656,6 +3658,14 @@
       });
     }
     drop.addEventListener('click', ()=> input.click());
+    const cameraBtn = wrap.querySelector('#fpCameraBtn');
+    const cameraInput = wrap.querySelector('#fpCameraInput');
+    cameraBtn.addEventListener('click', ()=> cameraInput.click());
+    cameraInput.addEventListener('change', (e)=>{
+      [...e.target.files].forEach(f=> picked.push(f));
+      cameraInput.value = '';
+      renderThumbs();
+    });
     input.addEventListener('change', (e)=>{
       [...e.target.files].forEach(f=> picked.push(f));
       input.value = '';
@@ -3796,7 +3806,7 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
         'authorization': 'Bearer ' + fpGetOpenAiKey(),
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // TEMPORARY diagnostic swap -- see if the same key fails differently against a universally-available model. Revert to gpt-6-astra once diagnosed.
+        model: 'gpt-6-astra',
         max_tokens: 4096,
         response_format: { type: 'json_object' },
         messages: [{ role:'user', content: [ ...images, { type:'text', text: prompt } ] }],
@@ -3924,7 +3934,7 @@ Apply exactly this change and nothing else (keep everything else -- other furnit
         'authorization': 'Bearer ' + fpGetOpenAiKey(),
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini', // TEMPORARY diagnostic swap -- see if the same key fails differently against a universally-available model. Revert to gpt-6-astra once diagnosed.
+        model: 'gpt-6-astra',
         max_tokens: 4096,
         response_format: { type: 'json_object' },
         messages: [{ role:'user', content: prompt }],
