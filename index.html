@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+50a0cdd9';
+  const APP_VERSION = '1.0+06187c27';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3568,10 +3568,16 @@
   // Shows just enough of a saved key (prefix + last 4 chars) for the user
   // to visually confirm it matches what they actually copied, without this
   // app (or us) ever needing to see/ask for the full value.
+  // Includes the character count deliberately -- a prefix+suffix-only mask
+  // would still "look right" even if something truncated the middle of the
+  // key (a real, documented failure mode for modern sk-proj-... keys, which
+  // run 150-170+ characters -- some integrations historically truncated
+  // them to ~100 assuming the shorter legacy sk-... format, causing exactly
+  // this "looks valid, gets rejected" symptom with no other visible sign).
   function fpMaskKey(key){
     if(!key) return '';
-    if(key.length <= 14) return key.slice(0,4)+'…';
-    return key.slice(0,10)+'…'+key.slice(-4);
+    const masked = key.length <= 14 ? key.slice(0,4)+'…' : key.slice(0,10)+'…'+key.slice(-4);
+    return masked + ' ['+key.length+' chars]';
   }
   // type="text" (not "password") deliberately -- on mobile, password-type
   // fields are prone to browser/OS password-manager autofill silently
