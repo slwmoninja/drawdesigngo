@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+b61a152a';
+  const APP_VERSION = '1.0+24cb413c';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3529,6 +3529,7 @@
   const FP_IMAGE_QUALITY = 0.82;
   function fpDownscaleImage(file){
     return new Promise((resolve, reject)=>{
+      const label = (file.name||'photo') + (file.type ? ' ('+file.type+')' : '');
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = ()=>{
@@ -3541,10 +3542,21 @@
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, w, h);
         canvas.toBlob(blob=>{
-          if(blob) resolve(blob); else reject(new Error('Could not encode photo.'));
+          if(blob) resolve(blob); else reject(new Error('Could not encode '+label+'.'));
         }, 'image/jpeg', FP_IMAGE_QUALITY);
       };
-      img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('Could not load photo.')); };
+      // Most commonly hit for HEIC/HEIF photos -- iOS Safari auto-converts
+      // those to JPEG on picking, but Android Chrome (and some other
+      // browsers) have no built-in HEIC decoder at all, so the <img> simply
+      // fails to load with no more specific reason given by the browser.
+      img.onerror = ()=>{
+        URL.revokeObjectURL(url);
+        const isHeic = /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name||'');
+        const hint = isHeic
+          ? ' -- likely a HEIC/HEIF photo, which this browser can\'t display. Try a photo saved as JPEG or PNG instead.'
+          : ' -- this browser could not decode it. Try a different photo (JPEG/PNG work everywhere).';
+        reject(new Error('Could not load '+label+hint));
+      };
       img.src = url;
     });
   }
