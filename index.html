@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+4fc3ae46';
+  const APP_VERSION = '1.0+0fa4484b';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3560,7 +3560,7 @@
       const proxyUrl = fpGetOpenAiProxyUrl();
       return `
         <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL (deployed 2026-09-04; see cloudflare-worker/README.md if you ever need to redeploy)
-          <input type="text" id="fpProxyInput" placeholder="https://floorplanner-openai-proxy.your-subdomain.workers.dev" value="${proxyUrl.replace(/"/g,'&quot;')}" style="width:100%;">
+          <input type="text" id="fpProxyInput" placeholder="https://floorplanner-openai-proxy.your-subdomain.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
         </label>
         <div class="fp-key-row" style="margin-top:.4rem;">
           ${hasKey
