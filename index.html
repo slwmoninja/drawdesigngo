@@ -2708,7 +2708,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+11dd00a6';
+  const APP_VERSION = '1.0+7849c64f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3748,12 +3748,17 @@ Wall openings (doors/windows): "wall" is one of back/right/front/left. "offset" 
 
 Furniture: "cx"/"cy" are the item's CENTER in feet using the same coordinate system as the room. "w"/"d" are the item's footprint in INCHES (width x depth). "rot" is rotation in degrees, 0 = default orientation.
 
+Precise placement is the hardest and most error-prone part of this task -- free-floating "somewhere in the middle" coordinate guesses are usually wrong even when the item/room identification itself is correct. To reduce that:
+- Calibrate scale from the most reliable fixed references first -- a standard door is 30-36in wide and ~80in tall, standard ceiling height is 8-9ft. Use whichever of these is visible to establish feet-per-pixel before estimating anything else, rather than guessing the room's overall size first.
+- Anchor every furniture item's position to a specific visible reference -- "flush against the back wall, centered under the window," "left edge touching the left wall, 2ft from the back corner" -- not a bare coordinate pulled from general impression. If you cannot identify a specific wall/corner/opening this item is positioned relative to, say so in that item's contribution to "notes" rather than inventing a precise-looking coordinate.
+- Sanity-check before finalizing: no two furniture footprints should overlap, and no item's footprint should extend outside the room's own w/d bounds. Adjust cx/cy/rot until both hold.
+
 ${notes ? 'The user also supplied these known measurements/notes, prefer them over your own visual estimate when they conflict: ' + notes : 'No measurements were supplied -- estimate from standard door/ceiling/furniture sizing and everyday visual proportion.'}
 
 Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape:
 {"title": string, "room": {"w": number, "d": number}, "openings": [{"wall": "back"|"right"|"front"|"left", "offset": number, "width": number, "label": string}], "furniture": [{"label": string, "w": number, "d": number, "cx": number, "cy": number, "rot": number}], "notes": [string, ...]}
 
-Include a "notes" entry stating which figures are firm (anchored to a supplied measurement or a standard size like a door width) versus rough visual estimates.`;
+Include a "notes" entry stating which figures are firm (anchored to a supplied measurement or a standard size like a door width) versus rough visual estimates, and flag any furniture item whose position wasn't anchored to a specific visible reference.`;
   }
 
   function fpExtractJson(text){
