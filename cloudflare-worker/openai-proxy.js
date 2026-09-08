@@ -41,19 +41,44 @@ export default {
     // as strings -- photo uploads can be tens of MB (base64-encoded images),
     // and materializing that in memory as a JS string crashed the Worker
     // (Cloudflare error 1101) under real multi-photo payloads.
-    const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'content-type': request.headers.get('content-type') || 'application/json',
-        'authorization': authHeader,
-      },
-      body: request.body,
-      duplex: 'half',
-    });
+    //
+    // The upstream fetch is wrapped in try/catch (and a hard timeout) on
+    // purpose -- if it throws (network hiccup, upstream hang, OpenAI taking
+    // longer than Cloudflare's own subrequest budget) with nothing here to
+    // catch it, Cloudflare returns its own generic crash page, which never
+    // gets CORS_HEADERS attached (those are only added by Response objects
+    // this code builds). Without that header the browser can't even read the
+    // response and just reports a bare "Failed to fetch" -- exactly the
+    // unhelpful failure mode this is closing off, so real errors (including
+    // upstream timeouts) actually reach the app's status text instead.
+    const controller = new AbortController();
+    const timeout = setTimeout(()=> controller.abort(), 60000);
+    try {
+      const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'content-type': request.headers.get('content-type') || 'application/json',
+          'authorization': authHeader,
+        },
+        body: request.body,
+        duplex: 'half',
+        signal: controller.signal,
+      });
 
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: { ...CORS_HEADERS, 'content-type': upstream.headers.get('content-type') || 'application/json' },
-    });
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: { ...CORS_HEADERS, 'content-type': upstream.headers.get('content-type') || 'application/json' },
+      });
+    } catch (err) {
+      const message = err && err.name === 'AbortError'
+        ? 'Request to OpenAI timed out after 60s.'
+        : 'Proxy error reaching OpenAI: ' + (err && err.message ? err.message : String(err));
+      return new Response(JSON.stringify({ error: { message } }), {
+        status: 502,
+        headers: { ...CORS_HEADERS, 'content-type': 'application/json' },
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
   },
 };
