@@ -225,6 +225,10 @@
     width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
     border-radius:8px; padding:.5rem .6rem; font-size:.82rem; font-family:inherit; resize:vertical;
   }
+  .fp-detail-input{
+    background:var(--panel2); border:1px solid var(--border); color:#1a3a8f;
+    border-radius:6px; padding:.4rem .55rem; font-size:.85rem; font-weight:600;
+  }
   .fp-key-row{
     display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.7rem;
     padding-top:.7rem; border-top:1px solid var(--border); font-size:.76rem; color:var(--dim);
@@ -494,7 +498,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+2935bcfa';
+  const APP_VERSION = '1.0+f41aa259';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -968,6 +972,82 @@
       cx: fpSnap(cx!=null ? cx : FP_GRID_W/2), cy: fpSnap(cy!=null ? cy : FP_GRID_H/2), rot:0,
     });
     fpSave(); fpRender();
+  }
+
+  // Asks OpenAI (text-only, via the same CORS proxy the photo-generation
+  // path uses) for a typical real-world width x depth given just an item's
+  // name -- no photo involved, this is a plain text completion. Always
+  // OpenAI specifically (not whichever provider is set for photo import),
+  // per how this was asked for.
+  async function fpDetectObjectDimensions(name){
+    const proxyUrl = fpGetOpenAiProxyUrl();
+    if(!proxyUrl) throw new Error('Set your OpenAI proxy Worker URL first (see cloudflare-worker/README.md).');
+    if(!fpGetOpenAiKey()) throw new Error('Set your OpenAI API key first (open "Import Photo" to add one).');
+    const prompt = `You are estimating typical real-world dimensions for a piece of furniture or fixture based on its name. Item: "${name}". Respond with ONLY a JSON object, no markdown fences, no commentary: {"w": number, "d": number} -- width and depth in INCHES, typical for this item as sold/used in a home. If the name is vague, pick a reasonable common size.`;
+    const resp = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'content-type':'application/json', 'authorization':'Bearer ' + fpGetOpenAiKey() },
+      body: JSON.stringify({
+        model: 'gpt-6-astra',
+        max_completion_tokens: 200,
+        response_format: { type:'json_object' },
+        messages: [{ role:'user', content: prompt }],
+      }),
+    });
+    if(!resp.ok){
+      const errBody = await resp.text().catch(()=>'');
+      throw new Error('API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,200) : ''));
+    }
+    const data = await resp.json();
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    const result = fpExtractJson(text);
+    return { w: Math.max(1, Number(result.w)||24), d: Math.max(1, Number(result.d)||24) };
+  }
+
+  function fpOpenObjectDetailsModal(item){
+    const wrap = openModal('Object Details', `
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Name
+        <input type="text" id="fpObjNameInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(item.label||'')}">
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Dimensions (inches)
+        <div style="display:flex; gap:.5rem; align-items:center; margin-top:.25rem;">
+          <input type="number" id="fpObjWidthInput" class="fp-detail-input" style="width:100%;" value="${Math.round(item.w)}" min="1">
+          <span class="mini">&times;</span>
+          <input type="number" id="fpObjDepthInput" class="fp-detail-input" style="width:100%;" value="${Math.round(item.d)}" min="1">
+        </div>
+      </label>
+      <button class="btn" id="fpObjAutoDetectBtn" type="button" style="width:100%; margin-bottom:.6rem; border-color:var(--accent); color:var(--accent);">&#10024; Auto-detect dimensions</button>
+      <p class="fp-hint" id="fpObjDetectStatus" style="margin:0 0 .6rem;"></p>
+      <button class="btn-primary" id="fpObjSaveBtn" type="button">Save</button>
+    `);
+    const nameInput = wrap.querySelector('#fpObjNameInput');
+    const widthInput = wrap.querySelector('#fpObjWidthInput');
+    const depthInput = wrap.querySelector('#fpObjDepthInput');
+    const status = wrap.querySelector('#fpObjDetectStatus');
+    nameInput.focus();
+    wrap.querySelector('#fpObjAutoDetectBtn').addEventListener('click', async ()=>{
+      const name = nameInput.value.trim();
+      if(!name){ status.textContent = 'Enter a name first.'; return; }
+      status.textContent = 'Detecting…';
+      try{
+        const dims = await fpDetectObjectDimensions(name);
+        widthInput.value = Math.round(dims.w);
+        depthInput.value = Math.round(dims.d);
+        status.textContent = 'Done -- adjust if needed.';
+      }catch(err){
+        status.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
+      }
+    });
+    function save(){
+      fpPushHistory();
+      item.label = nameInput.value.trim();
+      item.w = Math.max(1, parseFloat(widthInput.value)||item.w);
+      item.d = Math.max(1, parseFloat(depthInput.value)||item.d);
+      fpSave(); fpRender();
+      wrap.remove();
+    }
+    wrap.querySelector('#fpObjSaveBtn').addEventListener('click', save);
+    nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
   }
 
   function fpDefaultState(){
@@ -1886,24 +1966,14 @@
       const label = document.createElement('div');
       label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
       label.style.display = (hasLabel || isSelected) ? '' : 'none';
-      label.contentEditable = 'false';
       label.spellcheck = false;
       label.textContent = hasLabel ? item.label : 'Add label';
-      label.title = 'Double-click to rename';
-      label.addEventListener('dblclick', (e)=>{
+      label.title = 'Tap to edit name/dimensions';
+      label.addEventListener('pointerdown', e=>e.stopPropagation());
+      label.addEventListener('click', (e)=>{
         e.stopPropagation();
-        label.classList.remove('placeholder');
-        label.textContent = item.label || '';
-        label.contentEditable = 'true';
-        label.focus();
-        document.execCommand && document.execCommand('selectAll', false, null);
+        fpOpenObjectDetailsModal(item);
       });
-      label.addEventListener('blur', ()=>{
-        label.contentEditable = 'false';
-        item.label = label.textContent.trim();
-        fpSave(); fpRender();
-      });
-      label.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); label.blur(); } });
       el.appendChild(label);
 
       const rotHandle = document.createElement('div');
@@ -1962,7 +2032,7 @@
       el.addEventListener('pointerdown', (e)=>{
         if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('object', item.id); return; }
         if(fpMode!=='select') return;
-        if(e.target.closest('.fp-rotate-handle, .fp-del-btn, .fp-obj-node') || e.target.isContentEditable) return;
+        if(e.target.closest('.fp-rotate-handle, .fp-del-btn, .fp-obj-node, .fp-item-label') || e.target.isContentEditable) return;
         e.preventDefault();
         fpSelect('object', item.id);
         fpPushHistory();
