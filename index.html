@@ -118,9 +118,6 @@
   .fp-item:active{ cursor:grabbing; }
   .fp-item.selected{ z-index:5; }
   .fp-item-icon{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
-  .fp-icon-outline{ fill:rgba(91,122,153,.14); stroke:var(--obj-dim); stroke-width:1.5; vector-effect:non-scaling-stroke; }
-  .fp-icon-detail{ fill:none; stroke:var(--obj-dim); stroke-width:1; opacity:.75; vector-effect:non-scaling-stroke; }
-  .fp-item.selected .fp-icon-outline{ stroke:var(--accent); stroke-width:2; }
   .fp-item-label{
     position:absolute; left:50%; bottom:100%; margin-bottom:.3rem; transform:translateX(-50%);
     font-size:.68rem; font-weight:600; color:var(--text); outline:none;
@@ -522,7 +519,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+38ef9a1a';
+  const APP_VERSION = '1.0+82b12ec4';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -913,119 +910,81 @@
   // Object library: grouped for browsing/sorting only -- labels here are not
   // forced onto the canvas (an object's on-plan label is blank until the
   // user sets one, see fpAddObjectFromTemplate/the label rendering below).
-  // Icons are drawn as inline SVG (not raster images) so every item is
-  // inherently transparent-background and stays crisp at any resize.
+  // Each item is just its true footprint shape until real per-item artwork
+  // (an "icon:'image'" entry, see fpIconMarkup) replaces the plain outline.
   const FP_LIBRARY = [
     { name:'Tables', items:[
-      { label:'Large Conference', shape:'rect', icon:'tableChairs', w:96, d:40 },
-      { label:'Oval Conference', shape:'oval', icon:'tableChairs', w:108, d:44 },
-      { label:'6-Seat Table', shape:'rect', icon:'tableChairs', w:72, d:36 },
-      { label:'Square Table', shape:'rect', icon:'plain', w:36, d:36 },
-      { label:'Round Table', shape:'circle', icon:'plain', w:42, d:42 },
-      { label:'Coffee Table', shape:'rect', icon:'plain', w:48, d:24 },
-      { label:'Round Coffee Table', shape:'circle', icon:'plain', w:34, d:34 },
-      { label:'Console Table', shape:'rect', icon:'plain', w:48, d:16 },
-      { label:'TV Stand', shape:'rect', icon:'tiered', w:60, d:18 },
-      { label:'Sectional', shape:'lshape', icon:'cushioned', w:100, d:100 },
+      { label:'Large Conference', shape:'rect', w:96, d:40 },
+      { label:'Oval Conference', shape:'oval', w:108, d:44 },
+      { label:'6-Seat Table', shape:'rect', w:72, d:36 },
+      { label:'Square Table', shape:'rect', w:36, d:36 },
+      { label:'Round Table', shape:'circle', w:42, d:42 },
+      { label:'Coffee Table', shape:'rect', w:48, d:24 },
+      { label:'Round Coffee Table', shape:'circle', w:34, d:34 },
+      { label:'Console Table', shape:'rect', w:48, d:16 },
+      { label:'TV Stand', shape:'rect', w:60, d:18 },
+      { label:'Sectional', shape:'lshape', w:100, d:100 },
     ]},
     { name:'Seating', items:[
-      { label:'3-Seater Sofa', shape:'rect', icon:'cushioned', w:84, d:38 },
-      { label:'Love Seat', shape:'rect', icon:'cushioned', w:58, d:38 },
-      { label:'Armchair', shape:'rect', icon:'cushioned', w:34, d:34 },
-      { label:'Recliner Chair', shape:'rect', icon:'cushioned', w:36, d:38 },
-      { label:'Chaise Lounge', shape:'rect', icon:'cushioned', w:63, d:30 },
-      { label:'Ottoman', shape:'rect', icon:'plain', w:30, d:30 },
-      { label:'Round Ottoman', shape:'circle', icon:'plain', w:30, d:30 },
-      { label:'Upholstered Bench', shape:'rect', icon:'cushioned', w:48, d:18 },
-      { label:'Bar Stool', shape:'circle', icon:'plain', w:16, d:16 },
-      { label:'Counter Stool', shape:'circle', icon:'plain', w:16, d:16 },
+      { label:'3-Seater Sofa', shape:'rect', w:84, d:38 },
+      { label:'Love Seat', shape:'rect', w:58, d:38 },
+      { label:'Armchair', shape:'rect', w:34, d:34 },
+      { label:'Recliner Chair', shape:'rect', w:36, d:38 },
+      { label:'Chaise Lounge', shape:'rect', w:63, d:30 },
+      { label:'Ottoman', shape:'rect', w:30, d:30 },
+      { label:'Round Ottoman', shape:'circle', w:30, d:30 },
+      { label:'Upholstered Bench', shape:'rect', w:48, d:18 },
+      { label:'Bar Stool', shape:'circle', w:16, d:16 },
+      { label:'Counter Stool', shape:'circle', w:16, d:16 },
     ]},
     { name:'Bedroom', items:[
-      { label:'Queen Bed', shape:'rect', icon:'bed', w:60, d:80 },
-      { label:'King Bed', shape:'rect', icon:'bed', w:76, d:80 },
-      { label:'Twin Bed', shape:'rect', icon:'bed', w:38, d:75 },
-      { label:'Bunk Bed', shape:'rect', icon:'bed', w:38, d:75 },
-      { label:'Crib', shape:'rect', icon:'tiered', w:28, d:52 },
-      { label:'Nightstand', shape:'rect', icon:'tiered', w:20, d:16 },
-      { label:'Dresser', shape:'rect', icon:'tiered', w:60, d:18 },
-      { label:'Armoire', shape:'rect', icon:'tiered', w:40, d:22 },
-      { label:'Wardrobe', shape:'rect', icon:'tiered', w:48, d:24 },
-      { label:'Vanity Set', shape:'rect', icon:'tiered', w:48, d:18 },
+      { label:'Queen Bed', shape:'rect', w:60, d:80 },
+      { label:'King Bed', shape:'rect', w:76, d:80 },
+      { label:'Twin Bed', shape:'rect', w:38, d:75 },
+      { label:'Bunk Bed', shape:'rect', w:38, d:75 },
+      { label:'Crib', shape:'rect', w:28, d:52 },
+      { label:'Nightstand', shape:'rect', w:20, d:16 },
+      { label:'Dresser', shape:'rect', w:60, d:18 },
+      { label:'Armoire', shape:'rect', w:40, d:22 },
+      { label:'Wardrobe', shape:'rect', w:48, d:24 },
+      { label:'Vanity Set', shape:'rect', w:48, d:18 },
     ]},
     { name:'Kitchen & Appliances', items:[
-      { label:'Island with Sink', shape:'rect', icon:'appliance', w:72, d:36 },
-      { label:'Kitchen Base Cabinet', shape:'rect', icon:'tiered', w:24, d:24 },
-      { label:'Wall Cabinet', shape:'rect', icon:'tiered', w:30, d:12 },
-      { label:'Kitchen Sink Unit', shape:'rect', icon:'appliance', w:33, d:22 },
-      { label:'Hob Unit', shape:'rect', icon:'appliance', w:30, d:21 },
-      { label:'French Door Fridge', shape:'rect', icon:'appliance', w:36, d:30 },
-      { label:'Dishwasher', shape:'rect', icon:'appliance', w:24, d:24 },
-      { label:'Washing Machine', shape:'rect', icon:'appliance', w:27, d:27 },
-      { label:'Dryer', shape:'rect', icon:'appliance', w:27, d:27 },
-      { label:'Bar Setup', shape:'rect', icon:'tableChairs', w:48, d:18 },
+      { label:'Island with Sink', shape:'rect', w:72, d:36 },
+      { label:'Kitchen Base Cabinet', shape:'rect', w:24, d:24 },
+      { label:'Wall Cabinet', shape:'rect', w:30, d:12 },
+      { label:'Kitchen Sink Unit', shape:'rect', w:33, d:22 },
+      { label:'Hob Unit', shape:'rect', w:30, d:21 },
+      { label:'French Door Fridge', shape:'rect', w:36, d:30 },
+      { label:'Dishwasher', shape:'rect', w:24, d:24 },
+      { label:'Washing Machine', shape:'rect', w:27, d:27 },
+      { label:'Dryer', shape:'rect', w:27, d:27 },
+      { label:'Bar Setup', shape:'rect', w:48, d:18 },
     ]},
     { name:'Office & Patio', items:[
-      { label:'Desk (executive)', shape:'rect', icon:'plain', w:72, d:36 },
-      { label:'Writing Desk', shape:'rect', icon:'plain', w:48, d:24 },
-      { label:'L-Shaped Desk', shape:'lshape', icon:'plain', w:60, d:60 },
-      { label:'Task Chair', shape:'rect', icon:'chair', w:26, d:26 },
-      { label:'Filing Cabinet', shape:'rect', icon:'tiered', w:15, d:22 },
-      { label:'Bookshelf', shape:'rect', icon:'tiered', w:36, d:12 },
-      { label:'Credenza', shape:'rect', icon:'tiered', w:66, d:20 },
-      { label:'Dining Hutch', shape:'rect', icon:'tiered', w:42, d:18 },
-      { label:'Patio Chair', shape:'rect', icon:'chair', w:30, d:30 },
-      { label:'Patio Table', shape:'rect', icon:'plain', w:36, d:36 },
+      { label:'Desk (executive)', shape:'rect', w:72, d:36 },
+      { label:'Writing Desk', shape:'rect', w:48, d:24 },
+      { label:'L-Shaped Desk', shape:'lshape', w:60, d:60 },
+      { label:'Task Chair', shape:'rect', w:26, d:26 },
+      { label:'Filing Cabinet', shape:'rect', w:15, d:22 },
+      { label:'Bookshelf', shape:'rect', w:36, d:12 },
+      { label:'Credenza', shape:'rect', w:66, d:20 },
+      { label:'Dining Hutch', shape:'rect', w:42, d:18 },
+      { label:'Patio Chair', shape:'rect', w:30, d:30 },
+      { label:'Patio Table', shape:'rect', w:36, d:36 },
     ]},
   ];
 
   // Builds the inner SVG markup for one object's icon, in inch-space (its
-  // own w x d), from a small set of reusable decorative "families" layered
-  // over the outline shape -- far more maintainable than 50 bespoke drawings
-  // while still reading as visually distinct per category.
+  // own w x d). Renders only real supplied artwork (icon:'image', see the
+  // Image library and the furniture-catalog entries wired up over time) --
+  // no invented outline or decoration for anything that doesn't have real
+  // artwork yet; it places and resizes normally, just with no icon drawn.
   function fpIconMarkup(item){
-    const w = item.w, h = item.d;
     if(item.icon==='image' && item.img){
-      return `<image href="${item.img}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" />`;
+      return `<image href="${item.img}" x="0" y="0" width="${item.w}" height="${item.d}" preserveAspectRatio="xMidYMid meet" />`;
     }
-    let outline;
-    if(item.shape==='lshape'){
-      const armW = w*0.42, armH = h*0.42;
-      outline = `<path class="fp-icon-outline" d="M1,1 H${w-1} V${armH} H${armW} V${h-1} H1 Z" />`;
-    } else if(item.shape==='circle' || item.shape==='oval'){
-      outline = `<ellipse class="fp-icon-outline" cx="${w/2}" cy="${h/2}" rx="${w/2-1}" ry="${h/2-1}" />`;
-    } else {
-      const r = Math.min(6, w*0.06, h*0.06);
-      outline = `<rect class="fp-icon-outline" x="1" y="1" width="${w-2}" height="${h-2}" rx="${r}" />`;
-    }
-    let detail = '';
-    if(item.icon==='cushioned'){
-      const inset = Math.min(w,h)*0.16;
-      detail = `<rect class="fp-icon-detail" x="${inset}" y="${inset}" width="${w-inset*2}" height="${h-inset*2}" rx="4" />`;
-    } else if(item.icon==='tableChairs'){
-      const n = Math.max(2, Math.round(w/24));
-      for(let i=0;i<n;i++){
-        const cx = (w/(n+1))*(i+1);
-        detail += `<line class="fp-icon-detail" x1="${cx}" y1="-3" x2="${cx}" y2="1" />`;
-        detail += `<line class="fp-icon-detail" x1="${cx}" y1="${h-1}" x2="${cx}" y2="${h+3}" />`;
-      }
-    } else if(item.icon==='bed'){
-      const pw = w*0.22, ph = h*0.16, gap = w*0.06, startX = (w - pw*2 - gap)/2;
-      detail = `<rect class="fp-icon-detail" x="${startX}" y="4" width="${pw}" height="${ph}" rx="3" />` +
-                `<rect class="fp-icon-detail" x="${startX+pw+gap}" y="4" width="${pw}" height="${ph}" rx="3" />` +
-                `<line class="fp-icon-detail" x1="2" y1="${h*0.22}" x2="${w-2}" y2="${h*0.22}" />`;
-    } else if(item.icon==='tiered'){
-      const rows = h>30 ? 3 : 2;
-      for(let i=1;i<=rows;i++){
-        const y = (h/(rows+1))*i;
-        detail += `<line class="fp-icon-detail" x1="3" y1="${y}" x2="${w-3}" y2="${y}" />`;
-      }
-    } else if(item.icon==='appliance'){
-      detail = `<rect class="fp-icon-detail" x="${w-w*0.28-3}" y="3" width="${w*0.28}" height="${h*0.22}" rx="2" />` +
-                `<circle class="fp-icon-detail" cx="${w/2}" cy="${h*0.6}" r="${Math.min(w,h)*0.18}" />`;
-    } else if(item.icon==='chair'){
-      detail = `<line class="fp-icon-detail" x1="3" y1="${h*0.22}" x2="${w-3}" y2="${h*0.22}" />`;
-    }
-    return outline + detail;
+    return '';
   }
 
   function fpAddObjectFromTemplate(tpl, cx, cy){
@@ -1413,12 +1372,7 @@
         body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
       }
     });
-    // A standalone SVG (rasterized via a data: URI <img>, outside the page's
-    // own DOM/stylesheet) can't see the app's CSS, so the .fp-icon-outline/
-    // .fp-icon-detail classes fpIconMarkup() emits need their own embedded
-    // <style> here -- otherwise objects would export with no fill/stroke at all.
-    const iconStyle = `<style>.fp-icon-outline{fill:rgba(91,122,153,.14);stroke:#48627e;stroke-width:1.5;} .fp-icon-detail{fill:none;stroke:#48627e;stroke-width:1;opacity:.75;}</style>`;
-    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${iconStyle}<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
+    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
   }
   function fpRasterizeSvg(svgString, w, h){
     return new Promise((resolve,reject)=>{
