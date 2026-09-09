@@ -28,8 +28,9 @@
     position:sticky; top:0; z-index:20;
   }
   header .headerTop{ display:flex; align-items:center; gap:.6rem; }
-  header h1{ margin:0; line-height:0; }
+  header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; }
   header h1 img{ height:3.4rem; width:auto; display:block; border-radius:6px; }
+  header h1 .header-mark{ height:5.98rem; width:5.98rem; border-radius:50%; flex:none; }
   header .spacer{flex:1;}
 
   main{max-width:1180px; margin:0 auto; padding:1rem;}
@@ -74,10 +75,8 @@
     autoFit calc that derives from wrap.clientWidth feed back into each
     other, growing a little on every re-render (i.e. on every edit). */
   }
-  .fp-title-row{ display:flex; align-items:center; gap:.7rem; margin:.1rem 0 .7rem; }
-  .fp-logo-mark{ height:4.6rem; width:4.6rem; border-radius:50%; display:block; flex:none; }
   .fp-title{
-    margin:0; font-size:1.15rem; font-weight:700; color:var(--text);
+    margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:var(--text);
     outline:none; border-radius:6px; padding:.15rem .3rem; display:inline-block;
   }
   .fp-title:hover, .fp-title:focus{ background:var(--panel2); }
@@ -282,7 +281,7 @@
   .topbar-install-btn.installed{
     background:var(--panel2); border-color:var(--border); color:var(--dim); cursor:default;
   }
-  #infoBtn{
+  #infoBtn, .topbar-icon-btn{
     border-radius:999px; padding:.3rem; line-height:1;
     width:2.9rem; height:2.9rem; display:inline-flex; align-items:center; justify-content:center;
   }
@@ -344,9 +343,12 @@
 
 <header>
   <div class="headerTop">
-    <h1><img src="./ddg-logo.png" alt="DrawDesignGo"></h1>
+    <h1><img class="header-mark" src="./icon-512.png" alt=""><img src="./ddg-logo.png" alt="DrawDesignGo"></h1>
     <div class="spacer"></div>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
+    <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    </button>
     <button class="btn" id="infoBtn" title="Settings"><img src="./icon-header.png" alt="Settings"></button>
   </div>
 </header>
@@ -382,15 +384,13 @@
 
     <div class="fp-layout">
       <div class="fp-main">
-        <div class="fp-title-row">
-          <img class="fp-logo-mark" src="./icon-512.png" alt="">
-          <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Untitled Floor Plan</h2>
-        </div>
+        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Untitled Floor Plan</h2>
         <div class="fp-zoom-row">
           <button class="btn fp-zoom-btn" id="fpZoomOut" title="Zoom out">&minus;</button>
           <span class="mini" id="fpZoomLabel">100%</span>
           <button class="btn fp-zoom-btn" id="fpZoomIn" title="Zoom in">+</button>
           <button class="btn fp-zoom-btn" id="fpZoomFit" title="Reset to fit the screen">Fit</button>
+          <button class="btn fp-zoom-btn" id="fpGridToggle" title="Show or hide the grid lines">Grid</button>
         </div>
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
           <div class="fp-canvas" id="fpCanvas"></div>
@@ -451,6 +451,8 @@
   // ---------- DOM ----------
   const installBtn = document.getElementById('installBtn');
   const infoBtn = document.getElementById('infoBtn');
+  const printBtn = document.getElementById('printBtn');
+  printBtn.addEventListener('click', ()=> fpExportPdf());
 
   // ---------- Utility ----------
   function toast(msg, isErr){
@@ -503,7 +505,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+efe6fbd8';
+  const APP_VERSION = '1.0+d48f0fa2';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1679,7 +1681,12 @@
     refresh();
   }
 
+  const FP_SHOW_GRID_KEY = 'floorplanner-show-grid';
+  function fpGetShowGrid(){ try{ return localStorage.getItem(FP_SHOW_GRID_KEY) !== '0'; }catch(e){ return true; } }
+  function fpSetShowGrid(show){ try{ localStorage.setItem(FP_SHOW_GRID_KEY, show ? '1' : '0'); }catch(e){} }
+
   function fpApplyGridBackground(canvas, scale){
+    if(!fpGetShowGrid()){ canvas.style.backgroundImage = 'none'; return; }
     const minor = FP_GRID_STEP*scale, major = 5*scale;
     canvas.style.backgroundImage =
       'linear-gradient(to right, rgba(74,144,217,.4) 1px, transparent 1px),' +
@@ -1929,13 +1936,14 @@
     // which the zoom buttons apply a manual multiplier. Recomputed on every
     // render, which also covers resize/orientation change since those call
     // fpRender() too.
-    const naturalW = FP_GRID_W * FP_SCALE;
+    const gridSize = fpComputeGridSize();
+    const naturalW = gridSize.w * FP_SCALE;
     const availW = wrap ? wrap.clientWidth - 80 : 0; // minus 40px padding each side
     const autoFit = (availW > 0) ? Math.min(1, availW/naturalW) : 1;
     const scale = FP_SCALE * autoFit * fpZoomMultiplier;
     const zoomLabel = document.getElementById('fpZoomLabel');
     if(zoomLabel) zoomLabel.textContent = Math.round(autoFit*fpZoomMultiplier*100)+'%';
-    const w = FP_GRID_W * scale, d = FP_GRID_H * scale;
+    const w = gridSize.w * scale, d = gridSize.h * scale;
     canvas.style.width = w+'px'; canvas.style.height = d+'px';
     fpApplyGridBackground(canvas, scale);
     canvas.classList.toggle('fp-draw-mode', fpMode==='draw');
@@ -2403,6 +2411,14 @@
     document.getElementById('fpZoomIn').addEventListener('click', ()=>{ fpZoomMultiplier = Math.min(3, fpZoomMultiplier*1.25); fpRender(); });
     document.getElementById('fpZoomOut').addEventListener('click', ()=>{ fpZoomMultiplier = Math.max(0.25, fpZoomMultiplier/1.25); fpRender(); });
     document.getElementById('fpZoomFit').addEventListener('click', ()=>{ fpZoomMultiplier = 1; fpRender(); });
+    const gridToggleBtn = document.getElementById('fpGridToggle');
+    gridToggleBtn.classList.toggle('active', fpGetShowGrid());
+    gridToggleBtn.addEventListener('click', ()=>{
+      const show = !fpGetShowGrid();
+      fpSetShowGrid(show);
+      gridToggleBtn.classList.toggle('active', show);
+      fpRender();
+    });
     let fpResizeTimer = null;
     window.addEventListener('resize', ()=>{
       clearTimeout(fpResizeTimer);
