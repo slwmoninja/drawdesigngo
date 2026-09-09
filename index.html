@@ -74,8 +74,10 @@
     autoFit calc that derives from wrap.clientWidth feed back into each
     other, growing a little on every re-render (i.e. on every edit). */
   }
+  .fp-title-row{ display:flex; align-items:center; gap:.7rem; margin:.1rem 0 .7rem; }
+  .fp-logo-mark{ height:4.6rem; width:4.6rem; border-radius:50%; display:block; flex:none; }
   .fp-title{
-    margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:var(--text);
+    margin:0; font-size:1.15rem; font-weight:700; color:var(--text);
     outline:none; border-radius:6px; padding:.15rem .3rem; display:inline-block;
   }
   .fp-title:hover, .fp-title:focus{ background:var(--panel2); }
@@ -354,15 +356,11 @@
   <!-- ============ FLOOR PLAN SCREEN ============ -->
   <section id="floorplanScreen">
     <div class="toolbar fp-toolbar">
-      <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions" style="border-color:var(--accent); color:var(--accent);">&#10024; Import Photo</button>
-      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Projects</button>
-      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
-      <div class="divider"></div>
       <div class="segGroup" id="fpModeGroup">
-        <button class="btn active" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
-        <button class="btn" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid">Draw</button>
+        <button class="btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
+        <button class="btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
       </div>
-      <select id="fpDrawToolSelect" title="What Draw mode places on the next click/drag" style="display:none;">
+      <select id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
         <option value="line">Solid line</option>
         <option value="dashedline">Dashed line</option>
         <option value="rect">Rectangle</option>
@@ -372,15 +370,22 @@
       </select>
       <div class="divider"></div>
       <button class="btn" id="fpAddOpeningBtn" title="Add a door or window opening on a wall">+ Opening</button>
+      <div class="divider"></div>
+      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <div class="spacer"></div>
       <button class="btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
+      <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions">Import Photo</button>
+      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Project List</button>
     </div>
 
     <div class="fp-layout">
       <div class="fp-main">
-        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Untitled Floor Plan</h2>
+        <div class="fp-title-row">
+          <img class="fp-logo-mark" src="./icon-512.png" alt="">
+          <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Untitled Floor Plan</h2>
+        </div>
         <div class="fp-zoom-row">
           <button class="btn fp-zoom-btn" id="fpZoomOut" title="Zoom out">&minus;</button>
           <span class="mini" id="fpZoomLabel">100%</span>
@@ -390,7 +395,7 @@
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
           <div class="fp-canvas" id="fpCanvas"></div>
         </div>
-        <p class="fp-hint" id="fpModeHint">Drag to move, drag a node to reshape, the top dot to rotate.</p>
+        <p class="fp-hint" id="fpModeHint">Click to place a line, or click-drag to place a shape. Everything snaps to the grid.</p>
 
         <div class="fp-edit-bar">
           <input type="text" id="fpEditInstruction" placeholder="Describe a change &mdash; &quot;move the sofa against the north wall&quot;, &quot;add a window on that wall&quot;&hellip;">
@@ -498,7 +503,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+296f8151';
+  const APP_VERSION = '1.0+efe6fbd8';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -868,7 +873,12 @@
   // happens here -- see the "generate from photos" section below for that.
   const FP_SCALE = 22; // px per foot, before auto-fit/zoom are applied
   const FP_STORAGE_KEY = 'floorplanner-plan-v2';
-  const FP_GRID_W = 40, FP_GRID_H = 30; // feet -- fixed canvas size
+  // The grid is NOT a fixed size -- it's recomputed on every render to
+  // always cover the actual plan content (elements + objects), so a drawn
+  // or imported structure is never bigger than its own working area. Never
+  // shrinks below a minimum so a blank/small plan still has room to draw.
+  const FP_GRID_MIN_W = 24, FP_GRID_MIN_H = 18; // feet -- floor, even on an empty plan
+  const FP_GRID_PAD = 6; // feet of breathing room beyond the content's own bounding box
   const FP_GRID_STEP = 0.5; // feet -- snap resolution; every grid intersection is a "node"
   const SVG_NS = 'http://www.w3.org/2000/svg';
   let fpState = null;
@@ -877,7 +887,7 @@
   let fpZoomMultiplier = 1; // manual zoom on top of auto-fit, reset by the Fit button
   let fpHistory = [];
   let fpIdSeq = 1;
-  let fpMode = 'select'; // 'select' | 'draw'
+  let fpMode = 'draw'; // 'select' | 'draw'
   let fpDrawTool = 'line'; // line | dashedline | rect | square | circle | oval
   let fpDrawPending = null; // in-progress line placement: {x1,y1} in feet
 
@@ -998,9 +1008,10 @@
 
   function fpAddObjectFromTemplate(tpl, cx, cy){
     fpPushHistory();
+    const gridSize = fpComputeGridSize();
     fpState.objects.push({
       id: fpIdSeq++, label:'', w:tpl.w, d:tpl.d, shape:tpl.shape||'rect', icon:tpl.icon||'plain',
-      cx: fpSnap(cx!=null ? cx : FP_GRID_W/2), cy: fpSnap(cy!=null ? cy : FP_GRID_H/2), rot:0,
+      cx: fpSnap(cx!=null ? cx : gridSize.w/2), cy: fpSnap(cy!=null ? cy : gridSize.h/2), rot:0,
     });
     fpSave(); fpRender();
   }
@@ -1135,6 +1146,38 @@
     return inches===0 ? `${whole}'-0"` : (inches===12 ? `${whole+1}'-0"` : `${whole}'-${inches}"`);
   }
   function fpSnap(v){ return Math.round(v/FP_GRID_STEP)*FP_GRID_STEP; }
+
+  // Grid always starts at (0,0) and grows only in +X/+Y to cover whatever's
+  // actually on the plan -- see fpElementBounds/fpObjectBoundsFeet below
+  // (shared with the export code, which needs the same bounding-box math).
+  function fpComputeGridSize(){
+    let maxX=0, maxY=0;
+    fpState.elements.forEach(el=>{ const b=fpElementBounds(el); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
+    fpState.objects.forEach(o=>{ const b=fpObjectBoundsFeet(o); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
+    return {
+      w: Math.max(FP_GRID_MIN_W, Math.ceil(maxX + FP_GRID_PAD)),
+      h: Math.max(FP_GRID_MIN_H, Math.ceil(maxY + FP_GRID_PAD)),
+    };
+  }
+  // Shifts everything back onto the grid if anything ended up with a
+  // negative coordinate (an AI import that didn't quite anchor its origin
+  // at (0,0), most likely) -- the grid always starts at (0,0), so negative
+  // content would render into the canvas-wrap's padding, off the visible
+  // grid entirely, instead of being covered by fpComputeGridSize() above.
+  function fpNormalizeOrigin(){
+    let minX=Infinity, minY=Infinity;
+    const consider = (x,y)=>{ minX=Math.min(minX,x); minY=Math.min(minY,y); };
+    fpState.elements.forEach(el=>{ const b=fpElementBounds(el); consider(b.minX,b.minY); });
+    fpState.objects.forEach(o=>{ const b=fpObjectBoundsFeet(o); consider(b.minX,b.minY); });
+    if(minX===Infinity || (minX>=0 && minY>=0)) return;
+    const pad = 2;
+    const dx = minX<0 ? (pad-minX) : 0, dy = minY<0 ? (pad-minY) : 0;
+    fpState.elements.forEach(el=>{
+      if(el.type==='line' || el.type==='dashedline'){ el.x1+=dx; el.y1+=dy; el.x2+=dx; el.y2+=dy; }
+      else { el.cx+=dx; el.cy+=dy; }
+    });
+    fpState.objects.forEach(o=>{ o.cx+=dx; o.cy+=dy; });
+  }
 
   function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; }
 
