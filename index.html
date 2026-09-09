@@ -4,15 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>DrawDesignGo — Grid-based floor plan editor</title>
-<meta name="theme-color" content="#14161a">
+<meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png?v=a32300a2">
 <style>
   :root{
-    --bg:#14161a; --panel:#1c1f25; --panel2:#20242b; --border:#2c313a;
-    --text:#e8ebef; --dim:#9aa3af; --accent:#40d0b5; --accent-dim:#2b8f7c;
-    --danger:#e0607a; --danger-dim:#a8455c; --warn:#e0b04a;
+    --bg:#ffffff; --panel:#f6f7f9; --panel2:#eceef1; --border:#dde1e6;
+    --text:#1c2128; --dim:#6b7280; --accent:#0f9c86; --accent-dim:#0b7d6a;
+    --danger:#c93756; --danger-dim:#a12945; --warn:#a3720a;
+    --obj:#5b7a99; --obj-dim:#48627e; /* furniture/object color -- distinct from the teal UI accent */
   }
   *{box-sizing:border-box;}
   html,body{height:100%;}
@@ -27,13 +28,10 @@
     position:sticky; top:0; z-index:20;
   }
   header .headerTop{ display:flex; align-items:center; gap:.6rem; }
-  header h1{
-    font-size:1.55rem; margin:0; font-weight:650; letter-spacing:.2px;
-    color:rgba(232,235,239,.82); text-shadow:0 2px 10px rgba(64,208,181,.35), 0 1px 0 rgba(0,0,0,.4);
-  }
-  header .sub{
-    color:var(--dim); font-size:.78rem; text-align:center;
-    text-wrap:balance; /* distributes wrapped words evenly across lines instead of a long line + short leftover */
+  header h1{ margin:0; line-height:0; }
+  header h1 img{
+    height:2.3rem; width:auto; display:block;
+    filter:drop-shadow(0 0 1px rgba(28,33,40,.5)) drop-shadow(0 1px 1px rgba(28,33,40,.3));
   }
   header .spacer{flex:1;}
 
@@ -86,15 +84,22 @@
   .fp-zoom-btn{ padding:.15rem .55rem; min-width:2rem; }
   .fp-canvas-wrap{
     overflow:auto; border-radius:10px;
-    background:radial-gradient(ellipse at 50% 40%, #161a20 0%, #0c0e11 100%);
+    background:radial-gradient(ellipse at 50% 40%, #f4f5f7 0%, #e6e9ec 100%);
     padding:40px;
   }
   .fp-canvas{
     position:relative; background:#ffffff;
-    border:2px solid rgba(232,235,239,.55); box-sizing:content-box;
-    box-shadow:0 12px 40px rgba(0,0,0,.35);
+    border:2px solid rgba(28,33,40,.2); box-sizing:content-box;
+    box-shadow:0 12px 40px rgba(0,0,0,.18);
   }
   .fp-canvas.fp-draw-mode{ cursor:crosshair; }
+  .fp-canvas.fp-delete-mode,
+  .fp-canvas.fp-delete-mode .fp-el,
+  .fp-canvas.fp-delete-mode .fp-el .fp-el-shape,
+  .fp-canvas.fp-delete-mode .fp-item{
+    cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='26' height='26' viewBox='0 0 24 24'><path d='M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14' fill='none' stroke='%23c93756' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>") 12 12, pointer;
+  }
+  #fpDeleteBtn.active{ border-color:var(--danger); color:var(--danger); background:rgba(201,55,86,.12); }
   .fp-svg{ position:absolute; left:0; top:0; pointer-events:none; }
   .fp-el{ pointer-events:auto; }
   .fp-el .fp-el-shape{ cursor:grab; }
@@ -111,8 +116,8 @@
   .fp-item:active{ cursor:grabbing; }
   .fp-item.selected{ z-index:5; }
   .fp-item-icon{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
-  .fp-icon-outline{ fill:rgba(64,208,181,.14); stroke:var(--accent-dim); stroke-width:1.5; vector-effect:non-scaling-stroke; }
-  .fp-icon-detail{ fill:none; stroke:var(--accent-dim); stroke-width:1; opacity:.75; vector-effect:non-scaling-stroke; }
+  .fp-icon-outline{ fill:rgba(91,122,153,.14); stroke:var(--obj-dim); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+  .fp-icon-detail{ fill:none; stroke:var(--obj-dim); stroke-width:1; opacity:.75; vector-effect:non-scaling-stroke; }
   .fp-item.selected .fp-icon-outline{ stroke:var(--accent); stroke-width:2; }
   .fp-item-label{
     position:absolute; left:50%; bottom:2px; transform:translateX(-50%);
@@ -232,17 +237,17 @@
   /* ---------- Hints: hover (desktop) or long-press (touch) on any button shows
      its title as a small bubble, instead of a permanent on-screen instruction. */
   .hintBubble{
-    position:fixed; z-index:60; background:#20242b; border:1px solid var(--border);
+    position:fixed; z-index:60; background:var(--panel2); border:1px solid var(--border);
     color:var(--text); padding:.4rem .6rem; border-radius:8px; font-size:.76rem;
-    line-height:1.35; max-width:260px; box-shadow:0 8px 20px rgba(0,0,0,.4);
+    line-height:1.35; max-width:260px; box-shadow:0 8px 20px rgba(0,0,0,.18);
     pointer-events:none;
   }
 
   .toast{
     position:fixed; bottom:1.1rem; left:50%; transform:translateX(-50%);
-    background:#20242b; border:1px solid var(--border); color:var(--text);
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
     padding:.6rem 1rem; border-radius:10px; font-size:.82rem; z-index:50;
-    box-shadow:0 8px 24px rgba(0,0,0,.4); max-width:90vw;
+    box-shadow:0 8px 24px rgba(0,0,0,.18); max-width:90vw;
   }
   .toast.err{ border-color:var(--danger); color:#ffd7de; }
 
@@ -333,12 +338,11 @@
 
 <header>
   <div class="headerTop">
-    <h1>DrawDesignGo</h1>
+    <h1><img src="./ddg-logo.png" alt="DrawDesignGo"></h1>
     <div class="spacer"></div>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
     <button class="btn" id="infoBtn" title="Settings"><img src="./icon-header.png" alt="Settings"></button>
   </div>
-  <span class="sub">A grid-based floor plan editor — draw walls and shapes, drag in furniture, or start from room photos</span>
 </header>
 
 <main>
@@ -365,7 +369,7 @@
       <div class="divider"></div>
       <button class="btn" id="fpAddOpeningBtn" title="Add a door or window opening on a wall">+ Opening</button>
       <div class="spacer"></div>
-      <button class="btn" id="fpDeleteBtn" disabled title="Delete what's currently selected">&#128465; Delete</button>
+      <button class="btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
     </div>
@@ -490,7 +494,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+e4ad5ec9';
+  const APP_VERSION = '1.0+2935bcfa';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -974,7 +978,7 @@
       objects: [],
       legend: [
         { id: fpIdSeq++, color:'#8b8d8e', label:'Wall', desc:'solid or dashed line' },
-        { id: fpIdSeq++, color:'#40d0b5', label:'Object', desc:'furniture from the library' },
+        { id: fpIdSeq++, color:'#5b7a99', label:'Object', desc:'furniture from the library' },
       ],
       notes: [],
     };
@@ -1021,11 +1025,7 @@
   }
   function fpSnap(v){ return Math.round(v/FP_GRID_STEP)*FP_GRID_STEP; }
 
-  function fpUpdateDeleteBtn(){
-    const btn = document.getElementById('fpDeleteBtn');
-    if(btn) btn.disabled = fpSelectedId==null;
-  }
-  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; fpUpdateDeleteBtn(); }
+  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; }
 
   // Lightweight selection: toggles the CSS class on existing DOM nodes and
   // drops any stale node-handle layer, instead of a full fpRender() -- so
@@ -1044,20 +1044,35 @@
     });
     const nodesLayer = document.querySelector('#fpCanvas .fp-nodes-layer');
     if(nodesLayer) nodesLayer.remove();
-    fpUpdateDeleteBtn();
   }
 
+  // Delete tool: a toggled mode (like Draw), not a one-shot action -- once
+  // on, tapping any wall/shape/object deletes it immediately and the mode
+  // stays on so several items can be removed in a row; tapping the Delete
+  // button again (or switching to Select/Draw) turns it back off.
+  let fpDeleteModeActive = false;
+  function fpSetDeleteMode(active){
+    fpDeleteModeActive = active;
+    const btn = document.getElementById('fpDeleteBtn');
+    if(btn) btn.classList.toggle('active', active);
+    const canvas = document.getElementById('fpCanvas');
+    if(canvas) canvas.classList.toggle('fp-delete-mode', active);
+    if(active) fpDeselect();
+  }
+  function fpDeleteItem(kind, id){
+    fpPushHistory();
+    if(kind==='element'){
+      fpState.elements = fpState.elements.filter(el=>el.id!==id);
+      fpState.openings = fpState.openings.filter(op=>op.wallId!==id);
+    } else if(kind==='object'){
+      fpState.objects = fpState.objects.filter(o=>o.id!==id);
+    }
+    if(fpSelectedId===id) fpDeselect();
+    fpSave(); fpRender();
+  }
   function fpDeleteSelected(){
     if(fpSelectedId==null) return;
-    fpPushHistory();
-    if(fpSelectedKind==='element'){
-      fpState.elements = fpState.elements.filter(el=>el.id!==fpSelectedId);
-      fpState.openings = fpState.openings.filter(op=>op.wallId!==fpSelectedId);
-    } else if(fpSelectedKind==='object'){
-      fpState.objects = fpState.objects.filter(o=>o.id!==fpSelectedId);
-    }
-    fpDeselect();
-    fpSave(); fpRender();
+    fpDeleteItem(fpSelectedKind, fpSelectedId);
   }
 
   // ---------- Export: shared bounds/SVG snapshot, used by PNG/JPG/PDF/DXF/copy ----------
@@ -1141,7 +1156,12 @@
         body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
       }
     });
-    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
+    // A standalone SVG (rasterized via a data: URI <img>, outside the page's
+    // own DOM/stylesheet) can't see the app's CSS, so the .fp-icon-outline/
+    // .fp-icon-detail classes fpIconMarkup() emits need their own embedded
+    // <style> here -- otherwise objects would export with no fill/stroke at all.
+    const iconStyle = `<style>.fp-icon-outline{fill:rgba(91,122,153,.14);stroke:#48627e;stroke-width:1.5;} .fp-icon-detail{fill:none;stroke:#48627e;stroke-width:1;opacity:.75;}</style>`;
+    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${iconStyle}<rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
   }
   function fpRasterizeSvg(svgString, w, h){
     return new Promise((resolve,reject)=>{
@@ -1785,6 +1805,7 @@
       g.appendChild(shape);
 
       g.addEventListener('pointerdown', (e)=>{
+        if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('element', el.id); return; }
         if(fpMode!=='select') return;
         if(e.target.closest('.fp-node, .fp-rotate-node')) return;
         e.preventDefault(); e.stopPropagation();
@@ -1939,6 +1960,7 @@
       });
 
       el.addEventListener('pointerdown', (e)=>{
+        if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('object', item.id); return; }
         if(fpMode!=='select') return;
         if(e.target.closest('.fp-rotate-handle, .fp-del-btn, .fp-obj-node') || e.target.isContentEditable) return;
         e.preventDefault();
@@ -2119,6 +2141,7 @@
   function fpSetMode(mode){
     fpMode = mode;
     fpDrawPending = null;
+    fpSetDeleteMode(false);
     document.getElementById('fpModeSelectBtn').classList.toggle('active', mode==='select');
     document.getElementById('fpModeDrawBtn').classList.toggle('active', mode==='draw');
     document.getElementById('fpDrawToolSelect').style.display = mode==='draw' ? '' : 'none';
@@ -2202,7 +2225,7 @@
       if(e.key==='Enter'){ e.preventDefault(); runEditInstruction(); }
     });
 
-    document.getElementById('fpDeleteBtn').addEventListener('click', fpDeleteSelected);
+    document.getElementById('fpDeleteBtn').addEventListener('click', ()=> fpSetDeleteMode(!fpDeleteModeActive));
     document.getElementById('fpUndoBtn').addEventListener('click', fpUndo);
     document.getElementById('fpResetBtn').addEventListener('click', ()=>{
       if(!confirm('Clear this floor plan and start blank?')) return;
@@ -2224,6 +2247,7 @@
 
     document.addEventListener('keydown', (e)=>{
       if(e.key==='Escape' && fpDrawPending){ fpDrawPending = null; fpRender(); return; }
+      if(e.key==='Escape' && fpDeleteModeActive){ fpSetDeleteMode(false); return; }
       const typing = document.activeElement.tagName==='INPUT' || document.activeElement.isContentEditable;
       if((e.key==='Delete'||e.key==='Backspace') && fpSelectedId!==null && !typing){
         fpDeleteSelected();
@@ -3109,6 +3133,32 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
       });
     });
   }
+
+  // ---------- Single instance: if another tab/window of this app is already
+  // open, this one asks the service worker to focus that one and closes
+  // itself. window.close() is blocked in an ordinary tab (harmless no-op --
+  // both stay open, which is the acceptable fallback), but is allowed for an
+  // installed app's own standalone window, which is exactly the case this is
+  // for (clicking the desktop/taskbar icon while the app is already running).
+  // Runs alongside normal bootstrap rather than blocking it, so the common
+  // single-window case never waits on this.
+  (function enforceSingleInstance(){
+    if(!('BroadcastChannel' in window)) return;
+    try{
+      const bc = new BroadcastChannel('drawdesigngo-instance');
+      bc.onmessage = (e)=>{
+        if(e.data==='ping'){
+          bc.postMessage('pong'); // an existing window answering a newcomer's ping
+        } else if(e.data==='pong'){
+          if(navigator.serviceWorker && navigator.serviceWorker.controller){
+            navigator.serviceWorker.controller.postMessage({ type:'focus-other' });
+          }
+          setTimeout(()=>{ try{ window.close(); }catch(err){} }, 80);
+        }
+      };
+      bc.postMessage('ping');
+    }catch(e){}
+  })();
 
   // ---------- PWA: bootstrap ----------
   syncInstallUI();
