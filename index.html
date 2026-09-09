@@ -31,10 +31,6 @@
   header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; }
   header h1 img{ height:3.4rem; width:auto; display:block; border-radius:6px; }
   header h1 .header-mark{ height:5.98rem; width:5.98rem; border-radius:50%; flex:none; }
-  header h1 .header-wordmark{
-    -webkit-mask-image: radial-gradient(ellipse at center, #000 50%, transparent 92%);
-    mask-image: radial-gradient(ellipse at center, #000 50%, transparent 92%);
-  }
   header .spacer{flex:1;}
 
   main{max-width:1180px; margin:0 auto; padding:1rem;}
@@ -68,6 +64,23 @@
     background:var(--panel2); border:1px solid var(--border); color:var(--text);
     border-radius:8px; padding:.45rem .6rem; font-size:.82rem;
   }
+
+  /* ---------- Opening/Window/Door tool dropdown (custom, not <select>, so
+     each option can show a small line-style icon next to its label). ---------- */
+  .fp-opening-dd{ position:relative; }
+  .fp-opening-dd-btn-active{ border-color:var(--accent); color:var(--accent); }
+  #fpOpeningDdBtn{ display:inline-flex; align-items:center; gap:.4rem; }
+  .fp-opening-dd-menu{
+    position:absolute; top:calc(100% + .3rem); left:0; z-index:15; min-width:9rem;
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.15); padding:.3rem; display:flex; flex-direction:column; gap:.15rem;
+  }
+  .fp-opening-dd-menu[hidden]{ display:none; }
+  .fp-opening-dd-item{
+    display:flex; align-items:center; gap:.5rem; background:transparent; border:none;
+    color:var(--text); font-size:.82rem; font-weight:600; padding:.4rem .5rem; border-radius:6px; cursor:pointer;
+  }
+  .fp-opening-dd-item:hover{ background:var(--panel2); }
   .fp-layout{ display:grid; grid-template-columns:1fr; gap:.9rem; align-items:start; }
   @media (min-width:900px){ .fp-layout{ grid-template-columns:1fr 300px; } }
 
@@ -110,7 +123,7 @@
   .fp-el{ pointer-events:auto; }
   .fp-el .fp-el-shape{ cursor:grab; }
   .fp-el.selected .fp-el-shape{ stroke:var(--accent) !important; }
-  .fp-opening-mark{ cursor:pointer; pointer-events:auto; }
+  .fp-el.selected .fp-el-shape-secondary{ stroke:var(--accent) !important; }
   .fp-node, .fp-rotate-node{
     fill:var(--accent); stroke:#0a1512; stroke-width:1.5px; cursor:pointer; pointer-events:auto;
   }
@@ -363,7 +376,6 @@
     <div class="toolbar fp-toolbar">
       <div class="segGroup" id="fpModeGroup">
         <button class="btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
-        <button class="btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
       </div>
       <select id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
         <option value="line">Solid line</option>
@@ -373,8 +385,19 @@
         <option value="circle">Circle</option>
         <option value="oval">Oval</option>
       </select>
-      <div class="divider"></div>
-      <button class="btn" id="fpAddOpeningBtn" title="Add a door or window opening on a wall">+ Opening</button>
+      <div class="fp-opening-dd" id="fpOpeningDd">
+        <button type="button" class="btn" id="fpOpeningDdBtn" title="Draw an opening, window, or door -- click two points anywhere, including a blank area">
+          <svg id="fpOpeningDdIcon" viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>
+          <span id="fpOpeningDdLabel">+ Opening</span>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="fp-opening-dd-menu" id="fpOpeningDdMenu" hidden>
+          <button type="button" class="fp-opening-dd-item" data-tool="opening"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>Opening</button>
+          <button type="button" class="fp-opening-dd-item" data-tool="window"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#b8860b" stroke-width="2" stroke-linecap="round" stroke-dasharray="9,6"/></svg>Window</button>
+          <button type="button" class="fp-opening-dd-item" data-tool="door"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="3" x2="27" y2="3" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="27" y2="7" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/></svg>Door</button>
+        </div>
+      </div>
+      <button class="btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
       <div class="divider"></div>
       <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <div class="spacer"></div>
@@ -398,13 +421,6 @@
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
           <div class="fp-canvas" id="fpCanvas"></div>
         </div>
-        <p class="fp-hint" id="fpModeHint">Click to place a line, or click-drag to place a shape. Everything snaps to the grid.</p>
-
-        <div class="fp-edit-bar">
-          <input type="text" id="fpEditInstruction" placeholder="Describe a change &mdash; &quot;move the sofa against the north wall&quot;, &quot;add a window on that wall&quot;&hellip;">
-          <button class="btn" id="fpEditApplyBtn" style="border-color:var(--accent); color:var(--accent);">Apply</button>
-        </div>
-        <p class="fp-hint" id="fpEditStatus"></p>
       </div>
 
       <aside class="fp-side">
@@ -412,7 +428,6 @@
           <div class="fp-panel-head">
             <h3>Objects</h3>
           </div>
-          <p class="fp-hint" style="margin:0 0 .5rem;">Drag an item onto the grid, or tap to drop it at center.</p>
           <div id="fpObjectTemplates" class="fp-object-templates"></div>
           <input type="file" id="fpImageUploadInput" accept="image/*" multiple style="display:none;">
         </div>
@@ -496,7 +511,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+2ad8398f';
+  const APP_VERSION = '1.0+98d88c85';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -881,8 +896,18 @@
   let fpHistory = [];
   let fpIdSeq = 1;
   let fpMode = 'draw'; // 'select' | 'draw'
-  let fpDrawTool = 'line'; // line | dashedline | rect | square | circle | oval
+  let fpDrawTool = 'line'; // line | dashedline | rect | square | circle | oval | opening | window | door
   let fpDrawPending = null; // in-progress line placement: {x1,y1} in feet
+
+  // Opening/window/door are drawn exactly like a wall (two clicked points,
+  // see isLineTool below) but styled distinctly and never tied to a
+  // specific wall element -- free-floating, like any other structural line.
+  const FP_LINE_TYPE_STYLE = {
+    opening: { stroke:'#1c2128', dash:'1,5' },              // black, dotted
+    window:  { stroke:'#b8860b', dash:'9,6' },              // dark yellow/goldenrod, dashed
+    door:    { stroke:'#7a4a24', dash:null, double:true },  // brown, solid double line
+  };
+  function fpIsLineType(type){ return type==='line' || type==='dashedline' || !!FP_LINE_TYPE_STYLE[type]; }
 
   // Object library: grouped for browsing/sorting only -- labels here are not
   // forced onto the canvas (an object's on-plan label is blank until the
@@ -891,9 +916,9 @@
   // branch), sliced from library sheets -- nothing here is drawn by code.
   const FP_LIBRARY = [
     { name:'Tables', items:[
-      { label:'Large Conference', shape:'rect', w:96, d:40, icon:'image', img:'./library/large-conference.png' },
-      { label:'Oval Conference', shape:'oval', w:108, d:44, icon:'image', img:'./library/oval-conference.png' },
-      { label:'6-Seat Table', shape:'rect', w:72, d:36, icon:'image', img:'./library/6-seat-table.png' },
+      { label:'Lg table', shape:'rect', w:96, d:40, icon:'image', img:'./library/large-conference.png' },
+      { label:'Oval table', shape:'oval', w:108, d:44, icon:'image', img:'./library/oval-conference.png' },
+      { label:'Sm table', shape:'rect', w:72, d:36, icon:'image', img:'./library/6-seat-table.png' },
       { label:'Square Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/square-table.png' },
       { label:'Round Table', shape:'circle', w:42, d:42, icon:'image', img:'./library/round-table.png' },
       { label:'Coffee Table', shape:'rect', w:48, d:24, icon:'image', img:'./library/coffee-table.png' },
@@ -1055,6 +1080,51 @@
     });
   }
 
+  // A name/measurement label the user can drag to reposition (stored as a
+  // feet offset from the entity's own center, in its local -- i.e.
+  // pre-rotation -- frame, so it stays anchored to the entity wherever that
+  // entity itself moves or rotates) while a plain tap/click still opens its
+  // details modal. Shared by furniture objects and structural lines alike.
+  function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick){
+    function reposition(){
+      const dx = item.labelDx!=null ? item.labelDx : defaultDx;
+      const dy = item.labelDy!=null ? item.labelDy : defaultDy;
+      Object.assign(label.style, {
+        left:(centerPx.x + dx*scale)+'px', top:(centerPx.y + dy*scale)+'px',
+        right:'auto', bottom:'auto', marginBottom:'0', transform:'translate(-50%,-100%)',
+      });
+    }
+    reposition();
+    let dragged = false;
+    label.addEventListener('pointerdown', (e)=>{
+      e.stopPropagation();
+      fpPushHistory();
+      dragged = false;
+      const startX=e.clientX, startY=e.clientY;
+      const startDx = item.labelDx!=null ? item.labelDx : defaultDx;
+      const startDy = item.labelDy!=null ? item.labelDy : defaultDy;
+      const rad = (rotDeg||0)*Math.PI/180, cr=Math.cos(-rad), sr=Math.sin(-rad);
+      try{ label.setPointerCapture(e.pointerId); }catch(err){}
+      function move(ev){
+        const dxScreen=ev.clientX-startX, dyScreen=ev.clientY-startY;
+        if(Math.hypot(dxScreen,dyScreen)>3) dragged = true;
+        const ldx = dxScreen*cr - dyScreen*sr, ldy = dxScreen*sr + dyScreen*cr;
+        item.labelDx = startDx + ldx/scale;
+        item.labelDy = startDy + ldy/scale;
+        reposition();
+      }
+      function up(){
+        label.removeEventListener('pointermove', move);
+        label.removeEventListener('pointerup', up);
+        if(dragged){ fpSave(); fpRender(); }
+        else{ fpHistory.pop(); document.getElementById('fpUndoBtn').disabled = fpHistory.length===0; }
+      }
+      label.addEventListener('pointermove', move);
+      label.addEventListener('pointerup', up);
+    });
+    label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!dragged) onClick(); });
+  }
+
   // Asks OpenAI (text-only, via the same CORS proxy the photo-generation
   // path uses) for a typical real-world width x depth given just an item's
   // name -- no photo involved, this is a plain text completion. Always
@@ -1085,25 +1155,48 @@
     return { w: Math.max(1, Number(result.w)||24), d: Math.max(1, Number(result.d)||24) };
   }
 
+  // ---------- Every physical-measurement field in the app (furniture size,
+  // wall/opening length) is entered as a whole feet + inches pair -- e.g.
+  // "0 ft, 9 in" -- rather than one decimal-feet or decimal-inches number.
+  function fpFtInFieldsHtml(prefix, totalInches){
+    const ft = Math.floor(Math.max(0,totalInches)/12);
+    const inch = Math.round(Math.max(0,totalInches) - ft*12);
+    return `<div style="display:flex; gap:.4rem; align-items:center;">
+      <input type="number" id="${prefix}Ft" class="fp-detail-input" style="width:100%;" min="0" value="${ft}">
+      <span class="mini">ft</span>
+      <input type="number" id="${prefix}In" class="fp-detail-input" style="width:100%;" min="0" max="11" value="${inch}">
+      <span class="mini">in</span>
+    </div>`;
+  }
+  function fpSetFtInFields(wrap, prefix, totalInches){
+    const ft = Math.floor(Math.max(0,totalInches)/12);
+    const inch = Math.round(Math.max(0,totalInches) - ft*12);
+    wrap.querySelector('#'+prefix+'Ft').value = ft;
+    wrap.querySelector('#'+prefix+'In').value = inch;
+  }
+  function fpReadFtInFields(wrap, prefix, fallbackInches){
+    const ft = parseFloat(wrap.querySelector('#'+prefix+'Ft').value);
+    const inch = parseFloat(wrap.querySelector('#'+prefix+'In').value);
+    const total = (isNaN(ft)?0:ft)*12 + (isNaN(inch)?0:inch);
+    return total>0 ? total : fallbackInches;
+  }
+
   function fpOpenObjectDetailsModal(item){
     const wrap = openModal('Object Details', `
       <label class="mini" style="display:block; margin-bottom:.6rem;">Name
         <input type="text" id="fpObjNameInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(item.label||'')}">
       </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Dimensions (inches)
-        <div style="display:flex; gap:.5rem; align-items:center; margin-top:.25rem;">
-          <input type="number" id="fpObjWidthInput" class="fp-detail-input" style="width:100%;" value="${Math.round(item.w)}" min="1">
-          <span class="mini">&times;</span>
-          <input type="number" id="fpObjDepthInput" class="fp-detail-input" style="width:100%;" value="${Math.round(item.d)}" min="1">
-        </div>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Width
+        ${fpFtInFieldsHtml('fpObjWidth', item.w)}
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Depth
+        ${fpFtInFieldsHtml('fpObjDepth', item.d)}
       </label>
       <button class="btn" id="fpObjAutoDetectBtn" type="button" style="width:100%; margin-bottom:.6rem; border-color:var(--accent); color:var(--accent);">&#10024; Auto-detect dimensions</button>
       <p class="fp-hint" id="fpObjDetectStatus" style="margin:0 0 .6rem;"></p>
       <button class="btn-primary" id="fpObjSaveBtn" type="button">Save</button>
     `);
     const nameInput = wrap.querySelector('#fpObjNameInput');
-    const widthInput = wrap.querySelector('#fpObjWidthInput');
-    const depthInput = wrap.querySelector('#fpObjDepthInput');
     const status = wrap.querySelector('#fpObjDetectStatus');
     nameInput.focus();
     wrap.querySelector('#fpObjAutoDetectBtn').addEventListener('click', async ()=>{
@@ -1112,8 +1205,8 @@
       status.textContent = 'Detecting…';
       try{
         const dims = await fpDetectObjectDimensions(name);
-        widthInput.value = Math.round(dims.w);
-        depthInput.value = Math.round(dims.d);
+        fpSetFtInFields(wrap, 'fpObjWidth', dims.w);
+        fpSetFtInFields(wrap, 'fpObjDepth', dims.d);
         status.textContent = 'Done -- adjust if needed.';
       }catch(err){
         status.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
@@ -1122,8 +1215,8 @@
     function save(){
       fpPushHistory();
       item.label = nameInput.value.trim();
-      item.w = Math.max(1, parseFloat(widthInput.value)||item.w);
-      item.d = Math.max(1, parseFloat(depthInput.value)||item.d);
+      item.w = Math.max(1, fpReadFtInFields(wrap, 'fpObjWidth', item.w));
+      item.d = Math.max(1, fpReadFtInFields(wrap, 'fpObjDepth', item.d));
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -1131,59 +1224,51 @@
     nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
   }
 
-  function fpOpenOpeningDetailsModal(op){
-    const walls = fpState.elements.filter(e=>e.type==='line'||e.type==='dashedline');
-    const wallOptions = walls.map((wEl,i)=>
-      `<option value="${wEl.id}"${wEl.id===op.wallId?' selected':''}>Wall ${i+1} (${fpFmtFeet(Math.hypot(wEl.x2-wEl.x1, wEl.y2-wEl.y1))})</option>`
-    ).join('');
-    const wrap = openModal('Opening Details', `
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Wall
-        <select id="fpOpWallInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;">${wallOptions}</select>
+  // Any structural line -- wall, dashed wall, or a drawn opening/window/door
+  // -- gets the same Name + Length treatment furniture objects get. Length
+  // is the only "measurement" a line has; changing it keeps the start point
+  // and current angle fixed and moves the end point to match.
+  function fpOpenLineDetailsModal(el){
+    const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
+    const wrap = openModal('Line Details', `
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Name
+        <input type="text" id="fpLineNameInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(el.label||'')}">
       </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Label
-        <input type="text" id="fpOpLabelInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(op.label||'')}">
-      </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Offset from wall start / Width (ft)
-        <div style="display:flex; gap:.5rem; align-items:center; margin-top:.25rem;">
-          <input type="number" id="fpOpOffsetInput" class="fp-detail-input" style="width:100%;" step="0.5" value="${op.offset}">
-          <span class="mini">&times;</span>
-          <input type="number" id="fpOpWidthInput" class="fp-detail-input" style="width:100%;" step="0.5" value="${op.width}">
-        </div>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Length
+        ${fpFtInFieldsHtml('fpLineLen', lenFt*12)}
       </label>
       <div style="display:flex; gap:.5rem;">
-        <button class="btn" id="fpOpDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
-        <button class="btn-primary" id="fpOpSaveBtn" type="button" style="flex:1;">Save</button>
+        <button class="btn" id="fpLineDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
+        <button class="btn-primary" id="fpLineSaveBtn" type="button" style="flex:1;">Save</button>
       </div>
     `);
-    const wallInput = wrap.querySelector('#fpOpWallInput');
-    const labelInput = wrap.querySelector('#fpOpLabelInput');
-    const offsetInput = wrap.querySelector('#fpOpOffsetInput');
-    const widthInput = wrap.querySelector('#fpOpWidthInput');
-    labelInput.focus();
-    wrap.querySelector('#fpOpDeleteBtn').addEventListener('click', ()=>{
+    const nameInput = wrap.querySelector('#fpLineNameInput');
+    nameInput.focus();
+    wrap.querySelector('#fpLineDeleteBtn').addEventListener('click', ()=>{
       fpPushHistory();
-      fpState.openings = fpState.openings.filter(o=>o.id!==op.id);
+      fpState.elements = fpState.elements.filter(e=>e.id!==el.id);
+      fpDeselect();
       fpSave(); fpRender();
       wrap.remove();
     });
     function save(){
       fpPushHistory();
-      op.wallId = Number(wallInput.value);
-      op.label = labelInput.value.trim() || 'Opening';
-      op.offset = parseFloat(offsetInput.value)||0;
-      op.width = Math.max(0.5, parseFloat(widthInput.value)||1);
+      el.label = nameInput.value.trim();
+      const newLenFt = Math.max(0.5, fpReadFtInFields(wrap, 'fpLineLen', lenFt*12)/12);
+      const curLen = Math.hypot(el.x2-el.x1, el.y2-el.y1) || 1;
+      const ux = (el.x2-el.x1)/curLen, uy = (el.y2-el.y1)/curLen;
+      el.x2 = el.x1 + ux*newLenFt; el.y2 = el.y1 + uy*newLenFt;
       fpSave(); fpRender();
       wrap.remove();
     }
-    wrap.querySelector('#fpOpSaveBtn').addEventListener('click', save);
-    labelInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
+    wrap.querySelector('#fpLineSaveBtn').addEventListener('click', save);
+    nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
   }
 
   function fpDefaultState(){
     return {
       title: 'Untitled Floor Plan',
       elements: [],
-      openings: [],
       objects: [],
       notes: [],
     };
@@ -1223,11 +1308,6 @@
     fpRender();
   }
 
-  function fpFmtFeet(ft){
-    const whole = Math.floor(ft + 1e-6);
-    const inches = Math.round((ft-whole)*12);
-    return inches===0 ? `${whole}'-0"` : (inches===12 ? `${whole+1}'-0"` : `${whole}'-${inches}"`);
-  }
   function fpSnap(v){ return Math.round(v/FP_GRID_STEP)*FP_GRID_STEP; }
 
   // Grid always starts at (0,0) and grows only in +X/+Y to cover whatever's
@@ -1256,7 +1336,7 @@
     const pad = 2;
     const dx = minX<0 ? (pad-minX) : 0, dy = minY<0 ? (pad-minY) : 0;
     fpState.elements.forEach(el=>{
-      if(el.type==='line' || el.type==='dashedline'){ el.x1+=dx; el.y1+=dy; el.x2+=dx; el.y2+=dy; }
+      if(fpIsLineType(el.type)){ el.x1+=dx; el.y1+=dy; el.x2+=dx; el.y2+=dy; }
       else { el.cx+=dx; el.cy+=dy; }
     });
     fpState.objects.forEach(o=>{ o.cx+=dx; o.cy+=dy; });
@@ -1300,7 +1380,6 @@
     fpPushHistory();
     if(kind==='element'){
       fpState.elements = fpState.elements.filter(el=>el.id!==id);
-      fpState.openings = fpState.openings.filter(op=>op.wallId!==id);
     } else if(kind==='object'){
       fpState.objects = fpState.objects.filter(o=>o.id!==id);
     }
@@ -1318,7 +1397,7 @@
     return { minX:item.cx-hw, minY:item.cy-hd, maxX:item.cx+hw, maxY:item.cy+hd };
   }
   function fpElementBounds(el){
-    if(el.type==='line' || el.type==='dashedline'){
+    if(fpIsLineType(el.type)){
       return { minX:Math.min(el.x1,el.x2), minY:Math.min(el.y1,el.y2), maxX:Math.max(el.x1,el.x2), maxY:Math.max(el.y1,el.y2) };
     }
     if(el.type==='circle'){
@@ -1358,9 +1437,19 @@
     const px = (x,y) => [ (x-bounds.minX)*scale, (y-bounds.minY)*scale ];
     let body = '';
     fpState.elements.forEach(el=>{
-      if(el.type==='line' || el.type==='dashedline'){
+      if(fpIsLineType(el.type)){
         const [x1,y1] = px(el.x1,el.y1), [x2,y2] = px(el.x2,el.y2);
-        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#2a2f36" stroke-width="3" stroke-linecap="round"${el.type==='dashedline'?' stroke-dasharray="10,7"':''}/>`;
+        const lineStyle = FP_LINE_TYPE_STYLE[el.type];
+        const stroke = lineStyle ? lineStyle.stroke : '#2a2f36';
+        const dash = lineStyle ? lineStyle.dash : (el.type==='dashedline' ? '10,7' : null);
+        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;
+        if(lineStyle && lineStyle.double){
+          const dxr = el.x2-el.x1, dyr = el.y2-el.y1, len = Math.hypot(dxr,dyr)||1;
+          const off = 2.5/scale;
+          const [ox1,oy1] = px(el.x1-dyr/len*off, el.y1+dxr/len*off);
+          const [ox2,oy2] = px(el.x2-dyr/len*off, el.y2+dxr/len*off);
+          body += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>`;
+        }
       } else if(el.type==='circle'){
         const [cx,cy] = px(el.cx,el.cy);
         body += `<circle cx="${cx}" cy="${cy}" r="${el.r*scale}" stroke="#2a2f36" stroke-width="2" fill="none"/>`;
@@ -1372,17 +1461,6 @@
         const [cx,cy] = px(el.cx,el.cy);
         body += `<rect x="${x}" y="${y}" width="${el.w*scale}" height="${el.h*scale}" stroke="#2a2f36" stroke-width="2" fill="none" transform="rotate(${el.rot||0} ${cx} ${cy})"/>`;
       }
-    });
-    fpState.openings.forEach(op=>{
-      const wall = fpState.elements.find(e=>e.id===op.wallId && (e.type==='line'||e.type==='dashedline'));
-      if(!wall) return;
-      const len = Math.hypot(wall.x2-wall.x1, wall.y2-wall.y1) || 1;
-      const ux = (wall.x2-wall.x1)/len, uy = (wall.y2-wall.y1)/len;
-      const ox1 = wall.x1+ux*op.offset, oy1 = wall.y1+uy*op.offset;
-      const clampedLen = Math.min(len, op.offset+op.width);
-      const ox2 = wall.x1+ux*clampedLen, oy2 = wall.y1+uy*clampedLen;
-      const [x1,y1] = px(ox1,oy1), [x2,y2] = px(ox2,oy2);
-      body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${/window/i.test(op.label)?'#2b8f7c':'#40d0b5'}" stroke-width="6"/>`;
     });
     fpState.objects.forEach(item=>{
       const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
@@ -1483,8 +1561,13 @@
     let body = '';
     const flipY = y => -y;
     fpState.elements.forEach(el=>{
-      if(el.type==='line' || el.type==='dashedline'){
+      if(fpIsLineType(el.type)){
         body += fpDxfLine(el.x1, flipY(el.y1), el.x2, flipY(el.y2));
+        const lineStyle = FP_LINE_TYPE_STYLE[el.type];
+        if(lineStyle && lineStyle.double){
+          const dxr = el.x2-el.x1, dyr = el.y2-el.y1, len = Math.hypot(dxr,dyr)||1, off = 0.2;
+          body += fpDxfLine(el.x1-dyr/len*off, flipY(el.y1+dxr/len*off), el.x2-dyr/len*off, flipY(el.y2+dxr/len*off));
+        }
       } else if(el.type==='circle'){
         body += fpDxfCircle(el.cx, flipY(el.cy), el.r);
       } else if(el.type==='oval'){
@@ -1501,16 +1584,6 @@
         const corners = [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([dx,dy])=>fpRotatePoint(el.cx+dx, el.cy+dy, el.cx, el.cy, el.rot||0));
         for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
       }
-    });
-    fpState.openings.forEach(op=>{
-      const wall = fpState.elements.find(e=>e.id===op.wallId && (e.type==='line'||e.type==='dashedline'));
-      if(!wall) return;
-      const len = Math.hypot(wall.x2-wall.x1, wall.y2-wall.y1) || 1;
-      const ux=(wall.x2-wall.x1)/len, uy=(wall.y2-wall.y1)/len;
-      const ox1=wall.x1+ux*op.offset, oy1=wall.y1+uy*op.offset;
-      const clampedLen=Math.min(len, op.offset+op.width);
-      const ox2=wall.x1+ux*clampedLen, oy2=wall.y1+uy*clampedLen;
-      body += fpDxfLine(ox1, flipY(oy1), ox2, flipY(oy2));
     });
     fpState.objects.forEach(item=>{
       const hw=(item.w/12)/2, hd=(item.d/12)/2;
@@ -1784,7 +1857,7 @@
   // repaint identically without a full fpRender() mid-gesture.
   function fpUpdateShapeAttrs(shapeNode, el, px){
     if(!shapeNode) return;
-    if(el.type==='line' || el.type==='dashedline'){
+    if(fpIsLineType(el.type)){
       shapeNode.setAttribute('x1', px(el.x1)); shapeNode.setAttribute('y1', px(el.y1));
       shapeNode.setAttribute('x2', px(el.x2)); shapeNode.setAttribute('y2', px(el.y2));
     } else if(el.type==='circle'){
@@ -1837,7 +1910,7 @@
       return h;
     }
 
-    if(el.type==='line' || el.type==='dashedline'){
+    if(fpIsLineType(el.type)){
       layer.appendChild(mkHandle(el.x1, el.y1, 'fp-node', (mx,my)=>{ el.x1=mx; el.y1=my; }));
       layer.appendChild(mkHandle(el.x2, el.y2, 'fp-node', (mx,my)=>{ el.x2=mx; el.y2=my; }));
     } else if(el.type==='circle'){
@@ -1912,14 +1985,15 @@
       return;
     }
 
-    const isLineTool = fpDrawTool==='line' || fpDrawTool==='dashedline';
+    const isLineTool = fpIsLineType(fpDrawTool);
     if(isLineTool){
       if(fpDrawPending){
+        const previewStyle = FP_LINE_TYPE_STYLE[fpDrawTool];
         const previewLine = fpSvgEl('line', {
           x1:px(fpDrawPending.x1), y1:px(fpDrawPending.y1),
           x2:px(fpDrawPending.x1), y2:px(fpDrawPending.y1),
-          stroke:'#40d0b5', 'stroke-width':2,
-          'stroke-dasharray': fpDrawTool==='dashedline' ? '8,6' : 'none',
+          stroke: previewStyle ? previewStyle.stroke : '#40d0b5', 'stroke-width':2,
+          'stroke-dasharray': previewStyle ? (previewStyle.dash||'none') : (fpDrawTool==='dashedline' ? '8,6' : 'none'),
         });
         svg.appendChild(previewLine);
         canvas.onpointermove = (e)=>{
@@ -2034,12 +2108,28 @@
       const selected = fpSelectedKind==='element' && el.id===fpSelectedId;
       const g = fpSvgEl('g', { class:'fp-el'+(selected?' selected':''), 'data-id':el.id });
       let shape;
-      if(el.type==='line' || el.type==='dashedline'){
+      if(el.type==='line' || el.type==='dashedline' || FP_LINE_TYPE_STYLE[el.type]){
+        const lineStyle = FP_LINE_TYPE_STYLE[el.type];
         shape = fpSvgEl('line', {
           x1:px(el.x1), y1:px(el.y1), x2:px(el.x2), y2:px(el.y2),
-          stroke: el.color||'#8b8d8e', 'stroke-width':3, 'stroke-linecap':'round',
+          stroke: lineStyle ? lineStyle.stroke : (el.color||'#8b8d8e'), 'stroke-width':3, 'stroke-linecap':'round',
         });
         if(el.type==='dashedline') shape.setAttribute('stroke-dasharray','10,7');
+        if(lineStyle && lineStyle.dash) shape.setAttribute('stroke-dasharray', lineStyle.dash);
+        if(lineStyle && lineStyle.double){
+          // A second, perpendicular-offset line for the "double line" door
+          // symbol -- purely cosmetic (not draggable), recomputed on every
+          // full render, including right after a drag ends.
+          const dx = el.x2-el.x1, dy = el.y2-el.y1, len = Math.hypot(dx,dy)||1;
+          const off = 2.5/scale; // feet, so the on-screen gap stays constant across zoom
+          const ox = -dy/len*off, oy = dx/len*off;
+          const secondary = fpSvgEl('line', {
+            x1:px(el.x1+ox), y1:px(el.y1+oy), x2:px(el.x2+ox), y2:px(el.y2+oy),
+            stroke: lineStyle.stroke, 'stroke-width':3, 'stroke-linecap':'round',
+            class:'fp-el-shape-secondary',
+          });
+          g.appendChild(secondary);
+        }
       } else if(el.type==='circle'){
         shape = fpSvgEl('circle', {
           cx:px(el.cx), cy:px(el.cy), r:px(el.r),
@@ -2072,7 +2162,7 @@
         const orig = JSON.parse(JSON.stringify(el));
         function onMove(ev){
           const dx = (ev.clientX-startX)/scale, dy = (ev.clientY-startY)/scale;
-          if(el.type==='line' || el.type==='dashedline'){
+          if(fpIsLineType(el.type)){
             el.x1 = fpSnap(orig.x1+dx); el.y1 = fpSnap(orig.y1+dy);
             el.x2 = fpSnap(orig.x2+dx); el.y2 = fpSnap(orig.y2+dy);
           } else {
@@ -2091,27 +2181,20 @@
 
       svg.appendChild(g);
       if(selected && fpMode==='select') fpAddElementNodes(svg, canvas, el, px, scale);
-    });
 
-    // Openings: short thick highlight overlaid on their parent wall
-    fpState.openings.forEach(op=>{
-      const wall = fpState.elements.find(e=>e.id===op.wallId && (e.type==='line'||e.type==='dashedline'));
-      if(!wall) return;
-      const len = Math.hypot(wall.x2-wall.x1, wall.y2-wall.y1) || 1;
-      const ux = (wall.x2-wall.x1)/len, uy = (wall.y2-wall.y1)/len;
-      const ox1 = wall.x1+ux*op.offset, oy1 = wall.y1+uy*op.offset;
-      const clampedLen = Math.min(len, op.offset+op.width);
-      const ox2 = wall.x1+ux*clampedLen, oy2 = wall.y1+uy*clampedLen;
-      const mark = fpSvgEl('line', {
-        x1:px(ox1), y1:px(oy1), x2:px(ox2), y2:px(oy2),
-        stroke: /window/i.test(op.label) ? '#2b8f7c' : '#40d0b5', 'stroke-width':6, 'stroke-linecap':'butt',
-      });
-      mark.setAttribute('class','fp-opening-mark');
-      const titleEl = fpSvgEl('title', {});
-      titleEl.textContent = op.label + ' — tap to edit';
-      mark.appendChild(titleEl);
-      mark.addEventListener('click', (e)=>{ e.stopPropagation(); fpOpenOpeningDetailsModal(op); });
-      svg.appendChild(mark);
+      if(fpIsLineType(el.type)){
+        const hasLineLabel = !!(el.label && el.label.trim());
+        if(hasLineLabel || selected){
+          const midX = (el.x1+el.x2)/2, midY = (el.y1+el.y2)/2;
+          const lineLabel = document.createElement('div');
+          lineLabel.className = 'fp-item-label' + (hasLineLabel ? '' : ' placeholder');
+          lineLabel.spellcheck = false;
+          lineLabel.textContent = hasLineLabel ? el.label : 'Add label';
+          lineLabel.title = 'Tap to edit name/length, drag to reposition';
+          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el));
+          canvas.appendChild(lineLabel);
+        }
+      }
     });
 
     // Objects (furniture, from the library)
@@ -2146,12 +2229,9 @@
       label.style.display = (hasLabel || isSelected) ? '' : 'none';
       label.spellcheck = false;
       label.textContent = hasLabel ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : 'Add label';
-      label.title = 'Tap to edit name/dimensions';
-      label.addEventListener('pointerdown', e=>e.stopPropagation());
-      label.addEventListener('click', (e)=>{
-        e.stopPropagation();
-        fpOpenObjectDetailsModal(item);
-      });
+      label.title = 'Tap to edit name/dimensions, drag to reposition';
+      const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
+      fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item));
       el.appendChild(label);
 
       const rotHandle = document.createElement('div');
@@ -2286,10 +2366,9 @@
       tplWrap.appendChild(uploadDetails);
       fpRefreshImageLibraryGrid();
 
-      FP_LIBRARY.forEach((cat, ci)=>{
+      FP_LIBRARY.forEach((cat)=>{
         const details = document.createElement('details');
         details.className = 'fp-lib-cat';
-        if(ci===0) details.open = true;
         const summary = document.createElement('summary');
         summary.textContent = cat.name;
         details.appendChild(summary);
@@ -2338,9 +2417,6 @@
     document.getElementById('fpModeSelectBtn').classList.toggle('active', mode==='select');
     document.getElementById('fpModeDrawBtn').classList.toggle('active', mode==='draw');
     document.getElementById('fpDrawToolSelect').style.display = mode==='draw' ? '' : 'none';
-    document.getElementById('fpModeHint').textContent = mode==='draw'
-      ? 'Click to place a line, or click-drag to place a shape. Everything snaps to the grid.'
-      : 'Drag to move, drag a node to reshape, the top dot to rotate.';
     fpRender();
   }
 
@@ -2366,20 +2442,44 @@
       const btn = e.target.closest('button[data-mode]');
       if(btn) fpSetMode(btn.dataset.mode);
     });
+    document.getElementById('fpModeSelectBtn').addEventListener('click', ()=> fpSetMode('select'));
     document.getElementById('fpDrawToolSelect').addEventListener('change', (e)=>{
       fpDrawTool = e.target.value;
       fpDrawPending = null;
+      document.getElementById('fpOpeningDdBtn').classList.remove('fp-opening-dd-btn-active');
       fpRender();
     });
 
-    document.getElementById('fpAddOpeningBtn').addEventListener('click', ()=>{
-      const wall = fpState.elements.find(e=>e.type==='line'||e.type==='dashedline');
-      if(!wall){ toast('Draw a wall first, then add an opening on it.', true); return; }
-      fpPushHistory();
-      const op = { id: fpIdSeq++, wallId: wall.id, offset:1, width:3, label:'Door' };
-      fpState.openings.push(op);
-      fpSave(); fpRender();
-      fpOpenOpeningDetailsModal(op); // no sidebar list anymore -- open it straight away so its wall/offset/label are easy to adjust
+    // Opening/Window/Door: a custom dropdown (not <select>, which can't
+    // render a per-option icon) that arms Draw mode with whichever style was
+    // picked -- drawn exactly like a wall, two clicked points anywhere on
+    // the grid, not tied to any existing wall.
+    const openingDd = document.getElementById('fpOpeningDd');
+    const openingDdBtn = document.getElementById('fpOpeningDdBtn');
+    const openingDdMenu = document.getElementById('fpOpeningDdMenu');
+    const openingDdIcon = document.getElementById('fpOpeningDdIcon');
+    const openingDdLabel = document.getElementById('fpOpeningDdLabel');
+    const OPENING_DD_LABELS = { opening:'Opening', window:'Window', door:'Door' };
+    openingDdBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      openingDdMenu.hidden = !openingDdMenu.hidden;
+    });
+    openingDdMenu.querySelectorAll('.fp-opening-dd-item').forEach(item=>{
+      item.addEventListener('click', ()=>{
+        const tool = item.dataset.tool;
+        fpDrawTool = tool;
+        fpSetMode('draw');
+        openingDdIcon.innerHTML = item.querySelector('svg').innerHTML;
+        openingDdLabel.textContent = OPENING_DD_LABELS[tool];
+        openingDdBtn.classList.add('fp-opening-dd-btn-active');
+        openingDdMenu.hidden = true;
+      });
+    });
+    document.addEventListener('click', (e)=>{
+      if(!openingDd.contains(e.target)) openingDdMenu.hidden = true;
+    });
+    document.addEventListener('keydown', (e)=>{
+      if(e.key==='Escape') openingDdMenu.hidden = true;
     });
     document.getElementById('fpImageUploadInput').addEventListener('change', async (e)=>{
       const files = Array.from(e.target.files || []);
@@ -2393,32 +2493,6 @@
       fpSave(); fpRender();
     });
     document.getElementById('fpGenerateFromPhotosBtn').addEventListener('click', fpOpenGenerateModal);
-
-    async function runEditInstruction(){
-      const input = document.getElementById('fpEditInstruction');
-      const status = document.getElementById('fpEditStatus');
-      const btn = document.getElementById('fpEditApplyBtn');
-      const instruction = input.value.trim();
-      if(!instruction) return;
-      btn.disabled = true; status.textContent = 'Applying…';
-      try{
-        const result = await fpEditPlanWithText(instruction);
-        fpPushHistory();
-        fpApplyGeneratedPlan(result);
-        input.value = '';
-        status.textContent = 'Done.';
-        setTimeout(()=>{ if(status.textContent==='Done.') status.textContent=''; }, 3000);
-      }catch(err){
-        console.error(err);
-        status.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
-      }finally{
-        btn.disabled = false;
-      }
-    }
-    document.getElementById('fpEditApplyBtn').addEventListener('click', runEditInstruction);
-    document.getElementById('fpEditInstruction').addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ e.preventDefault(); runEditInstruction(); }
-    });
 
     document.getElementById('fpDeleteBtn').addEventListener('click', ()=> fpSetDeleteMode(!fpDeleteModeActive));
     document.getElementById('fpUndoBtn').addEventListener('click', fpUndo);
@@ -2628,30 +2702,27 @@
       const key = fpGetOpenAiKey();
       const proxyUrl = fpGetOpenAiProxyUrl();
       return `
-        <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL (deployed 2026-09-04; see cloudflare-worker/README.md if you ever need to redeploy)
-          <input type="text" id="fpProxyInput" placeholder="https://floorplanner-openai-proxy.your-subdomain.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
+        <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL
+          <input type="text" id="fpProxyInput" placeholder="https://your-proxy.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
         </label>
         <div class="fp-key-row" style="margin-top:.4rem;">
           ${key
-            ? `<span>OpenAI API key is set: <code>${fpEscapeHtml(fpMaskKey(key))}</code> (this device only) &mdash; check this matches what you copied.</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-            : `<span>Needs your own OpenAI API key &mdash;</span><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">get one</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
+            ? `<span>Key set: <code>${fpEscapeHtml(fpMaskKey(key))}</code></span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
+            : `<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get an OpenAI key</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
         </div>
-        <p class="fp-hint">Requests go from this browser through your own proxy Worker to OpenAI's API with that key &mdash; not through us.</p>
         <label class="mini" style="display:flex; align-items:flex-start; gap:.4rem; margin-top:.3rem; color:var(--dim);">
           <input type="checkbox" id="fpDataSharingAck" ${fpGetDataSharingAck() ? 'checked' : ''} style="margin-top:.2rem;">
-          <span>I've turned on OpenAI's <a href="https://platform.openai.com/settings/organization/data-controls" target="_blank" rel="noopener">data-sharing setting</a> for this account, so these prompts/photos may be used to train their models (in exchange for whatever discount that program offers). This is just your own record &mdash; the app can't set that account-level toggle for you, and leaving it unchecked doesn't stop OpenAI from applying its own default retention/training policy either way.</span>
+          <span>I've enabled OpenAI's <a href="https://platform.openai.com/settings/organization/data-controls" target="_blank" rel="noopener">data-sharing</a> discount.</span>
         </label>
-        <p class="fp-hint" id="fpDataSharingStatus">${fpGetDataSharingAck() ? 'Recorded: data-sharing acknowledged.' : 'Not yet acknowledged.'}</p>
       `;
     }
     const key = fpGetApiKey();
     return `
       <div class="fp-key-row">
         ${key
-          ? `<span>Anthropic API key is set: <code>${fpEscapeHtml(fpMaskKey(key))}</code> (this device only) &mdash; check this matches what you copied.</span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-          : `<span>Needs your own Anthropic API key &mdash;</span><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">get one</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-ant-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save key</button>`}
+          ? `<span>Key set: <code>${fpEscapeHtml(fpMaskKey(key))}</code></span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
+          : `<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get an Anthropic key</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-ant-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
       </div>
-      <p class="fp-hint">Photos and notes go straight from this browser to Anthropic's API with that key &mdash; not through us, not stored anywhere but here.</p>
     `;
   }
 
@@ -2799,9 +2870,7 @@
 
 Coordinate system: pick an origin (0,0) at whichever corner is clearest from the photos/description. X increases rightward, Y increases going away from that starting point (deeper into the space). All coordinates are in FEET, to the nearest 0.5ft.
 
-Elements (walls and floor shapes): "type" is "line" or "dashedline" for a wall segment ("x1"/"y1"/"x2"/"y2" = its two endpoints), or "rect"/"square"/"circle"/"oval" for a labeled floor shape like an island or fireplace ("cx"/"cy" = center, "w"/"h" = size in feet for rect/square/oval, "r" = radius in feet for circle, "rot" = rotation in degrees). Most rooms are 4 "line" elements forming a closed shape -- split a wall into multiple segments wherever another wall meets it (a T or L junction), so the segments' endpoints land exactly on the shared corner instead of crossing through it.
-
-Openings (doors/windows): "wallIndex" is the 0-based index of the "line"/"dashedline" element (in your own "elements" array below) that this opening sits on. "offset" is feet from that wall element's first endpoint (x1,y1) toward its second (x2,y2). "width" is the opening's width in feet.
+Elements (walls, openings, and floor shapes): "type" is "line" or "dashedline" for a wall segment, "door" or "window" for an opening, or "rect"/"square"/"circle"/"oval" for a labeled floor shape like an island or fireplace. "line"/"dashedline"/"door"/"window" all use "x1"/"y1"/"x2"/"y2" (its two endpoints); "rect"/"square"/"circle"/"oval" use "cx"/"cy" = center, "w"/"h" = size in feet for rect/square/oval, "r" = radius in feet for circle, "rot" = rotation in degrees. Most rooms are 4 "line" elements forming a closed shape -- split a wall into multiple segments wherever another wall meets it (a T or L junction), so the segments' endpoints land exactly on the shared corner instead of crossing through it. Place a "door"/"window" element directly on top of (overlapping) the wall segment it belongs to, spanning just the opening's own width, not the whole wall.
 
 Objects (furniture): "cx"/"cy" are the item's CENTER in feet, same coordinate system as elements. "w"/"d" are the item's footprint in INCHES (width x depth). "rot" is rotation in degrees, 0 = default orientation.
 
@@ -2813,7 +2882,7 @@ Precise placement is the hardest and most error-prone part of this task -- free-
 ${notes ? 'The user also supplied these known measurements/notes, prefer them over your own visual estimate when they conflict: ' + notes : 'No measurements were supplied -- estimate from standard door/ceiling/furniture sizing and everyday visual proportion.'}
 
 Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape (only include the fields relevant to each element's own "type" -- a line doesn't need cx/cy/w/h/r, a rect doesn't need x1/y1/x2/y2/r, etc.):
-{"title": string, "elements": [{"type": "line"|"dashedline"|"rect"|"square"|"circle"|"oval", "x1": number, "y1": number, "x2": number, "y2": number, "cx": number, "cy": number, "w": number, "h": number, "r": number, "rot": number}], "openings": [{"wallIndex": number, "offset": number, "width": number, "label": string}], "objects": [{"label": string, "w": number, "d": number, "cx": number, "cy": number, "rot": number}], "notes": [string, ...]}
+{"title": string, "elements": [{"type": "line"|"dashedline"|"door"|"window"|"rect"|"square"|"circle"|"oval", "x1": number, "y1": number, "x2": number, "y2": number, "cx": number, "cy": number, "w": number, "h": number, "r": number, "rot": number}], "objects": [{"label": string, "w": number, "d": number, "cx": number, "cy": number, "rot": number}], "notes": [string, ...]}
 
 Include a "notes" entry stating which figures are firm (anchored to a supplied measurement or a standard size like a door width) versus rough visual estimates, and flag any object whose position wasn't anchored to a specific visible reference.`;
   }
@@ -2897,33 +2966,22 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
   }
 
   // Shared by both the photo-generation and text-edit flows -- takes an API
-  // response shaped like fpStateToApiShape() and replaces the current plan
-  // with it, preserving title from the current plan when the response
-  // doesn't specify its own. The AI refers
-  // to walls by their position in its own "elements" array ("wallIndex" on
-  // an opening) since it has no way to know this app's internal ids --
-  // wallIndexToId translates that into a real id once each element has one.
+  // response shaped like the JSON schema in fpAnalyzePrompt() and replaces
+  // the current plan with it, preserving title from the current plan when
+  // the response doesn't specify its own.
   function fpApplyGeneratedPlan(result){
     const prev = fpState;
-    const wallIndexToId = [];
     const elements = (Array.isArray(result.elements)?result.elements:[]).map(raw=>{
       const id = fpIdSeq++;
-      const type = ['line','dashedline','rect','square','circle','oval'].includes(raw.type) ? raw.type : 'line';
-      if(type==='line' || type==='dashedline'){
-        wallIndexToId.push(id);
+      const type = ['line','dashedline','door','window','rect','square','circle','oval'].includes(raw.type) ? raw.type : 'line';
+      if(fpIsLineType(type)){
         return { id, type, x1:fpSnap(Number(raw.x1)||0), y1:fpSnap(Number(raw.y1)||0), x2:fpSnap(Number(raw.x2)||0), y2:fpSnap(Number(raw.y2)||0), color:'#8b8d8e' };
       }
-      wallIndexToId.push(null); // keep index alignment with the AI's own array
       if(type==='circle'){
         return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), r:Math.max(FP_GRID_STEP, fpSnap(Number(raw.r)||1)), color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
       }
       return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), w:Math.max(FP_GRID_STEP, fpSnap(Number(raw.w)||1)), h:Math.max(FP_GRID_STEP, fpSnap(Number(raw.h)||1)), rot:Number(raw.rot)||0, color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
     });
-    const openings = (Array.isArray(result.openings)?result.openings:[]).map(op=>{
-      const wallId = wallIndexToId[op.wallIndex];
-      if(wallId==null) return null;
-      return { id: fpIdSeq++, wallId, offset:Number(op.offset)||0, width:Math.max(0.5, Number(op.width)||3), label:String(op.label||'Opening') };
-    }).filter(Boolean);
     const objects = (Array.isArray(result.objects)?result.objects:[]).map(o=>({
       id: fpIdSeq++, label:String(o.label||''), shape:'rect', icon:'plain',
       w:Math.max(4, Number(o.w)||24), d:Math.max(4, Number(o.d)||24),
@@ -2931,7 +2989,7 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
     }));
     fpState = {
       title: typeof result.title==='string' && result.title.trim() ? result.title.trim() : (prev && prev.title) || 'Generated Floor Plan',
-      elements, openings, objects,
+      elements, objects,
       notes: Array.isArray(result.notes) ? result.notes.map(String) : ((prev && prev.notes) || []),
     };
     fpDeselect();
@@ -2939,98 +2997,9 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
     fpSave(); fpRender();
   }
 
-  function fpStateToApiShape(){
-    const wallIdToIndex = new Map();
-    fpState.elements.forEach((el,i)=>{ if(el.type==='line'||el.type==='dashedline') wallIdToIndex.set(el.id, i); });
-    return {
-      title: fpState.title,
-      elements: fpState.elements.map(el=>{
-        if(el.type==='line' || el.type==='dashedline') return { type:el.type, x1:el.x1, y1:el.y1, x2:el.x2, y2:el.y2 };
-        if(el.type==='circle') return { type:el.type, cx:el.cx, cy:el.cy, r:el.r };
-        return { type:el.type, cx:el.cx, cy:el.cy, w:el.w, h:el.h, rot:el.rot||0 };
-      }),
-      openings: fpState.openings.map(op=>({
-        wallIndex: wallIdToIndex.has(op.wallId) ? wallIdToIndex.get(op.wallId) : -1,
-        offset:op.offset, width:op.width, label:op.label,
-      })),
-      objects: fpState.objects.map(({label,w,d,cx,cy,rot})=>({label,w,d,cx,cy,rot})),
-      notes: fpState.notes,
-    };
-  }
-
-  function fpEditPrompt(instruction){
-    return `Here is a floor plan as JSON, using the same coordinate system described below:
-Coordinate system: feet, one shared origin for the whole plan; X increases rightward, Y increases going away from the origin. Elements: "line"/"dashedline" use x1/y1/x2/y2 endpoints; "rect"/"square"/"oval" use cx/cy center + w/h size (feet) + rot degrees; "circle" uses cx/cy + r (feet). Openings reference their wall by "wallIndex" (0-based position in this same "elements" array) plus "offset"/"width" in feet along that wall from its (x1,y1) end. Objects (furniture) use cx/cy center in feet, w/d footprint in INCHES, rot in degrees.
-
-Current plan:
-${JSON.stringify(fpStateToApiShape())}
-
-Requested change: "${instruction}"
-
-Apply exactly this change and nothing else (keep everything else -- other elements, openings, objects, notes, title -- as-is unless the change logically requires touching it). If you add or remove an element, keep every opening's "wallIndex" correct for the array you return. Respond with ONLY the full updated JSON object in the exact same shape as the input (title, elements, openings, objects, notes), no markdown fences, no commentary.`;
-  }
-
-  async function fpEditPlanWithText(instruction){
-    return fpGetProvider()==='openai' ? fpEditPlanWithTextOpenAI(instruction) : fpEditPlanWithTextAnthropic(instruction);
-  }
-
-  async function fpEditPlanWithTextAnthropic(instruction){
-    if(!fpGetApiKey()) throw new Error('Set your Anthropic API key first (open "Generate floor plan" to add one).');
-    const prompt = fpEditPrompt(instruction);
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': fpGetApiKey(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 4096,
-        messages: [{ role:'user', content: prompt }],
-      }),
-    });
-    if(!resp.ok){
-      const errBody = await resp.text().catch(()=>'');
-      throw new Error('API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,200) : ''));
-    }
-    const data = await resp.json();
-    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
-    return fpExtractJson(text);
-  }
-
-  async function fpEditPlanWithTextOpenAI(instruction){
-    const proxyUrl = fpGetOpenAiProxyUrl();
-    if(!proxyUrl) throw new Error('Set your proxy Worker URL first (see cloudflare-worker/README.md).');
-    if(!fpGetOpenAiKey()) throw new Error('Set your OpenAI API key first (open "Generate floor plan" to add one).');
-    const prompt = fpEditPrompt(instruction);
-
-    const resp = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer ' + fpGetOpenAiKey(),
-      },
-      body: JSON.stringify({
-        model: 'gpt-6-astra',
-        max_completion_tokens: 16384,
-        response_format: { type: 'json_object' },
-        messages: [{ role:'user', content: prompt }],
-      }),
-    });
-    if(!resp.ok){
-      const errBody = await resp.text().catch(()=>'');
-      throw new Error('API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,200) : ''));
-    }
-    const data = await resp.json();
-    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-    return fpExtractJson(text);
-  }
 
   // ---------- PWA: manual backup / restore of the floor plan (Steps 6/6b/7/7a) ----------
-  // The floor plan (title/elements/openings/objects/notes, stored
+  // The floor plan (title/elements/objects/notes, stored
   // under FP_STORAGE_KEY) is the one piece of real user data this app
   // persists. This section is the backup/restore flow, same pattern as
   // HealthScore's.
@@ -3096,7 +3065,7 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
   }
 
   // The exact bytes already sitting in localStorage under FP_STORAGE_KEY
-  // (title/elements/openings/objects/notes/__idSeq) IS the backup
+  // (title/elements/objects/notes/__idSeq) IS the backup
   // payload -- no separate export shape to keep in sync with fpSave()/fpLoad().
   function fpBackupPayload(){
     try{ return localStorage.getItem(FP_STORAGE_KEY) || ''; }catch(e){ return ''; }
@@ -3226,7 +3195,7 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
   // ---- Restore (Step 7) ----
   function fpValidBackupShape(parsed){
     return !!parsed && typeof parsed==='object' &&
-      Array.isArray(parsed.elements) && Array.isArray(parsed.objects) && Array.isArray(parsed.openings);
+      Array.isArray(parsed.elements) && Array.isArray(parsed.objects);
   }
   // Same blank template "Clear plan" already resets to -- used here so a
   // backup missing a field a future app version might add doesn't leave it
