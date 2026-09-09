@@ -498,7 +498,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+207e3ca0';
+  const APP_VERSION = '1.0+296f8151';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2687,8 +2687,15 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
   }
 
   function fpExtractJson(text){
+    if(!text || !text.trim()){
+      // A reasoning model (gpt-6-astra) can burn its whole token budget on
+      // internal reasoning before writing any visible output on a genuinely
+      // hard request (a detailed multi-room floor plan, several photos) --
+      // that shows up here as an empty completion, not a malformed one.
+      throw new Error('The model returned an empty response -- likely ran out of its token budget reasoning through a complex request. Try again, or split it into fewer photos/a simpler description.');
+    }
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('Could not find JSON in the response.');
+    if(!jsonMatch) throw new Error('Could not find JSON in the response: "' + text.slice(0,200) + '"');
     return JSON.parse(jsonMatch[0]);
   }
 
@@ -2743,7 +2750,7 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
       },
       body: JSON.stringify({
         model: 'gpt-6-astra',
-        max_completion_tokens: 4096,
+        max_completion_tokens: 16384,
         response_format: { type: 'json_object' },
         messages: [{ role:'user', content: [ ...images, { type:'text', text: prompt } ] }],
       }),
@@ -2878,7 +2885,7 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
       },
       body: JSON.stringify({
         model: 'gpt-6-astra',
-        max_completion_tokens: 4096,
+        max_completion_tokens: 16384,
         response_format: { type: 'json_object' },
         messages: [{ role:'user', content: prompt }],
       }),
