@@ -117,14 +117,13 @@
   .fp-icon-detail{ fill:none; stroke:var(--obj-dim); stroke-width:1; opacity:.75; vector-effect:non-scaling-stroke; }
   .fp-item.selected .fp-icon-outline{ stroke:var(--accent); stroke-width:2; }
   .fp-item-label{
-    position:absolute; left:50%; bottom:2px; transform:translateX(-50%);
-    font-size:.62rem; font-weight:600; color:var(--text); outline:none;
-    max-width:94%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    text-shadow:0 0 3px #0a1512, 0 0 3px #0a1512, 0 1px 2px #0a1512;
-    padding:0 .15rem; cursor:text;
+    position:absolute; left:50%; bottom:100%; margin-bottom:.3rem; transform:translateX(-50%);
+    font-size:.68rem; font-weight:600; color:var(--text); outline:none;
+    max-width:160%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    padding:0; cursor:pointer;
   }
-  .fp-item-label.placeholder{ color:var(--dim); font-style:italic; font-weight:500; opacity:.8; }
-  .fp-item-label:hover, .fp-item-label:focus{ background:rgba(10,21,18,.75); border-radius:3px; white-space:normal; }
+  .fp-item-label.placeholder{ color:var(--dim); font-style:italic; font-weight:500; }
+  .fp-item-label:hover, .fp-item-label:focus{ white-space:normal; }
   .fp-rotate-handle{
     position:absolute; top:-18px; left:50%; transform:translateX(-50%);
     width:9px; height:9px; border-radius:50%; background:var(--warn);
@@ -495,7 +494,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+6b38c5dd';
+  const APP_VERSION = '1.0+76de6645';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
