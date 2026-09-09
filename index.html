@@ -27,7 +27,10 @@
     position:sticky; top:0; z-index:20;
   }
   header .headerTop{ display:flex; align-items:center; gap:.6rem; }
-  header h1{font-size:1.02rem; margin:0; font-weight:650; letter-spacing:.2px;}
+  header h1{
+    font-size:1.55rem; margin:0; font-weight:650; letter-spacing:.2px;
+    color:rgba(232,235,239,.82); text-shadow:0 2px 10px rgba(64,208,181,.35), 0 1px 0 rgba(0,0,0,.4);
+  }
   header .sub{
     color:var(--dim); font-size:.78rem; text-align:center;
     text-wrap:balance; /* distributes wrapped words evenly across lines instead of a long line + short leftover */
@@ -87,7 +90,7 @@
     padding:40px;
   }
   .fp-canvas{
-    position:relative; background:var(--panel2);
+    position:relative; background:#ffffff;
     border:2px solid rgba(232,235,239,.55); box-sizing:content-box;
     box-shadow:0 12px 40px rgba(0,0,0,.35);
   }
@@ -250,6 +253,13 @@
   }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
+  #fpPrintContainer{ display:none; }
+  @media print{
+    body.fp-printing > *:not(#fpPrintContainer){ display:none !important; }
+    body.fp-printing #fpPrintContainer{ display:block !important; }
+    #fpPrintContainer svg{ width:100%; height:auto; }
+  }
+
   /* ---------- Install pill: pill-shaped, top-right of the topbar. The About
      popup (this app's Settings-equivalent surface) keeps showing it as an
      inert status line after install instead of hiding it entirely. ---------- */
@@ -263,7 +273,7 @@
   }
   #infoBtn{
     border-radius:999px; padding:.3rem; line-height:1;
-    width:2.1rem; height:2.1rem; display:inline-flex; align-items:center; justify-content:center;
+    width:2.9rem; height:2.9rem; display:inline-flex; align-items:center; justify-content:center;
   }
   #infoBtn img{ width:100%; height:100%; border-radius:50%; object-fit:cover; }
 
@@ -336,7 +346,9 @@
   <!-- ============ FLOOR PLAN SCREEN ============ -->
   <section id="floorplanScreen">
     <div class="toolbar fp-toolbar">
-      <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions" style="border-color:var(--accent); color:var(--accent);">&#10024; Generate floor plan</button>
+      <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions" style="border-color:var(--accent); color:var(--accent);">&#10024; Import Photo</button>
+      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Projects</button>
+      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <div class="divider"></div>
       <div class="segGroup" id="fpModeGroup">
         <button class="btn active" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
@@ -353,6 +365,7 @@
       <div class="divider"></div>
       <button class="btn" id="fpAddOpeningBtn" title="Add a door or window opening on a wall">+ Opening</button>
       <div class="spacer"></div>
+      <button class="btn" id="fpDeleteBtn" disabled title="Delete what's currently selected">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
     </div>
@@ -416,6 +429,8 @@
 
 </main>
 
+<div id="fpPrintContainer"></div>
+
 <script>
 (function(){
   'use strict';
@@ -475,7 +490,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+7dd26f1d';
+  const APP_VERSION = '1.0+e4ad5ec9';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -958,7 +973,7 @@
       openings: [],
       objects: [],
       legend: [
-        { id: fpIdSeq++, color:'#e8ebef', label:'Wall', desc:'solid or dashed line' },
+        { id: fpIdSeq++, color:'#8b8d8e', label:'Wall', desc:'solid or dashed line' },
         { id: fpIdSeq++, color:'#40d0b5', label:'Object', desc:'furniture from the library' },
       ],
       notes: [],
@@ -983,6 +998,7 @@
       localStorage.setItem(FP_STORAGE_KEY, JSON.stringify(toSave));
     }catch(e){}
     scheduleFpExitBackup(); // debounced silent safety-net snapshot -- see the PWA backup/restore section below
+    scheduleFpProjectSave(); // keeps the active entry in Recent Projects in sync -- see below
   }
   function fpPushHistory(){
     fpHistory.push(JSON.stringify(fpState));
@@ -1005,7 +1021,11 @@
   }
   function fpSnap(v){ return Math.round(v/FP_GRID_STEP)*FP_GRID_STEP; }
 
-  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; }
+  function fpUpdateDeleteBtn(){
+    const btn = document.getElementById('fpDeleteBtn');
+    if(btn) btn.disabled = fpSelectedId==null;
+  }
+  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; fpUpdateDeleteBtn(); }
 
   // Lightweight selection: toggles the CSS class on existing DOM nodes and
   // drops any stale node-handle layer, instead of a full fpRender() -- so
@@ -1015,7 +1035,7 @@
   // drag release), which is an acceptable one-step lag in exchange for
   // never rebuilding out from under a live drag.
   function fpSelect(kind, id){
-    fpSelectedKind = kind; fpSelectedId = id;
+    fpSelectedKind = kind; fpSelectedId = id; fpSelectAllActive = false;
     document.querySelectorAll('#fpCanvas .fp-item').forEach(node=>{
       node.classList.toggle('selected', kind==='object' && Number(node.dataset.id)===id);
     });
@@ -1024,6 +1044,7 @@
     });
     const nodesLayer = document.querySelector('#fpCanvas .fp-nodes-layer');
     if(nodesLayer) nodesLayer.remove();
+    fpUpdateDeleteBtn();
   }
 
   function fpDeleteSelected(){
@@ -1039,13 +1060,439 @@
     fpSave(); fpRender();
   }
 
+  // ---------- Export: shared bounds/SVG snapshot, used by PNG/JPG/PDF/DXF/copy ----------
+  function fpObjectBoundsFeet(item){
+    const hw = (item.w/12)/2, hd = (item.d/12)/2;
+    return { minX:item.cx-hw, minY:item.cy-hd, maxX:item.cx+hw, maxY:item.cy+hd };
+  }
+  function fpElementBounds(el){
+    if(el.type==='line' || el.type==='dashedline'){
+      return { minX:Math.min(el.x1,el.x2), minY:Math.min(el.y1,el.y2), maxX:Math.max(el.x1,el.x2), maxY:Math.max(el.y1,el.y2) };
+    }
+    if(el.type==='circle'){
+      return { minX:el.cx-el.r, minY:el.cy-el.r, maxX:el.cx+el.r, maxY:el.cy+el.r };
+    }
+    // rect/square/oval -- ignore rotation for a simple, slightly-generous bbox
+    const half = Math.max(el.w,el.h)/2;
+    return { minX:el.cx-half, minY:el.cy-half, maxX:el.cx+half, maxY:el.cy+half };
+  }
+  function fpComputePlanBounds(){
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    const consider = b=>{ minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); };
+    fpState.elements.forEach(el=>consider(fpElementBounds(el)));
+    fpState.objects.forEach(o=>consider(fpObjectBoundsFeet(o)));
+    if(minX===Infinity) return { minX:0, minY:0, maxX:10, maxY:10 }; // empty plan fallback
+    const pad = 2; // feet
+    return { minX:minX-pad, minY:minY-pad, maxX:maxX+pad, maxY:maxY+pad };
+  }
+  function fpSelectionBounds(){
+    if(fpSelectedId==null) return null;
+    if(fpSelectedKind==='element'){
+      const el = fpState.elements.find(e=>e.id===fpSelectedId);
+      return el ? fpElementBounds(el) : null;
+    }
+    const o = fpState.objects.find(x=>x.id===fpSelectedId);
+    return o ? fpObjectBoundsFeet(o) : null;
+  }
+
+  // Builds a standalone, self-contained SVG string of the plan (or a region
+  // of it) at a fixed export scale -- independent of the on-screen zoom --
+  // for rasterizing to PNG/JPG, printing to PDF, or copying to the clipboard.
+  const FP_EXPORT_SCALE = 40; // px per foot
+  function fpBuildExportSvg(bounds){
+    const scale = FP_EXPORT_SCALE;
+    const w = Math.max(1, Math.round((bounds.maxX-bounds.minX)*scale));
+    const h = Math.max(1, Math.round((bounds.maxY-bounds.minY)*scale));
+    const px = (x,y) => [ (x-bounds.minX)*scale, (y-bounds.minY)*scale ];
+    let body = '';
+    fpState.elements.forEach(el=>{
+      if(el.type==='line' || el.type==='dashedline'){
+        const [x1,y1] = px(el.x1,el.y1), [x2,y2] = px(el.x2,el.y2);
+        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#2a2f36" stroke-width="3" stroke-linecap="round"${el.type==='dashedline'?' stroke-dasharray="10,7"':''}/>`;
+      } else if(el.type==='circle'){
+        const [cx,cy] = px(el.cx,el.cy);
+        body += `<circle cx="${cx}" cy="${cy}" r="${el.r*scale}" stroke="#2a2f36" stroke-width="2" fill="none"/>`;
+      } else if(el.type==='oval'){
+        const [cx,cy] = px(el.cx,el.cy);
+        body += `<ellipse cx="${cx}" cy="${cy}" rx="${el.w/2*scale}" ry="${el.h/2*scale}" stroke="#2a2f36" stroke-width="2" fill="none" transform="rotate(${el.rot||0} ${cx} ${cy})"/>`;
+      } else {
+        const [x,y] = px(el.cx-el.w/2, el.cy-el.h/2);
+        const [cx,cy] = px(el.cx,el.cy);
+        body += `<rect x="${x}" y="${y}" width="${el.w*scale}" height="${el.h*scale}" stroke="#2a2f36" stroke-width="2" fill="none" transform="rotate(${el.rot||0} ${cx} ${cy})"/>`;
+      }
+    });
+    fpState.openings.forEach(op=>{
+      const wall = fpState.elements.find(e=>e.id===op.wallId && (e.type==='line'||e.type==='dashedline'));
+      if(!wall) return;
+      const len = Math.hypot(wall.x2-wall.x1, wall.y2-wall.y1) || 1;
+      const ux = (wall.x2-wall.x1)/len, uy = (wall.y2-wall.y1)/len;
+      const ox1 = wall.x1+ux*op.offset, oy1 = wall.y1+uy*op.offset;
+      const clampedLen = Math.min(len, op.offset+op.width);
+      const ox2 = wall.x1+ux*clampedLen, oy2 = wall.y1+uy*clampedLen;
+      const [x1,y1] = px(ox1,oy1), [x2,y2] = px(ox2,oy2);
+      body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${/window/i.test(op.label)?'#2b8f7c':'#40d0b5'}" stroke-width="6"/>`;
+    });
+    fpState.objects.forEach(item=>{
+      const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
+      const [x,y] = px(item.cx-item.w/24, item.cy-item.d/24);
+      const [cx,cy] = px(item.cx,item.cy);
+      body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="-4 -4 ${item.w+8} ${item.d+8}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
+      if(item.label && item.label.trim()){
+        body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
+      }
+    });
+    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
+  }
+  function fpRasterizeSvg(svgString, w, h){
+    return new Promise((resolve,reject)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+        resolve(canvas);
+      };
+      img.onerror = reject;
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+    });
+  }
+  function fpSafeFileName(title){
+    return (title||'floor-plan').trim().replace(/[\\/:*?"<>|]+/g,'-').slice(0,60) || 'floor-plan';
+  }
+  // Always shows a fresh save-location picker (unlike the auto-backup path,
+  // which silently reuses a remembered handle) -- this is "Save As", so a new
+  // destination each time is the point.
+  async function fpSaveBlobWithPicker(blob, suggestedName, description, acceptMap){
+    if(window.showSaveFilePicker){
+      try{
+        const handle = await window.showSaveFilePicker({ suggestedName, types:[{ description, accept:acceptMap }] });
+        const w = await handle.createWritable();
+        await w.write(blob);
+        await w.close();
+        return true;
+      }catch(e){ if(e && e.name==='AbortError') return false; /* else fall through to plain download */ }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = suggestedName;
+    document.body.appendChild(a); a.click(); a.remove();
+    return true;
+  }
+
+  async function fpExportRaster(format){ // 'png' | 'jpeg'
+    const bounds = fpComputePlanBounds();
+    const svg = fpBuildExportSvg(bounds);
+    const w = Math.round((bounds.maxX-bounds.minX)*FP_EXPORT_SCALE), h = Math.round((bounds.maxY-bounds.minY)*FP_EXPORT_SCALE);
+    const canvas = await fpRasterizeSvg(svg, w, h);
+    const mime = format==='jpeg' ? 'image/jpeg' : 'image/png';
+    const blob = await new Promise(res=>canvas.toBlob(res, mime, 0.95));
+    if(!blob){ toast('Could not create the image.', true); return; }
+    const ext = format==='jpeg' ? 'jpg' : 'png';
+    await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}.${ext}`, format==='jpeg'?'JPEG image':'PNG image', {[mime]:['.'+ext]});
+  }
+
+  async function fpExportPdf(){
+    const bounds = fpComputePlanBounds();
+    const svg = fpBuildExportSvg(bounds);
+    const container = document.getElementById('fpPrintContainer');
+    container.innerHTML = svg;
+    document.body.classList.add('fp-printing');
+    window.print();
+    // No reliable "print dialog closed" event across browsers -- clear the
+    // print-only content shortly after, well past when the dialog opens.
+    setTimeout(()=>{ document.body.classList.remove('fp-printing'); container.innerHTML=''; }, 1000);
+  }
+
+  async function fpExportProjectFile(){
+    const json = fpBackupPayload();
+    if(!json){ toast('Nothing to export yet.', true); return; }
+    const blob = new Blob([json], {type:'application/json'});
+    await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}.json`, 'DrawDesignGo project file', {'application/json':['.json']});
+  }
+
+  // ---- DXF export -----------------------------------------------------
+  // True binary DWG is a large, proprietary Autodesk format -- infeasible to
+  // write correctly from scratch. DXF is the open, text-based CAD exchange
+  // format AutoCAD (and virtually everything else) reads natively, so it
+  // actually satisfies "import into other CAD programs" without pretending
+  // to be a real DWG file. Coordinates are in feet; Y is flipped since DXF's
+  // convention is Y-up while this app's plan uses screen-style Y-down.
+  function fpDxfLine(x1,y1,x2,y2){ return `0\nLINE\n8\n0\n10\n${x1}\n20\n${y1}\n11\n${x2}\n21\n${y2}\n`; }
+  function fpDxfCircle(cx,cy,r){ return `0\nCIRCLE\n8\n0\n10\n${cx}\n20\n${cy}\n40\n${r}\n`; }
+  function fpDxfText(x,y,text,height){ return `0\nTEXT\n8\n0\n10\n${x}\n20\n${y}\n40\n${height}\n1\n${String(text).replace(/[\r\n]+/g,' ')}\n`; }
+  function fpRotatePoint(x,y,cx,cy,deg){
+    const rad = deg*Math.PI/180;
+    const dx=x-cx, dy=y-cy;
+    return [ cx+dx*Math.cos(rad)-dy*Math.sin(rad), cy+dx*Math.sin(rad)+dy*Math.cos(rad) ];
+  }
+  function fpBuildDxf(){
+    let body = '';
+    const flipY = y => -y;
+    fpState.elements.forEach(el=>{
+      if(el.type==='line' || el.type==='dashedline'){
+        body += fpDxfLine(el.x1, flipY(el.y1), el.x2, flipY(el.y2));
+      } else if(el.type==='circle'){
+        body += fpDxfCircle(el.cx, flipY(el.cy), el.r);
+      } else if(el.type==='oval'){
+        const N=48; let prev=null;
+        for(let i=0;i<=N;i++){
+          const t=(i/N)*2*Math.PI;
+          let x=el.cx+Math.cos(t)*el.w/2, y=el.cy+Math.sin(t)*el.h/2;
+          [x,y]=fpRotatePoint(x,y,el.cx,el.cy,el.rot||0);
+          if(prev) body += fpDxfLine(prev[0], flipY(prev[1]), x, flipY(y));
+          prev=[x,y];
+        }
+      } else { // rect | square
+        const hw=el.w/2, hh=el.h/2;
+        const corners = [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([dx,dy])=>fpRotatePoint(el.cx+dx, el.cy+dy, el.cx, el.cy, el.rot||0));
+        for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
+      }
+    });
+    fpState.openings.forEach(op=>{
+      const wall = fpState.elements.find(e=>e.id===op.wallId && (e.type==='line'||e.type==='dashedline'));
+      if(!wall) return;
+      const len = Math.hypot(wall.x2-wall.x1, wall.y2-wall.y1) || 1;
+      const ux=(wall.x2-wall.x1)/len, uy=(wall.y2-wall.y1)/len;
+      const ox1=wall.x1+ux*op.offset, oy1=wall.y1+uy*op.offset;
+      const clampedLen=Math.min(len, op.offset+op.width);
+      const ox2=wall.x1+ux*clampedLen, oy2=wall.y1+uy*clampedLen;
+      body += fpDxfLine(ox1, flipY(oy1), ox2, flipY(oy2));
+    });
+    fpState.objects.forEach(item=>{
+      const hw=(item.w/12)/2, hd=(item.d/12)/2;
+      const corners = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([dx,dy])=>fpRotatePoint(item.cx+dx, item.cy+dy, item.cx, item.cy, item.rot||0));
+      for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
+      if(item.label && item.label.trim()){
+        body += fpDxfText(item.cx-hw, flipY(item.cy-hd-0.3), item.label, 0.25);
+      }
+    });
+    return `0\nSECTION\n2\nENTITIES\n${body}0\nENDSEC\n0\nEOF\n`;
+  }
+  async function fpExportDxf(){
+    const dxf = fpBuildDxf();
+    const blob = new Blob([dxf], {type:'application/dxf'});
+    await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}.dxf`, 'DXF drawing (opens in AutoCAD and most CAD software)', {'application/dxf':['.dxf']});
+  }
+
+  function fpOpenExportModal(){
+    const wrap = openModal('Save As',
+      '<p class="fp-hint" style="margin:0 0 .7rem;">Choose a format, then pick where to save it.</p>' +
+      '<button class="btn" id="fpExpPng" style="width:100%; margin-bottom:.4rem;">Image (PNG)</button>' +
+      '<button class="btn" id="fpExpJpg" style="width:100%; margin-bottom:.4rem;">Image (JPG)</button>' +
+      '<button class="btn" id="fpExpPdf" style="width:100%; margin-bottom:.4rem;">Print / Save as PDF&hellip;</button>' +
+      '<button class="btn" id="fpExpDxf" style="width:100%; margin-bottom:.4rem;">DXF drawing (AutoCAD &amp; other CAD software)</button>' +
+      '<button class="btn" id="fpExpProject" style="width:100%; border-color:var(--accent); color:var(--accent);">Project file (.json, re-editable)</button>'
+    );
+    wrap.querySelector('#fpExpPng').addEventListener('click', async ()=>{ wrap.remove(); await fpExportRaster('png'); });
+    wrap.querySelector('#fpExpJpg').addEventListener('click', async ()=>{ wrap.remove(); await fpExportRaster('jpeg'); });
+    wrap.querySelector('#fpExpPdf').addEventListener('click', async ()=>{ wrap.remove(); await fpExportPdf(); });
+    wrap.querySelector('#fpExpDxf').addEventListener('click', async ()=>{ wrap.remove(); await fpExportDxf(); });
+    wrap.querySelector('#fpExpProject').addEventListener('click', async ()=>{ wrap.remove(); await fpExportProjectFile(); });
+  }
+
+  // ---- Copy to system clipboard (Ctrl/Cmd+C; Ctrl/Cmd+A marks "whole plan") ----
+  let fpSelectAllActive = false;
+  async function fpCopyToClipboard(){
+    if(!navigator.clipboard || !window.ClipboardItem){ toast('This browser can\'t copy images to the clipboard.', true); return; }
+    let bounds = null;
+    if(!fpSelectAllActive){
+      const sel = fpSelectionBounds();
+      if(sel) bounds = { minX:sel.minX-1, minY:sel.minY-1, maxX:sel.maxX+1, maxY:sel.maxY+1 };
+    }
+    if(!bounds) bounds = fpComputePlanBounds();
+    const svg = fpBuildExportSvg(bounds);
+    const w = Math.round((bounds.maxX-bounds.minX)*FP_EXPORT_SCALE), h = Math.round((bounds.maxY-bounds.minY)*FP_EXPORT_SCALE);
+    try{
+      const canvas = await fpRasterizeSvg(svg, w, h);
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
+      await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+      toast('Copied to clipboard.');
+    }catch(e){
+      toast('Could not copy to clipboard in this browser.', true);
+    }
+  }
+
+  // ---- Recent Projects: up to 5, entirely internal (IndexedDB) -- click to
+  // switch, no file picker involved. The currently-open plan is always also
+  // one of these entries, kept in sync by scheduleFpProjectSave() from
+  // fpSave() on every real edit. Separate from the file-system backup above,
+  // which is about surviving data loss, not organizing multiple plans.
+  const FP_PROJECTS_DB = 'floorplanner-projects', FP_PROJECTS_STORE = 'projects', FP_MAX_PROJECTS = 5;
+  const FP_ACTIVE_PROJECT_ID_KEY = 'floorplanner-active-project-id';
+  let fpActiveProjectId = null;
+  function openFpProjectsDb(){
+    return new Promise((resolve,reject)=>{
+      const req = indexedDB.open(FP_PROJECTS_DB, 1);
+      req.onupgradeneeded = ()=>{ req.result.createObjectStore(FP_PROJECTS_STORE, { keyPath:'id' }); };
+      req.onsuccess = ()=>resolve(req.result);
+      req.onerror = ()=>reject(req.error);
+    });
+  }
+  async function fpListProjects(){
+    try{
+      const db = await openFpProjectsDb();
+      const all = await new Promise((resolve,reject)=>{
+        const req = db.transaction(FP_PROJECTS_STORE,'readonly').objectStore(FP_PROJECTS_STORE).getAll();
+        req.onsuccess = ()=>resolve(req.result||[]);
+        req.onerror = ()=>reject(req.error);
+      });
+      return all.sort((a,b)=>b.savedAt-a.savedAt);
+    }catch(e){ return []; }
+  }
+  async function fpGetProject(id){
+    try{
+      const db = await openFpProjectsDb();
+      return await new Promise((resolve,reject)=>{
+        const req = db.transaction(FP_PROJECTS_STORE,'readonly').objectStore(FP_PROJECTS_STORE).get(id);
+        req.onsuccess = ()=>resolve(req.result||null);
+        req.onerror = ()=>reject(req.error);
+      });
+    }catch(e){ return null; }
+  }
+  async function fpPutProject(record){
+    try{
+      const db = await openFpProjectsDb();
+      await new Promise((resolve,reject)=>{
+        const tx = db.transaction(FP_PROJECTS_STORE,'readwrite');
+        tx.objectStore(FP_PROJECTS_STORE).put(record);
+        tx.oncomplete = resolve; tx.onerror = ()=>reject(tx.error);
+      });
+    }catch(e){}
+  }
+  async function fpDeleteProject(id){
+    try{
+      const db = await openFpProjectsDb();
+      await new Promise((resolve,reject)=>{
+        const tx = db.transaction(FP_PROJECTS_STORE,'readwrite');
+        tx.objectStore(FP_PROJECTS_STORE).delete(id);
+        tx.oncomplete = resolve; tx.onerror = ()=>reject(tx.error);
+      });
+    }catch(e){}
+  }
+  function fpGetActiveProjectId(){ try{ return localStorage.getItem(FP_ACTIVE_PROJECT_ID_KEY); }catch(e){ return null; } }
+  function fpSetActiveProjectId(id){ try{ localStorage.setItem(FP_ACTIVE_PROJECT_ID_KEY, id); }catch(e){} }
+  function fpNewProjectId(){ return 'p' + Date.now() + Math.random().toString(36).slice(2,7); }
+  function fpProjectSnapshot(){
+    return JSON.parse(JSON.stringify(Object.assign({}, fpState, { __idSeq: fpIdSeq })));
+  }
+  async function fpEnforceProjectLimit(){
+    const list = await fpListProjects();
+    for(const p of list.slice(FP_MAX_PROJECTS)) await fpDeleteProject(p.id); // oldest beyond the cap
+  }
+
+  let fpProjectSaveDebounceId = null;
+  function scheduleFpProjectSave(){
+    if(fpProjectSaveDebounceId) clearTimeout(fpProjectSaveDebounceId);
+    fpProjectSaveDebounceId = setTimeout(async ()=>{
+      fpProjectSaveDebounceId = null;
+      if(!fpActiveProjectId) return;
+      await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
+    }, 500);
+  }
+
+  async function fpStartNewProject(){
+    fpActiveProjectId = fpNewProjectId();
+    fpSetActiveProjectId(fpActiveProjectId);
+    fpState = fpDefaultState();
+    fpDeselect();
+    fpHistory = [];
+    document.getElementById('fpUndoBtn').disabled = true;
+    document.getElementById('fpTitle').textContent = fpState.title;
+    fpSave();
+    await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
+    await fpEnforceProjectLimit();
+    fpRender();
+  }
+  async function fpSwitchToProject(id){
+    if(id===fpActiveProjectId) return;
+    const record = await fpGetProject(id);
+    if(!record) return;
+    fpActiveProjectId = id;
+    fpSetActiveProjectId(id);
+    const parsed = record.state || {};
+    fpState = Object.assign({}, fpDefaultState(), parsed);
+    fpIdSeq = parsed.__idSeq || 1000;
+    delete fpState.__idSeq;
+    fpDeselect();
+    fpHistory = [];
+    document.getElementById('fpUndoBtn').disabled = true;
+    document.getElementById('fpTitle').textContent = fpState.title;
+    fpSave();
+    fpRender();
+  }
+  async function fpRenameProject(id, name){
+    const record = await fpGetProject(id);
+    if(!record) return;
+    record.name = name;
+    await fpPutProject(record);
+    if(id===fpActiveProjectId){
+      fpState.title = name;
+      document.getElementById('fpTitle').textContent = name;
+      fpSave();
+    }
+  }
+
+  function fpOpenProjectsModal(){
+    const wrap = openModal('Recent Projects',
+      '<button class="btn" id="fpNewProjectBtn" style="width:100%; margin-bottom:.7rem; border-color:var(--accent); color:var(--accent);">+ New Project</button>' +
+      '<div id="fpProjectsListWrap" class="fp-list"></div>'
+    );
+    async function refresh(){
+      const list = await fpListProjects();
+      const listWrap = wrap.querySelector('#fpProjectsListWrap');
+      listWrap.innerHTML = '';
+      if(!list.length){
+        const p = document.createElement('p'); p.className = 'fp-hint'; p.style.margin = '0';
+        p.textContent = 'No saved projects yet.';
+        listWrap.appendChild(p);
+        return;
+      }
+      list.forEach(rec=>{
+        const isActive = rec.id===fpActiveProjectId;
+        const row = document.createElement('div'); row.className = 'fp-row';
+        const nameBtn = document.createElement('button');
+        nameBtn.type = 'button'; nameBtn.className = 'fp-row-grow';
+        nameBtn.style.cssText = 'text-align:left; background:none; border:none; font-size:.8rem; cursor:pointer; padding:.3rem 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' +
+          (isActive ? 'color:var(--accent); font-weight:700;' : 'color:var(--text);');
+        nameBtn.textContent = (rec.name || 'Untitled Floor Plan') + (isActive ? ' (current)' : '');
+        nameBtn.title = 'Open this project';
+        nameBtn.addEventListener('click', async ()=>{ await fpSwitchToProject(rec.id); wrap.remove(); });
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button'; renameBtn.className = 'fp-row-remove'; renameBtn.style.color = 'var(--dim)';
+        renameBtn.textContent = '✎'; renameBtn.title = 'Rename';
+        renameBtn.addEventListener('click', async ()=>{
+          const next = prompt('Rename project', rec.name || 'Untitled Floor Plan');
+          if(next && next.trim()){ await fpRenameProject(rec.id, next.trim()); refresh(); }
+        });
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button'; delBtn.className = 'fp-row-remove'; delBtn.textContent = '×'; delBtn.title = 'Delete';
+        delBtn.addEventListener('click', async ()=>{
+          if(!confirm(`Delete "${rec.name || 'Untitled Floor Plan'}"? This can't be undone.`)) return;
+          await fpDeleteProject(rec.id);
+          if(rec.id===fpActiveProjectId) await fpStartNewProject();
+          refresh();
+        });
+        row.append(nameBtn, renameBtn, delBtn);
+        listWrap.appendChild(row);
+      });
+    }
+    wrap.querySelector('#fpNewProjectBtn').addEventListener('click', async ()=>{
+      if(!confirm('Start a new blank project? Your current one stays saved in Recent Projects.')) return;
+      await fpStartNewProject();
+      wrap.remove();
+    });
+    refresh();
+  }
+
   function fpApplyGridBackground(canvas, scale){
     const minor = FP_GRID_STEP*scale, major = 5*scale;
     canvas.style.backgroundImage =
-      'linear-gradient(to right, rgba(154,163,175,.14) 1px, transparent 1px),' +
-      'linear-gradient(to bottom, rgba(154,163,175,.14) 1px, transparent 1px),' +
-      'linear-gradient(to right, rgba(154,163,175,.05) 1px, transparent 1px),' +
-      'linear-gradient(to bottom, rgba(154,163,175,.05) 1px, transparent 1px)';
+      'linear-gradient(to right, rgba(74,144,217,.4) 1px, transparent 1px),' +
+      'linear-gradient(to bottom, rgba(74,144,217,.4) 1px, transparent 1px),' +
+      'linear-gradient(to right, rgba(74,144,217,.16) 1px, transparent 1px),' +
+      'linear-gradient(to bottom, rgba(74,144,217,.16) 1px, transparent 1px)';
     canvas.style.backgroundSize = `${major}px ${major}px, ${major}px ${major}px, ${minor}px ${minor}px, ${minor}px ${minor}px`;
     canvas.style.backgroundPosition = '-1.5px -1.5px';
   }
@@ -1215,7 +1662,7 @@
           fpDrawPending = null;
           if(Math.hypot(mx-start.x1, my-start.y1) >= FP_GRID_STEP){
             fpPushHistory();
-            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, x1:start.x1, y1:start.y1, x2:mx, y2:my, color:'#e8ebef' });
+            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, x1:start.x1, y1:start.y1, x2:mx, y2:my, color:'#8b8d8e' });
             fpSave();
           }
           fpRender();
@@ -1261,7 +1708,7 @@
           const r = Math.max(FP_GRID_STEP, fpSnap(Math.hypot(mx-sx,my-sy)));
           if(r>=FP_GRID_STEP){
             fpPushHistory();
-            fpState.elements.push({ id:fpIdSeq++, type:'circle', cx:sx, cy:sy, r, color:'#e8ebef', fill:'rgba(232,235,239,.08)' });
+            fpState.elements.push({ id:fpIdSeq++, type:'circle', cx:sx, cy:sy, r, color:'#8b8d8e', fill:'rgba(139,141,142,.06)' });
             fpSave();
           }
         } else {
@@ -1270,7 +1717,7 @@
           if(ww>=FP_GRID_STEP && hh>=FP_GRID_STEP){
             const cx = fpSnap((sx+mx)/2), cy = fpSnap((sy+my)/2);
             fpPushHistory();
-            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, cx, cy, w:ww, h:hh, rot:0, color:'#e8ebef', fill:'rgba(232,235,239,.08)' });
+            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, cx, cy, w:ww, h:hh, rot:0, color:'#8b8d8e', fill:'rgba(139,141,142,.06)' });
             fpSave();
           }
         }
@@ -1313,24 +1760,24 @@
       if(el.type==='line' || el.type==='dashedline'){
         shape = fpSvgEl('line', {
           x1:px(el.x1), y1:px(el.y1), x2:px(el.x2), y2:px(el.y2),
-          stroke: el.color||'#e8ebef', 'stroke-width':3, 'stroke-linecap':'round',
+          stroke: el.color||'#8b8d8e', 'stroke-width':3, 'stroke-linecap':'round',
         });
         if(el.type==='dashedline') shape.setAttribute('stroke-dasharray','10,7');
       } else if(el.type==='circle'){
         shape = fpSvgEl('circle', {
           cx:px(el.cx), cy:px(el.cy), r:px(el.r),
-          stroke: el.color||'#e8ebef', 'stroke-width':2, fill: el.fill||'rgba(232,235,239,.08)',
+          stroke: el.color||'#8b8d8e', 'stroke-width':2, fill: el.fill||'rgba(139,141,142,.06)',
         });
       } else if(el.type==='oval'){
         shape = fpSvgEl('ellipse', {
           cx:px(el.cx), cy:px(el.cy), rx:px(el.w/2), ry:px(el.h/2),
-          stroke: el.color||'#e8ebef', 'stroke-width':2, fill: el.fill||'rgba(232,235,239,.08)',
+          stroke: el.color||'#8b8d8e', 'stroke-width':2, fill: el.fill||'rgba(139,141,142,.06)',
           transform: `rotate(${el.rot||0} ${px(el.cx)} ${px(el.cy)})`,
         });
       } else { // rect | square
         shape = fpSvgEl('rect', {
           x:px(el.cx-el.w/2), y:px(el.cy-el.h/2), width:px(el.w), height:px(el.h),
-          stroke: el.color||'#e8ebef', 'stroke-width':2, fill: el.fill||'rgba(232,235,239,.08)',
+          stroke: el.color||'#8b8d8e', 'stroke-width':2, fill: el.fill||'rgba(139,141,142,.06)',
           transform: `rotate(${el.rot||0} ${px(el.cx)} ${px(el.cy)})`,
         });
       }
@@ -1683,13 +2130,21 @@
 
   function initFloorPlan(){
     fpState = fpLoad();
+    fpActiveProjectId = fpGetActiveProjectId() || fpNewProjectId();
+    fpSetActiveProjectId(fpActiveProjectId);
     document.getElementById('fpTitle').textContent = fpState.title;
     fpRender();
+    // Registers the just-loaded plan in Recent Projects even before its
+    // first edit, so a fresh install's default/empty plan still shows up.
+    fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
 
     document.getElementById('fpTitle').addEventListener('blur', (e)=>{
       fpState.title = e.target.textContent.trim() || 'Untitled Floor Plan';
       fpSave();
     });
+
+    document.getElementById('fpProjectsBtn').addEventListener('click', fpOpenProjectsModal);
+    document.getElementById('fpExportBtn').addEventListener('click', fpOpenExportModal);
 
     document.getElementById('fpModeGroup').addEventListener('click', (e)=>{
       const btn = e.target.closest('button[data-mode]');
@@ -1747,6 +2202,7 @@
       if(e.key==='Enter'){ e.preventDefault(); runEditInstruction(); }
     });
 
+    document.getElementById('fpDeleteBtn').addEventListener('click', fpDeleteSelected);
     document.getElementById('fpUndoBtn').addEventListener('click', fpUndo);
     document.getElementById('fpResetBtn').addEventListener('click', ()=>{
       if(!confirm('Clear this floor plan and start blank?')) return;
@@ -1768,8 +2224,21 @@
 
     document.addEventListener('keydown', (e)=>{
       if(e.key==='Escape' && fpDrawPending){ fpDrawPending = null; fpRender(); return; }
-      if((e.key==='Delete'||e.key==='Backspace') && fpSelectedId!==null && document.activeElement.tagName!=='INPUT' && !document.activeElement.isContentEditable){
+      const typing = document.activeElement.tagName==='INPUT' || document.activeElement.isContentEditable;
+      if((e.key==='Delete'||e.key==='Backspace') && fpSelectedId!==null && !typing){
         fpDeleteSelected();
+        return;
+      }
+      if(!typing && (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='a'){
+        e.preventDefault();
+        fpSelectAllActive = true;
+        toast('Selected all — press Ctrl/Cmd+C to copy the whole plan.');
+        return;
+      }
+      if(!typing && (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='c'){
+        if(fpSelectedId==null && !fpSelectAllActive) return; // nothing to copy, let the browser's own copy behave normally
+        e.preventDefault();
+        fpCopyToClipboard();
       }
     });
   }
@@ -1915,7 +2384,7 @@
 
   function fpOpenGenerateModal(){
     const provider = fpGetProvider();
-    const wrap = openModal('Generate floor plan', `
+    const wrap = openModal('Import Photo', `
       <p class="fp-hint" style="margin-top:0;">Take 3&ndash;4 photos of the room from different corners, so every wall shows in at least one shot, and/or just describe the room's dimensions below &mdash; photos are optional if you give exact measurements.</p>
       <div class="fp-photo-drop" id="fpPhotoDrop">Tap to choose photos, or drag them here</div>
       <input type="file" id="fpPhotoInput" accept="image/*" multiple style="display:none;">
@@ -2145,13 +2614,13 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
       const type = ['line','dashedline','rect','square','circle','oval'].includes(raw.type) ? raw.type : 'line';
       if(type==='line' || type==='dashedline'){
         wallIndexToId.push(id);
-        return { id, type, x1:fpSnap(Number(raw.x1)||0), y1:fpSnap(Number(raw.y1)||0), x2:fpSnap(Number(raw.x2)||0), y2:fpSnap(Number(raw.y2)||0), color:'#e8ebef' };
+        return { id, type, x1:fpSnap(Number(raw.x1)||0), y1:fpSnap(Number(raw.y1)||0), x2:fpSnap(Number(raw.x2)||0), y2:fpSnap(Number(raw.y2)||0), color:'#8b8d8e' };
       }
       wallIndexToId.push(null); // keep index alignment with the AI's own array
       if(type==='circle'){
-        return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), r:Math.max(FP_GRID_STEP, fpSnap(Number(raw.r)||1)), color:'#e8ebef', fill:'rgba(232,235,239,.08)' };
+        return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), r:Math.max(FP_GRID_STEP, fpSnap(Number(raw.r)||1)), color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
       }
-      return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), w:Math.max(FP_GRID_STEP, fpSnap(Number(raw.w)||1)), h:Math.max(FP_GRID_STEP, fpSnap(Number(raw.h)||1)), rot:Number(raw.rot)||0, color:'#e8ebef', fill:'rgba(232,235,239,.08)' };
+      return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), w:Math.max(FP_GRID_STEP, fpSnap(Number(raw.w)||1)), h:Math.max(FP_GRID_STEP, fpSnap(Number(raw.h)||1)), rot:Number(raw.rot)||0, color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
     });
     const openings = (Array.isArray(result.openings)?result.openings:[]).map(op=>{
       const wallId = wallIndexToId[op.wallIndex];
