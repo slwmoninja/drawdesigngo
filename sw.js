@@ -1,8 +1,9 @@
 // Precaches the app shell and serves it cache-first with a background network
 // refresh (stale-while-revalidate) -- fast, offline-capable loads instead of
-// re-downloading the whole app every open. Everything (segmentation,
-// inpainting, compositing) runs on-device with no external requests, so this
-// worker only ever needs to own the same-origin app shell.
+// re-downloading the whole app every open. The floor plan editor itself runs
+// entirely client-side (only the optional photo-to-plan AI generation makes
+// an external request), so this worker only ever needs to own the
+// same-origin app shell.
 //
 // This does NOT fight index.html's own checkForUpdate() (a HEAD request with
 // cache:'no-store' + a cache-busting query string, comparing etag/last-
@@ -17,7 +18,7 @@
 // stamps manifest.json's icon src URLs (and index.html's apple-touch-icon
 // href) with a content hash whenever the icon files change, so a real icon
 // update always gets a new URL for this check to notice.
-const CACHE_NAME = 'floorplanner-shell-e679f28705ba';
+const CACHE_NAME = 'floorplanner-shell-1e9825cc26f8';
 const PRECACHE_URLS = [
   './index.html', './manifest.json', './icon-192.png', './icon-512.png'
 ];

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keeps FloorPlanner's PWA install/update machinery honest on every commit.
+"""Keeps DrawDesignGo's PWA install/update machinery honest on every commit.
 
 Three independent things this does, all driven by content hashes so nothing
 has to be hand-bumped:

@@ -1,6 +1,6 @@
-# FloorPlanner OpenAI proxy
+# DrawDesignGo OpenAI proxy
 
-FloorPlanner is a static site with no backend, and OpenAI's API doesn't
+DrawDesignGo is a static site with no backend, and OpenAI's API doesn't
 support direct browser calls (no CORS headers) the way Anthropic's does.
 This Worker is a thin passthrough that just adds the missing CORS header
 and forwards the request to `api.openai.com` unchanged -- your OpenAI key
@@ -23,15 +23,15 @@ separate copy.
 3. Deploy: `wrangler deploy`
 4. Wrangler prints a URL like `https://floorplanner-openai-proxy.<your-subdomain>.workers.dev`.
    Copy it.
-5. In FloorPlanner, open "Generate floor plan" > switch provider to OpenAI,
+5. In DrawDesignGo, open "Generate floor plan" > switch provider to OpenAI,
    and paste that URL into the "Proxy URL" field (replacing the default),
    plus your OpenAI API key (from platform.openai.com/api-keys) into the
    key field.
 
-## Locked to FloorPlanner's own site
+## Locked to DrawDesignGo's own site
 
 `ALLOWED_ORIGIN` in `openai-proxy.js` is set to `https://slwmoninja.github.io`
-(not `'*'`), so only requests from FloorPlanner's real deployed origin will
+(not `'*'`), so only requests from DrawDesignGo's real deployed origin will
 complete in a browser -- others get the CORS header back but it won't match
 their origin, so the browser blocks it client-side. This does mean local
 testing (e.g. `python -m http.server` on localhost) won't be able to reach
