@@ -31,6 +31,10 @@
   header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; }
   header h1 img{ height:3.4rem; width:auto; display:block; border-radius:6px; }
   header h1 .header-mark{ height:5.98rem; width:5.98rem; border-radius:50%; flex:none; }
+  header h1 .header-wordmark{
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 50%, transparent 92%);
+    mask-image: radial-gradient(ellipse at center, #000 50%, transparent 92%);
+  }
   header .spacer{flex:1;}
 
   main{max-width:1180px; margin:0 auto; padding:1rem;}
@@ -136,12 +140,6 @@
     content:""; position:absolute; top:9px; left:50%; width:1px; height:9px;
     background:var(--warn); transform:translateX(-50%);
   }
-  .fp-del-btn{
-    position:absolute; top:-10px; right:-10px; width:18px; height:18px; border-radius:50%;
-    background:var(--danger); color:#fff; border:none; font-size:.7rem; line-height:1;
-    cursor:pointer; display:none; align-items:center; justify-content:center; z-index:2;
-  }
-  .fp-item.selected .fp-del-btn{ display:flex; }
   .fp-obj-node{
     position:absolute; width:9px; height:9px; margin:-5px 0 0 -5px; border-radius:50%;
     background:var(--accent); border:1.5px solid #0a1512; cursor:pointer; display:none; z-index:2;
@@ -346,7 +344,7 @@
 
 <header>
   <div class="headerTop">
-    <h1><img class="header-mark" src="./icon-512.png" alt=""><img src="./ddg-logo.png" alt="DrawDesignGo"></h1>
+    <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
     <div class="spacer"></div>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
     <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
@@ -416,31 +414,7 @@
           </div>
           <p class="fp-hint" style="margin:0 0 .5rem;">Drag an item onto the grid, or tap to drop it at center.</p>
           <div id="fpObjectTemplates" class="fp-object-templates"></div>
-        </div>
-
-        <div class="fp-panel">
-          <div class="fp-panel-head">
-            <h3>Images</h3>
-          </div>
-          <p class="fp-hint" style="margin:0 0 .5rem;">Drag an image onto the grid, or tap to drop it at center.</p>
-          <div id="fpImageTemplates" class="fp-object-templates"></div>
           <input type="file" id="fpImageUploadInput" accept="image/*" multiple style="display:none;">
-        </div>
-
-        <div class="fp-panel">
-          <div class="fp-panel-head">
-            <h3>Openings</h3>
-            <button class="fp-add-row" id="fpOpeningsAdd" title="Add opening">+</button>
-          </div>
-          <div id="fpOpeningsList" class="fp-list"></div>
-        </div>
-
-        <div class="fp-panel">
-          <div class="fp-panel-head">
-            <h3>Legend</h3>
-            <button class="fp-add-row" id="fpLegendAdd" title="Add legend item">+</button>
-          </div>
-          <div id="fpLegendList" class="fp-list"></div>
         </div>
 
         <div class="fp-panel">
@@ -458,6 +432,7 @@
 
 <div id="fpPrintContainer"></div>
 
+<script src="./vendor/pdfjs/pdf.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -467,6 +442,8 @@
   const infoBtn = document.getElementById('infoBtn');
   const printBtn = document.getElementById('printBtn');
   printBtn.addEventListener('click', ()=> fpExportPdf());
+
+  if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdfjs/pdf.worker.min.js';
 
   // ---------- Utility ----------
   function toast(msg, isErr){
@@ -519,7 +496,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+146ccdf6';
+  const APP_VERSION = '1.0+2ad8398f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1154,16 +1131,60 @@
     nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
   }
 
+  function fpOpenOpeningDetailsModal(op){
+    const walls = fpState.elements.filter(e=>e.type==='line'||e.type==='dashedline');
+    const wallOptions = walls.map((wEl,i)=>
+      `<option value="${wEl.id}"${wEl.id===op.wallId?' selected':''}>Wall ${i+1} (${fpFmtFeet(Math.hypot(wEl.x2-wEl.x1, wEl.y2-wEl.y1))})</option>`
+    ).join('');
+    const wrap = openModal('Opening Details', `
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Wall
+        <select id="fpOpWallInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;">${wallOptions}</select>
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Label
+        <input type="text" id="fpOpLabelInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(op.label||'')}">
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Offset from wall start / Width (ft)
+        <div style="display:flex; gap:.5rem; align-items:center; margin-top:.25rem;">
+          <input type="number" id="fpOpOffsetInput" class="fp-detail-input" style="width:100%;" step="0.5" value="${op.offset}">
+          <span class="mini">&times;</span>
+          <input type="number" id="fpOpWidthInput" class="fp-detail-input" style="width:100%;" step="0.5" value="${op.width}">
+        </div>
+      </label>
+      <div style="display:flex; gap:.5rem;">
+        <button class="btn" id="fpOpDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
+        <button class="btn-primary" id="fpOpSaveBtn" type="button" style="flex:1;">Save</button>
+      </div>
+    `);
+    const wallInput = wrap.querySelector('#fpOpWallInput');
+    const labelInput = wrap.querySelector('#fpOpLabelInput');
+    const offsetInput = wrap.querySelector('#fpOpOffsetInput');
+    const widthInput = wrap.querySelector('#fpOpWidthInput');
+    labelInput.focus();
+    wrap.querySelector('#fpOpDeleteBtn').addEventListener('click', ()=>{
+      fpPushHistory();
+      fpState.openings = fpState.openings.filter(o=>o.id!==op.id);
+      fpSave(); fpRender();
+      wrap.remove();
+    });
+    function save(){
+      fpPushHistory();
+      op.wallId = Number(wallInput.value);
+      op.label = labelInput.value.trim() || 'Opening';
+      op.offset = parseFloat(offsetInput.value)||0;
+      op.width = Math.max(0.5, parseFloat(widthInput.value)||1);
+      fpSave(); fpRender();
+      wrap.remove();
+    }
+    wrap.querySelector('#fpOpSaveBtn').addEventListener('click', save);
+    labelInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
+  }
+
   function fpDefaultState(){
     return {
       title: 'Untitled Floor Plan',
       elements: [],
       openings: [],
       objects: [],
-      legend: [
-        { id: fpIdSeq++, color:'#8b8d8e', label:'Wall', desc:'solid or dashed line' },
-        { id: fpIdSeq++, color:'#5b7a99', label:'Object', desc:'furniture from the library' },
-      ],
       notes: [],
     };
   }
@@ -2087,8 +2108,9 @@
       });
       mark.setAttribute('class','fp-opening-mark');
       const titleEl = fpSvgEl('title', {});
-      titleEl.textContent = op.label + ' — edit in the Openings list';
+      titleEl.textContent = op.label + ' — tap to edit';
       mark.appendChild(titleEl);
+      mark.addEventListener('click', (e)=>{ e.stopPropagation(); fpOpenOpeningDetailsModal(op); });
       svg.appendChild(mark);
     });
 
@@ -2136,18 +2158,6 @@
       rotHandle.className = 'fp-rotate-handle';
       el.appendChild(rotHandle);
 
-      const delBtn = document.createElement('button');
-      delBtn.className = 'fp-del-btn'; delBtn.type='button'; delBtn.textContent = '×';
-      delBtn.title = 'Delete this item';
-      delBtn.addEventListener('pointerdown', e=>e.stopPropagation());
-      delBtn.addEventListener('click', ()=>{
-        fpPushHistory();
-        fpState.objects = fpState.objects.filter(o=>o.id!==item.id);
-        fpDeselect();
-        fpSave(); fpRender();
-      });
-      el.appendChild(delBtn);
-
       // Resize/reshape nodes: 4 corners, center-anchored (mirrors the
       // structural-element node-resize in fpAddElementNodes) -- dragging a
       // corner grows/shrinks item.w/item.d symmetrically around cx/cy.
@@ -2188,7 +2198,7 @@
       el.addEventListener('pointerdown', (e)=>{
         if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('object', item.id); return; }
         if(fpMode!=='select') return;
-        if(e.target.closest('.fp-rotate-handle, .fp-del-btn, .fp-obj-node, .fp-item-label') || e.target.isContentEditable) return;
+        if(e.target.closest('.fp-rotate-handle, .fp-obj-node, .fp-item-label') || e.target.isContentEditable) return;
         e.preventDefault();
         fpSelect('object', item.id);
         fpPushHistory();
@@ -2258,9 +2268,24 @@
     // Objects: category accordion, built once. Each item is a draggable
     // (real HTML5 DnD onto the grid) icon card; a plain click/tap is a
     // fallback that drops it at grid center, for touch devices without drag.
+    // "Upload" (user-added graphics) sits first, folded by default; the
+    // furniture categories from FP_LIBRARY follow, with the first one open.
     const tplWrap = document.getElementById('fpObjectTemplates');
     if(tplWrap && !tplWrap.dataset.built){
       tplWrap.dataset.built = '1';
+
+      const uploadDetails = document.createElement('details');
+      uploadDetails.className = 'fp-lib-cat';
+      const uploadSummary = document.createElement('summary');
+      uploadSummary.textContent = 'Upload';
+      uploadDetails.appendChild(uploadSummary);
+      const uploadGrid = document.createElement('div');
+      uploadGrid.className = 'fp-lib-grid';
+      uploadGrid.id = 'fpImageUploadGrid';
+      uploadDetails.appendChild(uploadGrid);
+      tplWrap.appendChild(uploadDetails);
+      fpRefreshImageLibraryGrid();
+
       FP_LIBRARY.forEach((cat, ci)=>{
         const details = document.createElement('details');
         details.className = 'fp-lib-cat';
@@ -2286,88 +2311,6 @@
         tplWrap.appendChild(details);
       });
     }
-
-    // Images: same accordion shell, built once -- but the "Upload" category's
-    // items are user data (persisted in localStorage), not a fixed catalog,
-    // so its grid is (re)filled by fpRefreshImageLibraryGrid() rather than
-    // built here directly, so an upload can refresh it without rebuilding
-    // the <details> shell (and losing its open/closed state).
-    const imgWrap = document.getElementById('fpImageTemplates');
-    if(imgWrap && !imgWrap.dataset.built){
-      imgWrap.dataset.built = '1';
-      const details = document.createElement('details');
-      details.className = 'fp-lib-cat';
-      details.open = true;
-      const summary = document.createElement('summary');
-      summary.textContent = 'Upload';
-      details.appendChild(summary);
-      const grid = document.createElement('div');
-      grid.className = 'fp-lib-grid';
-      grid.id = 'fpImageUploadGrid';
-      details.appendChild(grid);
-      imgWrap.appendChild(details);
-      fpRefreshImageLibraryGrid();
-    }
-
-    // Openings -- picks which drawn wall (line/dashed-line element) they sit on
-    const walls = fpState.elements.filter(e=>e.type==='line'||e.type==='dashedline');
-    const opList = document.getElementById('fpOpeningsList');
-    opList.innerHTML = '';
-    if(!walls.length){
-      const hint = document.createElement('p');
-      hint.className = 'fp-hint'; hint.style.margin = '0';
-      hint.textContent = 'Draw a wall first, then add openings on it.';
-      opList.appendChild(hint);
-    }
-    fpState.openings.forEach(op=>{
-      const row = document.createElement('div'); row.className='fp-row';
-      const wallOptions = walls.map((wEl,i)=>
-        `<option value="${wEl.id}"${wEl.id===op.wallId?' selected':''}>Wall ${i+1} (${fpFmtFeet(Math.hypot(wEl.x2-wEl.x1, wEl.y2-wEl.y1))})</option>`
-      ).join('');
-      row.innerHTML = `
-        <select class="fp-op-wall">${wallOptions}</select>
-        <input type="text" class="fp-row-grow fp-op-label" placeholder="Label">
-        <input type="number" class="fp-op-offset" step="0.5" title="Offset from the wall's start (ft)">
-        <input type="number" class="fp-op-width" step="0.5" title="Width (ft)">
-        <button class="fp-row-remove" type="button" title="Remove">&times;</button>`;
-      row.querySelector('.fp-op-label').value = op.label;
-      row.querySelector('.fp-op-offset').value = op.offset;
-      row.querySelector('.fp-op-width').value = op.width;
-      row.querySelector('.fp-op-wall').addEventListener('change', e=>{ op.wallId=Number(e.target.value); fpSave(); fpRender(); });
-      row.querySelector('.fp-op-label').addEventListener('change', e=>{ op.label=e.target.value; fpSave(); fpRender(); });
-      row.querySelector('.fp-op-offset').addEventListener('change', e=>{ op.offset=parseFloat(e.target.value)||0; fpSave(); fpRender(); });
-      row.querySelector('.fp-op-width').addEventListener('change', e=>{ op.width=parseFloat(e.target.value)||1; fpSave(); fpRender(); });
-      row.querySelector('.fp-row-remove').addEventListener('click', ()=>{
-        fpPushHistory();
-        fpState.openings = fpState.openings.filter(o=>o.id!==op.id);
-        fpSave(); fpRender();
-      });
-      opList.appendChild(row);
-    });
-
-    // Legend
-    const legList = document.getElementById('fpLegendList');
-    legList.innerHTML = '';
-    fpState.legend.forEach(item=>{
-      const row = document.createElement('div'); row.className='fp-row';
-      row.innerHTML = `
-        <input type="color" class="fp-leg-color">
-        <input type="text" class="fp-row-grow fp-leg-label" placeholder="Label">
-        <input type="text" class="fp-row-grow fp-leg-desc" placeholder="Description">
-        <button class="fp-row-remove" type="button" title="Remove">&times;</button>`;
-      row.querySelector('.fp-leg-color').value = item.color;
-      row.querySelector('.fp-leg-label').value = item.label;
-      row.querySelector('.fp-leg-desc').value = item.desc;
-      row.querySelector('.fp-leg-color').addEventListener('change', e=>{ item.color=e.target.value; fpSave(); });
-      row.querySelector('.fp-leg-label').addEventListener('change', e=>{ item.label=e.target.value; fpSave(); });
-      row.querySelector('.fp-leg-desc').addEventListener('change', e=>{ item.desc=e.target.value; fpSave(); });
-      row.querySelector('.fp-row-remove').addEventListener('click', ()=>{
-        fpPushHistory();
-        fpState.legend = fpState.legend.filter(l=>l.id!==item.id);
-        fpSave(); fpRender();
-      });
-      legList.appendChild(row);
-    });
 
     // Notes
     const noteList = document.getElementById('fpNotesList');
@@ -2433,20 +2376,16 @@
       const wall = fpState.elements.find(e=>e.type==='line'||e.type==='dashedline');
       if(!wall){ toast('Draw a wall first, then add an opening on it.', true); return; }
       fpPushHistory();
-      fpState.openings.push({ id: fpIdSeq++, wallId: wall.id, offset:1, width:3, label:'Door' });
+      const op = { id: fpIdSeq++, wallId: wall.id, offset:1, width:3, label:'Door' };
+      fpState.openings.push(op);
       fpSave(); fpRender();
+      fpOpenOpeningDetailsModal(op); // no sidebar list anymore -- open it straight away so its wall/offset/label are easy to adjust
     });
-    document.getElementById('fpOpeningsAdd').addEventListener('click', ()=>document.getElementById('fpAddOpeningBtn').click());
     document.getElementById('fpImageUploadInput').addEventListener('change', async (e)=>{
       const files = Array.from(e.target.files || []);
       e.target.value = ''; // allow re-selecting the same file later
       for(const file of files) await fpAddImageToLibrary(file);
       if(files.length) toast(files.length>1 ? `Added ${files.length} images.` : 'Image added.');
-    });
-    document.getElementById('fpLegendAdd').addEventListener('click', ()=>{
-      fpPushHistory();
-      fpState.legend.push({ id: fpIdSeq++, color:'#40d0b5', label:'New item', desc:'' });
-      fpSave(); fpRender();
     });
     document.getElementById('fpNotesAdd').addEventListener('click', ()=>{
       fpPushHistory();
@@ -2618,6 +2557,51 @@
     return fpFileToBase64(blob);
   }
 
+  // Renders each page of a PDF to a PNG File (via pdf.js, vendored under
+  // ./vendor/pdfjs so this keeps working offline once installed) so a
+  // scanned/exported floor-plan PDF can flow through the exact same
+  // photo-analysis pipeline as a regular photo -- no separate code path.
+  // Capped at 6 pages: this is meant for a floor plan, not a whole document.
+  const FP_PDF_MAX_PAGES = 6;
+  const FP_PDF_RENDER_SCALE = 2;
+  async function fpPdfFileToImageFiles(file){
+    if(!window.pdfjsLib) throw new Error('PDF support failed to load -- try again after reloading the page.');
+    const baseName = (file.name||'plan').replace(/\.pdf$/i,'');
+    const data = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data }).promise;
+    const pageCount = Math.min(pdf.numPages, FP_PDF_MAX_PAGES);
+    const files = [];
+    for(let i=1; i<=pageCount; i++){
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: FP_PDF_RENDER_SCALE });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      const blob = await new Promise(res=> canvas.toBlob(res, 'image/png'));
+      if(blob) files.push(new File([blob], `${baseName}-p${i}.png`, { type:'image/png' }));
+    }
+    if(!files.length) throw new Error('Could not render any pages from '+(file.name||'that PDF')+'.');
+    return files;
+  }
+
+  // Shared by every photo-input path (file picker, drag-drop) -- expands any
+  // PDF into its rendered page images first, so everything downstream only
+  // ever deals in actual images.
+  async function fpExpandPickedFiles(fileList, statusEl){
+    const out = [];
+    for(const f of fileList){
+      if(f.type==='application/pdf' || /\.pdf$/i.test(f.name||'')){
+        if(statusEl) statusEl.textContent = 'Converting '+(f.name||'PDF')+'…';
+        try{ out.push(...await fpPdfFileToImageFiles(f)); }
+        catch(err){ toast(err.message || 'Could not convert that PDF.', true); }
+      } else {
+        out.push(f);
+      }
+    }
+    if(statusEl) statusEl.textContent = '';
+    return out;
+  }
+
   // Shows just enough of a saved key (prefix + last 4 chars) for the user
   // to visually confirm it matches what they actually copied, without this
   // app (or us) ever needing to see/ask for the full value.
@@ -2724,11 +2708,12 @@
     const hasKey = provider==='openai' ? !!fpGetOpenAiKey() : !!fpGetApiKey();
     const providerName = provider==='openai' ? 'OpenAI' : 'Claude (Anthropic)';
     const wrap = openModal('Import Photo', `
-      <p class="fp-hint" style="margin-top:0;">Take 3&ndash;4 photos of the room from different corners, so every wall shows in at least one shot, and/or just describe the room's dimensions below &mdash; photos are optional if you give exact measurements.</p>
-      <div class="fp-photo-drop" id="fpPhotoDrop">Tap to choose photos, or drag them here</div>
-      <input type="file" id="fpPhotoInput" accept="image/*" multiple style="display:none;">
+      <p class="fp-hint" style="margin-top:0;">Take 3&ndash;4 photos of the room from different corners, so every wall shows in at least one shot, and/or just describe the room's dimensions below &mdash; photos are optional if you give exact measurements. PDFs (e.g. a scanned or exported floor plan) work too -- each page converts to an image automatically.</p>
+      <div class="fp-photo-drop" id="fpPhotoDrop">Tap to choose photos or a PDF, or drag them here</div>
+      <input type="file" id="fpPhotoInput" accept="image/*,application/pdf" multiple style="display:none;">
       <button class="btn" type="button" id="fpCameraBtn" style="margin-top:.4rem; width:100%;">&#128247; Take a photo instead</button>
       <input type="file" id="fpCameraInput" accept="image/*" capture="environment" style="display:none;">
+      <p class="fp-hint" id="fpPhotoConvertStatus" style="margin:.4rem 0 0;"></p>
       <div id="fpPhotoThumbs" class="fp-photo-thumbs"></div>
       <div style="margin-top:.7rem; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
         <button class="btn" id="fpGenerateBtn" style="border-color:var(--accent); color:var(--accent);">Generate floor plan</button>
@@ -2750,6 +2735,7 @@
     const drop = wrap.querySelector('#fpPhotoDrop');
     const input = wrap.querySelector('#fpPhotoInput');
     const thumbs = wrap.querySelector('#fpPhotoThumbs');
+    const convertStatus = wrap.querySelector('#fpPhotoConvertStatus');
     function renderThumbs(){
       thumbs.innerHTML = '';
       picked.forEach((f,i)=>{
@@ -2769,16 +2755,18 @@
       cameraInput.value = '';
       renderThumbs();
     });
-    input.addEventListener('change', (e)=>{
-      [...e.target.files].forEach(f=> picked.push(f));
+    input.addEventListener('change', async (e)=>{
+      const files = [...e.target.files];
       input.value = '';
+      picked.push(...await fpExpandPickedFiles(files, convertStatus));
       renderThumbs();
     });
     drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
     drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
-    drop.addEventListener('drop', (e)=>{
+    drop.addEventListener('drop', async (e)=>{
       e.preventDefault(); drop.classList.remove('drag');
-      [...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/')).forEach(f=>picked.push(f));
+      const files = [...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/') || f.type==='application/pdf' || /\.pdf$/i.test(f.name||''));
+      picked.push(...await fpExpandPickedFiles(files, convertStatus));
       renderThumbs();
     });
 
@@ -2910,9 +2898,8 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
 
   // Shared by both the photo-generation and text-edit flows -- takes an API
   // response shaped like fpStateToApiShape() and replaces the current plan
-  // with it, preserving legend/title from the current plan when the
-  // response doesn't specify its own (a text edit like "move the sofa" has
-  // no reason to reset legend customizations, for instance). The AI refers
+  // with it, preserving title from the current plan when the response
+  // doesn't specify its own. The AI refers
   // to walls by their position in its own "elements" array ("wallIndex" on
   // an opening) since it has no way to know this app's internal ids --
   // wallIndexToId translates that into a real id once each element has one.
@@ -2945,7 +2932,6 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
     fpState = {
       title: typeof result.title==='string' && result.title.trim() ? result.title.trim() : (prev && prev.title) || 'Generated Floor Plan',
       elements, openings, objects,
-      legend: (prev && prev.legend && prev.legend.length) ? prev.legend : fpDefaultState().legend,
       notes: Array.isArray(result.notes) ? result.notes.map(String) : ((prev && prev.notes) || []),
     };
     fpDeselect();
@@ -3044,7 +3030,7 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
   }
 
   // ---------- PWA: manual backup / restore of the floor plan (Steps 6/6b/7/7a) ----------
-  // The floor plan (title/elements/openings/objects/legend/notes, stored
+  // The floor plan (title/elements/openings/objects/notes, stored
   // under FP_STORAGE_KEY) is the one piece of real user data this app
   // persists. This section is the backup/restore flow, same pattern as
   // HealthScore's.
@@ -3110,7 +3096,7 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
   }
 
   // The exact bytes already sitting in localStorage under FP_STORAGE_KEY
-  // (title/elements/openings/objects/legend/notes/__idSeq) IS the backup
+  // (title/elements/openings/objects/notes/__idSeq) IS the backup
   // payload -- no separate export shape to keep in sync with fpSave()/fpLoad().
   function fpBackupPayload(){
     try{ return localStorage.getItem(FP_STORAGE_KEY) || ''; }catch(e){ return ''; }
