@@ -6,7 +6,7 @@
 <title>DrawDesignGo — Grid-based floor plan editor</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./icon-192.png">
+<link rel="icon" href="./icon-192.png?v=1e2652ec">
 <link rel="apple-touch-icon" href="./icon-192.png?v=1e2652ec">
 <style>
   :root{
@@ -68,7 +68,11 @@
 
   .fp-main{
     background:var(--panel); border:1px solid var(--border); border-radius:12px;
-    padding:.8rem 1rem 1rem;
+    padding:.8rem 1rem 1rem; min-width:0; /* grid items default to min-width:auto,
+    which would let this grow to fit the canvas's own (auto-fit-computed)
+    width instead of the grid track -- without this, canvas width and the
+    autoFit calc that derives from wrap.clientWidth feed back into each
+    other, growing a little on every re-render (i.e. on every edit). */
   }
   .fp-title{
     margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:var(--text);
@@ -494,7 +498,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+76de6645';
+  const APP_VERSION = '1.0+77ecfa4f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -516,6 +520,26 @@
     wrap.querySelector('.modal-close').addEventListener('click', close);
     wrap.querySelector('.modal-backdrop').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) close(); });
     return wrap;
+  }
+
+  // In-app replacement for window.confirm() -- native blocking dialogs
+  // (alert/confirm/prompt) are unreliable in an installed standalone-mode
+  // PWA window on several platforms (silently no-op, auto-resolve, or render
+  // oddly), so anything destructive routes through this instead.
+  function fpConfirmModal(message, confirmLabel){
+    return new Promise(resolve=>{
+      const wrap = openModal('Are you sure?', `
+        <p style="margin:0 0 1rem;">${fpEscapeHtml(message)}</p>
+        <button class="btn-primary" id="fpConfirmYes">${fpEscapeHtml(confirmLabel||'Confirm')}</button>
+        <button class="btn-secondary" id="fpConfirmNo">Cancel</button>
+      `);
+      let resolved = false;
+      function finish(v){ if(resolved) return; resolved = true; resolve(v); }
+      wrap.querySelector('#fpConfirmYes').addEventListener('click', ()=>{ finish(true); wrap.remove(); });
+      wrap.querySelector('#fpConfirmNo').addEventListener('click', ()=>{ finish(false); wrap.remove(); });
+      wrap.querySelector('.modal-close').addEventListener('click', ()=>finish(false));
+      wrap.querySelector('.modal-backdrop').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) finish(false); });
+    });
   }
 
   // ---------- PWA: install pill ----------
@@ -1557,15 +1581,33 @@
         nameBtn.addEventListener('click', async ()=>{ await fpSwitchToProject(rec.id); wrap.remove(); });
         const renameBtn = document.createElement('button');
         renameBtn.type = 'button'; renameBtn.className = 'fp-row-remove'; renameBtn.style.color = 'var(--dim)';
-        renameBtn.textContent = '✎'; renameBtn.title = 'Rename';
-        renameBtn.addEventListener('click', async ()=>{
-          const next = prompt('Rename project', rec.name || 'Untitled Floor Plan');
-          if(next && next.trim()){ await fpRenameProject(rec.id, next.trim()); refresh(); }
+        renameBtn.textContent = '⌨'; renameBtn.title = 'Rename';
+        // In-row inline edit instead of window.prompt() -- native blocking
+        // dialogs are unreliable in an installed standalone-mode PWA window.
+        renameBtn.addEventListener('click', ()=>{
+          const input = document.createElement('input');
+          input.type = 'text'; input.className = 'fp-row-grow fp-detail-input';
+          input.value = rec.name || 'Untitled Floor Plan';
+          row.replaceChild(input, nameBtn);
+          input.focus(); input.select();
+          let done = false;
+          function commit(){
+            if(done) return; done = true;
+            const next = input.value.trim();
+            if(next && next!==rec.name){ fpRenameProject(rec.id, next).then(refresh); }
+            else refresh();
+          }
+          input.addEventListener('blur', commit);
+          input.addEventListener('keydown', (e)=>{
+            if(e.key==='Enter'){ e.preventDefault(); commit(); }
+            else if(e.key==='Escape'){ e.preventDefault(); done = true; refresh(); }
+          });
         });
         const delBtn = document.createElement('button');
         delBtn.type = 'button'; delBtn.className = 'fp-row-remove'; delBtn.textContent = '×'; delBtn.title = 'Delete';
         delBtn.addEventListener('click', async ()=>{
-          if(!confirm(`Delete "${rec.name || 'Untitled Floor Plan'}"? This can't be undone.`)) return;
+          const ok = await fpConfirmModal(`Delete "${rec.name || 'Untitled Floor Plan'}"? This can't be undone.`, 'Delete');
+          if(!ok) return;
           await fpDeleteProject(rec.id);
           if(rec.id===fpActiveProjectId) await fpStartNewProject();
           refresh();
@@ -1575,7 +1617,8 @@
       });
     }
     wrap.querySelector('#fpNewProjectBtn').addEventListener('click', async ()=>{
-      if(!confirm('Start a new blank project? Your current one stays saved in Recent Projects.')) return;
+      const ok = await fpConfirmModal('Start a new blank project? Your current one stays saved in Recent Projects.', 'Start new');
+      if(!ok) return;
       await fpStartNewProject();
       wrap.remove();
     });
@@ -1963,7 +2006,7 @@
       label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
       label.style.display = (hasLabel || isSelected) ? '' : 'none';
       label.spellcheck = false;
-      label.textContent = hasLabel ? item.label : 'Add label';
+      label.textContent = hasLabel ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : 'Add label';
       label.title = 'Tap to edit name/dimensions';
       label.addEventListener('pointerdown', e=>e.stopPropagation());
       label.addEventListener('click', (e)=>{
@@ -2293,8 +2336,9 @@
 
     document.getElementById('fpDeleteBtn').addEventListener('click', ()=> fpSetDeleteMode(!fpDeleteModeActive));
     document.getElementById('fpUndoBtn').addEventListener('click', fpUndo);
-    document.getElementById('fpResetBtn').addEventListener('click', ()=>{
-      if(!confirm('Clear this floor plan and start blank?')) return;
+    document.getElementById('fpResetBtn').addEventListener('click', async ()=>{
+      const ok = await fpConfirmModal('Clear this floor plan and start blank?', 'Clear');
+      if(!ok) return;
       fpPushHistory();
       fpState = fpDefaultState();
       fpDeselect();
@@ -2346,7 +2390,7 @@
   // cloudflare-worker/README.md) -- your key still only ever lives here and
   // in that Worker's memory for a single request, never a third party.
   const FP_PROVIDER_STORAGE = 'floorplanner-ai-provider';
-  function fpGetProvider(){ try{ return localStorage.getItem(FP_PROVIDER_STORAGE) || 'anthropic'; }catch(e){ return 'anthropic'; } }
+  function fpGetProvider(){ try{ return localStorage.getItem(FP_PROVIDER_STORAGE) || 'openai'; }catch(e){ return 'openai'; } }
   function fpSetProvider(p){ try{ localStorage.setItem(FP_PROVIDER_STORAGE, p); }catch(e){} }
   const FP_OPENAI_KEY_STORAGE = 'floorplanner-openai-key';
   function fpGetOpenAiKey(){ try{ return localStorage.getItem(FP_OPENAI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
@@ -3045,7 +3089,8 @@ Apply exactly this change and nothing else (keep everything else -- other elemen
       const text = await file.text();
       const parsed = JSON.parse(text);
       if(!fpValidBackupShape(parsed)) throw new Error('This file does not look like a DrawDesignGo backup.');
-      if(!confirm('This will replace the current floor plan on this device with the contents of the imported file. Continue?')) return;
+      const ok = await fpConfirmModal('This will replace the current floor plan on this device with the contents of the imported file. Continue?', 'Replace');
+      if(!ok) return;
       fpApplyRestoredState(parsed);
       document.querySelectorAll('.modal-backdrop').forEach(m=>m.remove());
       toast('Floor plan restored.');

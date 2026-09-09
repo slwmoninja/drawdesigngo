@@ -93,6 +93,21 @@ def sync_icon_versions():
         replace_apple_touch_icon,
         index_text,
     )
+
+    # The plain browser-tab/bookmark favicon link had no cache-busting at
+    # all (only apple-touch-icon and the manifest's own icons array did),
+    # so a stale cached favicon could persist indefinitely across icon
+    # updates -- give it the same treatment.
+    def replace_favicon(m):
+        rel_path = m.group(1)
+        return f'<link rel="icon" href="./{rel_path}?v={digest_for(rel_path)}">'
+
+    new_index_text = re.sub(
+        r'<link rel="icon" href="\./(icon-192\.png)(?:\?v=[0-9a-f]+)?">',
+        replace_favicon,
+        new_index_text,
+    )
+
     if new_index_text != index_text:
         INDEX_PATH.write_text(new_index_text, encoding="utf-8")
         changed_paths.append(INDEX_PATH)
