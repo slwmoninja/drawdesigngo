@@ -51,8 +51,13 @@ export default {
     // response and just reports a bare "Failed to fetch" -- exactly the
     // unhelpful failure mode this is closing off, so real errors (including
     // upstream timeouts) actually reach the app's status text instead.
+    // A detailed multi-photo floor plan analysis (careful spatial reasoning
+    // across several images, producing a large JSON response) can genuinely
+    // take well over a minute -- 60s was too tight and was cutting off real,
+    // still-in-progress requests, not just genuinely-hung ones.
     const controller = new AbortController();
-    const timeout = setTimeout(()=> controller.abort(), 60000);
+    const TIMEOUT_MS = 180000;
+    const timeout = setTimeout(()=> controller.abort(), TIMEOUT_MS);
     try {
       const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -71,7 +76,7 @@ export default {
       });
     } catch (err) {
       const message = err && err.name === 'AbortError'
-        ? 'Request to OpenAI timed out after 60s.'
+        ? `Request to OpenAI timed out after ${TIMEOUT_MS/1000}s.`
         : 'Proxy error reaching OpenAI: ' + (err && err.message ? err.message : String(err));
       return new Response(JSON.stringify({ error: { message } }), {
         status: 502,
