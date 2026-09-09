@@ -519,7 +519,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+82b12ec4';
+  const APP_VERSION = '1.0+146ccdf6';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -910,68 +910,68 @@
   // Object library: grouped for browsing/sorting only -- labels here are not
   // forced onto the canvas (an object's on-plan label is blank until the
   // user sets one, see fpAddObjectFromTemplate/the label rendering below).
-  // Each item is just its true footprint shape until real per-item artwork
-  // (an "icon:'image'" entry, see fpIconMarkup) replaces the plain outline.
+  // Every item's icon is real supplied artwork (see fpIconMarkup's image
+  // branch), sliced from library sheets -- nothing here is drawn by code.
   const FP_LIBRARY = [
     { name:'Tables', items:[
-      { label:'Large Conference', shape:'rect', w:96, d:40 },
-      { label:'Oval Conference', shape:'oval', w:108, d:44 },
-      { label:'6-Seat Table', shape:'rect', w:72, d:36 },
-      { label:'Square Table', shape:'rect', w:36, d:36 },
-      { label:'Round Table', shape:'circle', w:42, d:42 },
-      { label:'Coffee Table', shape:'rect', w:48, d:24 },
-      { label:'Round Coffee Table', shape:'circle', w:34, d:34 },
-      { label:'Console Table', shape:'rect', w:48, d:16 },
-      { label:'TV Stand', shape:'rect', w:60, d:18 },
-      { label:'Sectional', shape:'lshape', w:100, d:100 },
+      { label:'Large Conference', shape:'rect', w:96, d:40, icon:'image', img:'./library/large-conference.png' },
+      { label:'Oval Conference', shape:'oval', w:108, d:44, icon:'image', img:'./library/oval-conference.png' },
+      { label:'6-Seat Table', shape:'rect', w:72, d:36, icon:'image', img:'./library/6-seat-table.png' },
+      { label:'Square Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/square-table.png' },
+      { label:'Round Table', shape:'circle', w:42, d:42, icon:'image', img:'./library/round-table.png' },
+      { label:'Coffee Table', shape:'rect', w:48, d:24, icon:'image', img:'./library/coffee-table.png' },
+      { label:'Round Coffee Table', shape:'circle', w:34, d:34, icon:'image', img:'./library/round-coffee-table.png' },
+      { label:'Console Table', shape:'rect', w:48, d:16, icon:'image', img:'./library/console-table.png' },
+      { label:'TV Stand', shape:'rect', w:60, d:18, icon:'image', img:'./library/tv-stand.png' },
+      { label:'Sectional', shape:'lshape', w:100, d:100, icon:'image', img:'./library/sectional.png' },
     ]},
     { name:'Seating', items:[
-      { label:'3-Seater Sofa', shape:'rect', w:84, d:38 },
-      { label:'Love Seat', shape:'rect', w:58, d:38 },
-      { label:'Armchair', shape:'rect', w:34, d:34 },
-      { label:'Recliner Chair', shape:'rect', w:36, d:38 },
-      { label:'Chaise Lounge', shape:'rect', w:63, d:30 },
-      { label:'Ottoman', shape:'rect', w:30, d:30 },
-      { label:'Round Ottoman', shape:'circle', w:30, d:30 },
-      { label:'Upholstered Bench', shape:'rect', w:48, d:18 },
-      { label:'Bar Stool', shape:'circle', w:16, d:16 },
-      { label:'Counter Stool', shape:'circle', w:16, d:16 },
+      { label:'3-Seater Sofa', shape:'rect', w:84, d:38, icon:'image', img:'./library/3-seater-sofa.png' },
+      { label:'Love Seat', shape:'rect', w:58, d:38, icon:'image', img:'./library/love-seat.png' },
+      { label:'Armchair', shape:'rect', w:34, d:34, icon:'image', img:'./library/armchair.png' },
+      { label:'Recliner Chair', shape:'rect', w:36, d:38, icon:'image', img:'./library/recliner-chair.png' },
+      { label:'Chaise Lounge', shape:'rect', w:63, d:30, icon:'image', img:'./library/chaise-lounge.png' },
+      { label:'Ottoman', shape:'rect', w:30, d:30, icon:'image', img:'./library/ottoman.png' },
+      { label:'Round Ottoman', shape:'circle', w:30, d:30, icon:'image', img:'./library/round-ottoman.png' },
+      { label:'Upholstered Bench', shape:'rect', w:48, d:18, icon:'image', img:'./library/upholstered-bench.png' },
+      { label:'Bar Stool', shape:'circle', w:16, d:16, icon:'image', img:'./library/bar-stool.png' },
+      { label:'Counter Stool', shape:'circle', w:16, d:16, icon:'image', img:'./library/counter-stool.png' },
     ]},
     { name:'Bedroom', items:[
-      { label:'Queen Bed', shape:'rect', w:60, d:80 },
-      { label:'King Bed', shape:'rect', w:76, d:80 },
-      { label:'Twin Bed', shape:'rect', w:38, d:75 },
-      { label:'Bunk Bed', shape:'rect', w:38, d:75 },
-      { label:'Crib', shape:'rect', w:28, d:52 },
-      { label:'Nightstand', shape:'rect', w:20, d:16 },
-      { label:'Dresser', shape:'rect', w:60, d:18 },
-      { label:'Armoire', shape:'rect', w:40, d:22 },
-      { label:'Wardrobe', shape:'rect', w:48, d:24 },
-      { label:'Vanity Set', shape:'rect', w:48, d:18 },
+      { label:'Queen Bed', shape:'rect', w:60, d:80, icon:'image', img:'./library/queen-bed.png' },
+      { label:'King Bed', shape:'rect', w:76, d:80, icon:'image', img:'./library/king-bed.png' },
+      { label:'Twin Bed', shape:'rect', w:38, d:75, icon:'image', img:'./library/twin-bed.png' },
+      { label:'Bunk Bed', shape:'rect', w:38, d:75, icon:'image', img:'./library/bunk-bed.png' },
+      { label:'Crib', shape:'rect', w:28, d:52, icon:'image', img:'./library/crib.png' },
+      { label:'Nightstand', shape:'rect', w:20, d:16, icon:'image', img:'./library/nightstand.png' },
+      { label:'Dresser', shape:'rect', w:60, d:18, icon:'image', img:'./library/dresser.png' },
+      { label:'Armoire', shape:'rect', w:40, d:22, icon:'image', img:'./library/armoire.png' },
+      { label:'Wardrobe', shape:'rect', w:48, d:24, icon:'image', img:'./library/wardrobe.png' },
+      { label:'Vanity Set', shape:'rect', w:48, d:18, icon:'image', img:'./library/vanity-set.png' },
     ]},
     { name:'Kitchen & Appliances', items:[
-      { label:'Island with Sink', shape:'rect', w:72, d:36 },
-      { label:'Kitchen Base Cabinet', shape:'rect', w:24, d:24 },
-      { label:'Wall Cabinet', shape:'rect', w:30, d:12 },
-      { label:'Kitchen Sink Unit', shape:'rect', w:33, d:22 },
-      { label:'Hob Unit', shape:'rect', w:30, d:21 },
-      { label:'French Door Fridge', shape:'rect', w:36, d:30 },
-      { label:'Dishwasher', shape:'rect', w:24, d:24 },
-      { label:'Washing Machine', shape:'rect', w:27, d:27 },
-      { label:'Dryer', shape:'rect', w:27, d:27 },
-      { label:'Bar Setup', shape:'rect', w:48, d:18 },
+      { label:'Island with Sink', shape:'rect', w:72, d:36, icon:'image', img:'./library/island-with-sink.png' },
+      { label:'Kitchen Base Cabinet', shape:'rect', w:24, d:24, icon:'image', img:'./library/kitchen-base-cabinet.png' },
+      { label:'Wall Cabinet', shape:'rect', w:30, d:12, icon:'image', img:'./library/wall-cabinet.png' },
+      { label:'Kitchen Sink Unit', shape:'rect', w:33, d:22, icon:'image', img:'./library/kitchen-sink-unit.png' },
+      { label:'Hob Unit', shape:'rect', w:30, d:21, icon:'image', img:'./library/hob-unit.png' },
+      { label:'French Door Fridge', shape:'rect', w:36, d:30, icon:'image', img:'./library/french-door-fridge.png' },
+      { label:'Dishwasher', shape:'rect', w:24, d:24, icon:'image', img:'./library/dishwasher.png' },
+      { label:'Washing Machine', shape:'rect', w:27, d:27, icon:'image', img:'./library/washing-machine.png' },
+      { label:'Dryer', shape:'rect', w:27, d:27, icon:'image', img:'./library/dryer.png' },
+      { label:'Bar Setup', shape:'rect', w:48, d:18, icon:'image', img:'./library/bar-setup.png' },
     ]},
     { name:'Office & Patio', items:[
-      { label:'Desk (executive)', shape:'rect', w:72, d:36 },
-      { label:'Writing Desk', shape:'rect', w:48, d:24 },
-      { label:'L-Shaped Desk', shape:'lshape', w:60, d:60 },
-      { label:'Task Chair', shape:'rect', w:26, d:26 },
-      { label:'Filing Cabinet', shape:'rect', w:15, d:22 },
-      { label:'Bookshelf', shape:'rect', w:36, d:12 },
-      { label:'Credenza', shape:'rect', w:66, d:20 },
-      { label:'Dining Hutch', shape:'rect', w:42, d:18 },
-      { label:'Patio Chair', shape:'rect', w:30, d:30 },
-      { label:'Patio Table', shape:'rect', w:36, d:36 },
+      { label:'Desk (executive)', shape:'rect', w:72, d:36, icon:'image', img:'./library/desk-executive.png' },
+      { label:'Writing Desk', shape:'rect', w:48, d:24, icon:'image', img:'./library/writing-desk.png' },
+      { label:'L-Shaped Desk', shape:'lshape', w:60, d:60, icon:'image', img:'./library/l-shaped-desk.png' },
+      { label:'Task Chair', shape:'rect', w:26, d:26, icon:'image', img:'./library/task-chair.png' },
+      { label:'Filing Cabinet', shape:'rect', w:15, d:22, icon:'image', img:'./library/filing-cabinet.png' },
+      { label:'Bookshelf', shape:'rect', w:36, d:12, icon:'image', img:'./library/bookshelf.png' },
+      { label:'Credenza', shape:'rect', w:66, d:20, icon:'image', img:'./library/credenza.png' },
+      { label:'Dining Hutch', shape:'rect', w:42, d:18, icon:'image', img:'./library/dining-hutch.png' },
+      { label:'Patio Chair', shape:'rect', w:30, d:30, icon:'image', img:'./library/patio-chair.png' },
+      { label:'Patio Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/patio-table.png' },
     ]},
   ];
 
@@ -2234,10 +2234,12 @@
       canvas.appendChild(el);
     });
 
-    // Real drag-and-drop from the Objects library panel onto the grid
-    canvas.ondragover = (e)=>{ if(fpMode==='select') e.preventDefault(); };
+    // Real drag-and-drop from the Objects/Images library panels onto the
+    // grid -- allowed in any tool mode (it's a distinct browser DnD event
+    // stream from the pointerdown/move/up sequence Draw mode uses to place
+    // lines/shapes, so there's no real conflict between the two).
+    canvas.ondragover = (e)=>{ e.preventDefault(); };
     canvas.ondrop = (e)=>{
-      if(fpMode!=='select') return;
       const raw = e.dataTransfer.getData('application/json');
       if(!raw) return;
       e.preventDefault();
