@@ -642,7 +642,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+fd6a75b8';
+  const APP_VERSION = '1.0+b7a33028';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1160,6 +1160,17 @@
       { label:'Patio Daybed', shape:'rect', w:80, d:48, icon:'image', img:'./library/outdoor-patio-daybed.png' },
       { label:'Hanging Egg Chair', shape:'circle', w:40, d:40, icon:'image', img:'./library/outdoor-hanging-egg-chair.png' },
       { label:'Chaise Lounge (Outdoor)', shape:'rect', w:78, d:26, icon:'image', img:'./library/outdoor-chaise-lounge.png' },
+      { label:'Large Rectangular Planter', shape:'rect', w:48, d:18, icon:'image', img:'./library/outdoor-large-rectangular-planter.png' },
+      { label:'Large Round Planter', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-large-round-planter.png' },
+      { label:'Tapered Square Planter', shape:'rect', w:20, d:20, icon:'image', img:'./library/outdoor-tapered-square-planter.png' },
+      { label:'Tiered Herb Garden Planter', shape:'rect', w:24, d:16, icon:'image', img:'./library/outdoor-tiered-herb-garden-planter.png' },
+      { label:'Flower Box', shape:'rect', w:36, d:10, icon:'image', img:'./library/outdoor-flower-box.png' },
+      { label:'Raised Garden Bed', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-raised-garden-bed.png' },
+      { label:'Trellis', shape:'rect', w:20, d:22, icon:'image', img:'./library/outdoor-trellis.png' },
+      { label:'Arbor (Square Top)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-a.png' },
+      { label:'Arbor (Arched)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-b.png' },
+      { label:'Potted Palm Tree', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-potted-palm-tree.png' },
+      { label:'Hedge', shape:'rect', w:36, d:13, icon:'image', img:'./library/outdoor-hedge.png' },
     ]},
     { name:'Pools & Water Features', items:[
       { label:'Rectangular Swimming Pool', shape:'rect', w:240, d:120, icon:'image', img:'./library/outdoor-rectangular-swimming-pool.png' },
@@ -1173,20 +1184,7 @@
       { label:'Infinity Edge Detail', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-infinity-edge-detail.png' },
       { label:'Swim-up Bar Stools', shape:'rect', w:60, d:24, icon:'image', img:'./library/outdoor-swim-up-bar-stools.png' },
     ]},
-    { name:'Garden Planting', items:[
-      { label:'Large Rectangular Planter', shape:'rect', w:48, d:18, icon:'image', img:'./library/outdoor-large-rectangular-planter.png' },
-      { label:'Large Round Planter', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-large-round-planter.png' },
-      { label:'Tapered Square Planter', shape:'rect', w:20, d:20, icon:'image', img:'./library/outdoor-tapered-square-planter.png' },
-      { label:'Tiered Herb Garden Planter', shape:'rect', w:24, d:16, icon:'image', img:'./library/outdoor-tiered-herb-garden-planter.png' },
-      { label:'Flower Box', shape:'rect', w:36, d:10, icon:'image', img:'./library/outdoor-flower-box.png' },
-      { label:'Raised Garden Bed', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-raised-garden-bed.png' },
-      { label:'Trellis', shape:'rect', w:20, d:22, icon:'image', img:'./library/outdoor-trellis.png' },
-      { label:'Arbor (Square Top)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-a.png' },
-      { label:'Arbor (Arched)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-b.png' },
-      { label:'Potted Palm Tree', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-potted-palm-tree.png' },
-      { label:'Hedge', shape:'rect', w:36, d:13, icon:'image', img:'./library/outdoor-hedge.png' },
-    ]},
-    { name:'Hardscape & Fencing', items:[
+    { name:'Outdoor Fixtures', items:[
       { label:'Paver Pathway', shape:'rect', w:24, d:13, icon:'image', img:'./library/outdoor-paver-pathway.png' },
       { label:'Stepping Stones', shape:'rect', w:30, d:18, icon:'image', img:'./library/outdoor-stepping-stones.png' },
       { label:'Gravel Path', shape:'rect', w:24, d:14, icon:'image', img:'./library/outdoor-gravel-path.png' },
@@ -1197,8 +1195,6 @@
       { label:'Garden Gate', shape:'rect', w:24, d:15, icon:'image', img:'./library/outdoor-garden-gate.png' },
       { label:'Retaining Wall', shape:'rect', w:36, d:21, icon:'image', img:'./library/outdoor-retaining-wall.png' },
       { label:'Staircase', shape:'rect', w:48, d:36, icon:'image', img:'./library/outdoor-staircase.png' },
-    ]},
-    { name:'Outdoor Living & Fire', items:[
       { label:'Decking', shape:'rect', w:36, d:22, icon:'image', img:'./library/outdoor-decking.png' },
       { label:'Outdoor Kitchen Island', shape:'rect', w:96, d:24, icon:'image', img:'./library/outdoor-outdoor-kitchen-island.png' },
       { label:'Fire Pit', shape:'rect', w:36, d:36, icon:'image', img:'./library/outdoor-fire-pit.png' },
@@ -1210,7 +1206,7 @@
       { label:'String Lights', shape:'rect', w:48, d:26, icon:'image', img:'./library/outdoor-string-lights.png' },
       { label:'Garden Bench', shape:'rect', w:48, d:22, icon:'image', img:'./library/outdoor-garden-bench.png' },
     ]},
-    { name:'Ceiling Lighting', items:[
+    { name:'Lighting', items:[
       { label:'Recessed Light (4-inch)', shape:'circle', w:4, d:4, icon:'image', img:'./library/lf-recessed-light-4-inch.png' },
       { label:'Recessed Light (6-inch)', shape:'circle', w:6, d:7, icon:'image', img:'./library/lf-recessed-light-6-inch.png' },
       { label:'Flush Mount (Circular)', shape:'circle', w:13, d:14, icon:'image', img:'./library/lf-flush-mount-circular.png' },
@@ -1222,8 +1218,6 @@
       { label:'Chandelier (Round Small)', shape:'circle', w:20, d:23, icon:'image', img:'./library/lf-chandelier-round-small.png' },
       { label:'Chandelier (Crystal Large)', shape:'circle', w:30, d:32, icon:'image', img:'./library/lf-chandelier-crystal-large.png' },
       { label:'Chandelier (Modern Linear)', shape:'rect', w:40, d:18, icon:'image', img:'./library/lf-chandelier-modern-linear.png' },
-    ]},
-    { name:'Lamps, Sconces & Fans', items:[
       { label:'Pendant Light A', shape:'circle', w:10, d:18, icon:'image', img:'./library/lf-pendant-light-a.png' },
       { label:'Pendant Light B', shape:'circle', w:14, d:17, icon:'image', img:'./library/lf-pendant-light-b.png' },
       { label:'Pendant Light C', shape:'circle', w:10, d:19, icon:'image', img:'./library/lf-pendant-light-c.png' },
@@ -1235,8 +1229,6 @@
       { label:'Desk Lamp (Articulated)', shape:'rect', w:14, d:19, icon:'image', img:'./library/lf-desk-lamp-articulated.png' },
       { label:'Ceiling Fan (Standard)', shape:'circle', w:52, d:29, icon:'image', img:'./library/lf-ceiling-fan-standard.png' },
       { label:'Ceiling Fan with Light (Modern)', shape:'circle', w:52, d:30, icon:'image', img:'./library/lf-ceiling-fan-with-light-modern.png' },
-    ]},
-    { name:'Accent & Outdoor Lighting', items:[
       { label:'Outdoor Wall Light (Traditional)', shape:'rect', w:8, d:14, icon:'image', img:'./library/lf-outdoor-wall-light-traditional.png' },
       { label:'Outdoor Post Light', shape:'circle', w:6, d:16, icon:'image', img:'./library/lf-outdoor-post-light.png' },
       { label:'Landscape Path Light', shape:'circle', w:5, d:12, icon:'image', img:'./library/lf-landscape-path-light.png' },
@@ -1248,7 +1240,7 @@
       { label:'Accent Spot Light B', shape:'circle', w:6, d:7, icon:'image', img:'./library/lf-accent-spot-light-b.png' },
       { label:'Smart Bulb', shape:'circle', w:3, d:5, icon:'image', img:'./library/lf-smart-bulb.png' },
     ]},
-    { name:'Wood & Stone Flooring', items:[
+    { name:'Flooring', items:[
       { label:'Oak Hardwood Plank (Light)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-oak-hardwood-plank-light.png' },
       { label:'Walnut Hardwood Plank (Dark)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-walnut-hardwood-plank-dark.png' },
       { label:'Herringbone Wood Floor', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-herringbone-wood-floor.png' },
@@ -1259,8 +1251,6 @@
       { label:'Marble Slab (Calacatta)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-marble-slab-calacatta.png' },
       { label:'Travertine Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-travertine-tile.png' },
       { label:'Slate Tile (Riven)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-slate-tile-riven.png' },
-    ]},
-    { name:'Tile, Carpet & Specialty Flooring', items:[
       { label:'Mosaic Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-mosaic-tile.png' },
       { label:'Penny Round Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-penny-round-tile.png' },
       { label:'Subway Tile (Stacked)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-subway-tile-stacked.png' },
