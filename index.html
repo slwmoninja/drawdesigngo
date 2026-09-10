@@ -531,9 +531,9 @@
         </div>
       </div>
       <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
+      <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <div class="divider"></div>
       <div class="spacer"></div>
-      <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
       <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
     </div>
@@ -642,7 +642,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+350a73ec';
+  const APP_VERSION = '1.0+31ac0d3b';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
