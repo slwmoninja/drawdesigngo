@@ -174,7 +174,11 @@
     position:absolute; cursor:grab; touch-action:none; user-select:none;
   }
   .fp-item:active{ cursor:grabbing; }
-  .fp-item.selected{ z-index:5; }
+  /* Mirrors .fp-el.selected's accent-colored stroke below -- objects had no
+     equivalent visible highlight before (only the resize/rotate handles,
+     which only exist for a single genuine selection, see .fp-multi-selected
+     below), so a select-all left every object looking unselected. */
+  .fp-item.selected{ z-index:5; outline:2px solid var(--accent); outline-offset:2px; border-radius:3px; }
   .fp-item-icon{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
   .fp-item-label{
     position:absolute; left:50%; bottom:100%; margin-bottom:.3rem; transform:translateX(-50%);
@@ -189,7 +193,11 @@
     width:9px; height:9px; border-radius:50%; background:var(--warn);
     cursor:grab; display:none; z-index:2;
   }
-  .fp-item.selected .fp-rotate-handle{ display:block; }
+  /* :not(.fp-multi-selected) -- suppressed during a select-all (see the
+     render loop's isSelected/fp-multi-selected comment) so a whole plan's
+     worth of objects doesn't sprout a handle set apiece; the outline above
+     is the "selected" cue in that case instead. */
+  .fp-item.selected:not(.fp-multi-selected) .fp-rotate-handle{ display:block; }
   .fp-rotate-handle::before{
     content:""; position:absolute; top:9px; left:50%; width:1px; height:9px;
     background:var(--warn); transform:translateX(-50%);
@@ -198,7 +206,7 @@
     position:absolute; width:9px; height:9px; margin:-5px 0 0 -5px; border-radius:50%;
     background:var(--accent); border:1.5px solid #0a1512; cursor:pointer; display:none; z-index:2;
   }
-  .fp-item.selected .fp-obj-node{ display:block; }
+  .fp-item.selected:not(.fp-multi-selected) .fp-obj-node{ display:block; }
   .fp-obj-node.nw{ left:0; top:0; } .fp-obj-node.ne{ left:100%; top:0; }
   .fp-obj-node.sw{ left:0; top:100%; } .fp-obj-node.se{ left:100%; top:100%; }
   .fp-obj-node.n{ left:50%; top:0; } .fp-obj-node.s{ left:50%; top:100%; }
@@ -442,7 +450,6 @@
       </div>
       <button class="btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
       <div class="divider"></div>
-      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <div class="spacer"></div>
       <div class="fp-opening-dd" id="fpCopyDd">
         <button type="button" class="btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
@@ -459,6 +466,7 @@
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
       <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions">Import Photo</button>
       <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Projects</button>
+      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
     </div>
 
@@ -566,7 +574,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+31ba52ae';
+  const APP_VERSION = '1.0+d72daa28';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1550,12 +1558,28 @@
     fpSelectedKind = kind; fpSelectedId = id; fpSelectAllActive = false;
     document.querySelectorAll('#fpCanvas .fp-item').forEach(node=>{
       node.classList.toggle('selected', kind==='object' && Number(node.dataset.id)===id);
+      // Left over from a prior select-all -- without removing it here, an
+      // object picked out of a select-all would keep its resize/rotate
+      // handles suppressed (see the CSS' :not(.fp-multi-selected)) even
+      // though it's now a genuine single selection.
+      node.classList.remove('fp-multi-selected');
     });
     document.querySelectorAll('#fpCanvas .fp-el').forEach(node=>{
       node.classList.toggle('selected', kind==='element' && Number(node.dataset.id)===id);
     });
     const nodesLayer = document.querySelector('#fpCanvas .fp-nodes-layer');
     if(nodesLayer) nodesLayer.remove();
+  }
+
+  // "Select all" for Copy all / Ctrl+Cmd+A -- unlike fpSelect() above this
+  // isn't lightweight (it needs a real fpRender() so every wall/shape/object
+  // picks up fpSelectAllActive in the render loop's own selected/isSelected
+  // checks), but select-all is a deliberate, infrequent action, not
+  // something firing on every drag frame.
+  function fpSelectAll(){
+    fpDeselect();
+    fpSelectAllActive = true;
+    fpRender();
   }
 
   // Delete tool: a toggled mode (like Draw), not a one-shot action -- once
@@ -2396,7 +2420,7 @@
 
     // Structural elements (walls + shapes)
     fpState.elements.forEach(el=>{
-      const selected = fpSelectedKind==='element' && el.id===fpSelectedId;
+      const selected = fpSelectAllActive || (fpSelectedKind==='element' && el.id===fpSelectedId);
       const g = fpSvgEl('g', { class:'fp-el'+(selected?' selected':''), 'data-id':el.id });
       let shape;
       let visibleRanges = null; // wall-only: sub-ranges NOT covered by an opening on top (see fpVisibleWallRanges)
@@ -2508,7 +2532,11 @@
       });
 
       svg.appendChild(g);
-      if(selected && fpMode==='select') fpAddElementNodes(svg, canvas, el, px, scale);
+      // Skip resize/rotate handles during a select-all (fpSelectAllActive) --
+      // one handle set per wall/shape would be visual clutter across a whole
+      // plan; the accent-colored stroke (.fp-el.selected above) is enough of
+      // a "this is selected" cue when everything's selected at once.
+      if(selected && fpMode==='select' && !fpSelectAllActive) fpAddElementNodes(svg, canvas, el, px, scale);
 
       if(fpIsLineType(el.type)){
         const hasLineLabel = !!(el.label && el.label.trim());
@@ -2535,8 +2563,12 @@
     }
     fpState.objects.forEach(item=>{
       const el = document.createElement('div');
-      const isSelected = fpSelectedKind==='object' && item.id===fpSelectedId;
-      el.className = 'fp-item' + (isSelected ? ' selected' : '');
+      const isSelected = fpSelectAllActive || (fpSelectedKind==='object' && item.id===fpSelectedId);
+      // fp-multi-selected suppresses the resize/rotate handles (see CSS) --
+      // one handle set per object would be visual clutter across a whole
+      // plan during a select-all; the outline below (.fp-item.selected) is
+      // enough of a "this is selected" cue when everything's selected.
+      el.className = 'fp-item' + (isSelected ? ' selected' : '') + (fpSelectAllActive ? ' fp-multi-selected' : '');
       el.dataset.id = item.id;
       updateObjStyle(el, item);
 
@@ -2862,7 +2894,7 @@
     });
     document.getElementById('fpCopyAllBtn').addEventListener('click', ()=>{
       copyDdMenu.hidden = true;
-      fpSelectAllActive = true;
+      fpSelectAll(); // visibly highlights every wall/shape/object, not just a silent flag flip -- see fpSelectAll()
       fpCopyToClipboard();
     });
 
@@ -2943,7 +2975,7 @@
       }
       if(!typing && (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='a'){
         e.preventDefault();
-        fpSelectAllActive = true;
+        fpSelectAll();
         toast('Selected all — press Ctrl/Cmd+C to copy the whole plan.');
         return;
       }
