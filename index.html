@@ -123,6 +123,10 @@
     box-shadow:0 8px 24px rgba(0,0,0,.15); padding:.3rem; display:flex; flex-direction:column; gap:.15rem;
   }
   .fp-opening-dd-menu[hidden]{ display:none; }
+  /* Header toolbox sits near the right edge -- open its menu leftward
+     (right:0) instead of the toolbar dropdowns' default left:0, or it would
+     overflow past the viewport edge. */
+  .fp-toolbox-dd-menu{ left:auto; right:0; }
   .fp-opening-dd-item{
     display:flex; align-items:center; gap:.5rem; background:transparent; border:none;
     color:var(--text); font-size:.82rem; font-weight:600; padding:.4rem .5rem; border-radius:6px; cursor:pointer;
@@ -461,6 +465,21 @@
     <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
     <div class="spacer"></div>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
+    <div class="fp-opening-dd" id="fpToolboxDd">
+      <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Import Photo, Projects, Save As, Backup, Restore">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7h20v13a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 7l2.5-4h15L22 7"/><path d="M9 12h6"/></svg>
+      </button>
+      <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxImportPhoto">Import Photo</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxBackup">Backup</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxRestore">Restore&hellip;</button>
+        <input type="file" id="fpToolboxLoadProjectInput" accept="application/json,.json" style="display:none;">
+        <input type="file" id="fpToolboxRestoreInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">
+      </div>
+    </div>
     <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
     </button>
@@ -516,9 +535,6 @@
       <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
-      <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions">Import Photo</button>
-      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Projects</button>
-      <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
     </div>
 
@@ -626,7 +642,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+7dcb596f';
+  const APP_VERSION = '1.0+fd6a75b8';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -785,12 +801,6 @@
       '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
         '<div style="font-weight:600; margin-bottom:.5rem;">AI provider (used for Import Photo)</div>' +
         '<div id="fpSettingsProviderWrap"></div>' +
-      '</div>' +
-      '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
-        '<div style="font-weight:600; margin-bottom:.5rem;">Floor plan backup</div>' +
-        '<button class="btn" id="fpBackupNowBtn" style="width:100%;">Back up now</button>' +
-        '<button class="btn" id="fpRestoreBtn" style="width:100%; margin-top:.5rem;">Restore from backup&hellip;</button>' +
-        '<input type="file" id="fpRestoreFileInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">' +
       '</div>'
     );
     function renderSettingsProvider(){
@@ -811,17 +821,6 @@
         toast('Install status reset.');
       });
     }
-    // Manual backup (Step 6) / restore (Step 7) for the floor plan -- the one
-    // piece of real user data this app persists (see the big PWA
-    // backup/restore comment block near fpSave()/initFloorPlan()).
-    wrap.querySelector('#fpBackupNowBtn').addEventListener('click', async ()=>{
-      if(!fpBackupPayload()){ toast('Nothing to back up yet — edit your floor plan first.', true); return; }
-      const wrote = await runFpBackupDownload();
-      toast(wrote ? 'Backup saved.' : 'Already up to date — no changes since last backup.');
-    });
-    const restoreFileInput = wrap.querySelector('#fpRestoreFileInput');
-    wrap.querySelector('#fpRestoreBtn').addEventListener('click', ()=>{ openFpBackupRestorePicker(restoreFileInput); });
-    restoreFileInput.addEventListener('change', ()=>{ importLatestFpBackupFromFiles(restoreFileInput.files); });
   });
 
   // Proactive "Install DrawDesignGo?" prompt, shown once ever per device,
@@ -2302,6 +2301,38 @@
     await fpEnforceProjectLimit();
     fpRender();
   }
+  // Brings a previously-exported "Project file" (Save As) or backup .json
+  // back in as a brand-new Recent Projects entry -- distinct from Restore
+  // (importFpBackupFile), which overwrites the CURRENTLY OPEN project in
+  // place. This is how a plan evicted from the 5-slot rotation by
+  // fpEnforceProjectLimit() (see FP_MAX_PROJECTS above) comes back, as long
+  // as the user saved a copy of it as a file at some point.
+  async function fpLoadProjectFromFile(file){
+    if(!file) return;
+    try{
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if(!fpValidBackupShape(parsed)) throw new Error('This file does not look like a DrawDesignGo project file.');
+      await fpFlushActiveProjectSave();
+      fpActiveProjectId = fpNewProjectId();
+      fpSetActiveProjectId(fpActiveProjectId);
+      fpState = Object.assign({}, fpBlankState(), parsed);
+      fpIdSeq = parsed.__idSeq || 1000;
+      delete fpState.__idSeq;
+      fpDeselect();
+      fpHistory = [];
+      document.getElementById('fpUndoBtn').disabled = true;
+      document.getElementById('fpTitle').textContent = fpState.title;
+      fpSave();
+      await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
+      await fpEnforceProjectLimit();
+      fpRender();
+      document.querySelectorAll('.modal-backdrop').forEach(m=>m.remove());
+      toast('Project loaded.');
+    }catch(e){
+      toast('Could not load that file: ' + (e && e.message ? e.message : e), true);
+    }
+  }
   async function fpSwitchToProject(id){
     if(id===fpActiveProjectId) return;
     const record = await fpGetProject(id);
@@ -3127,13 +3158,57 @@
       fpSave();
     });
 
-    document.getElementById('fpProjectsBtn').addEventListener('click', fpOpenProjectsModal);
     document.getElementById('fpNewProjectQuickBtn').addEventListener('click', async ()=>{
       const ok = await fpConfirmModal('Start a new blank project? Your current one is saved first, and stays in Recent Projects.', 'Start new');
       if(!ok) return;
       await fpStartNewProject();
     });
-    document.getElementById('fpExportBtn').addEventListener('click', fpOpenExportModal);
+
+    // Toolbox: all file-management actions (Import Photo, Projects, Load
+    // Project, Save As, Backup, Restore) live here as one dropdown, to the
+    // left of Print in the header, rather than scattered across the toolbar
+    // and Settings.
+    const toolboxDd = document.getElementById('fpToolboxDd');
+    const toolboxBtn = document.getElementById('fpToolboxBtn');
+    const toolboxMenu = document.getElementById('fpToolboxDdMenu');
+    toolboxBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      toolboxMenu.hidden = !toolboxMenu.hidden;
+    });
+    document.getElementById('fpToolboxImportPhoto').addEventListener('click', ()=>{
+      toolboxMenu.hidden = true;
+      fpOpenGenerateModal();
+    });
+    document.getElementById('fpToolboxProjects').addEventListener('click', ()=>{
+      toolboxMenu.hidden = true;
+      fpOpenProjectsModal();
+    });
+    document.getElementById('fpToolboxSaveAs').addEventListener('click', ()=>{
+      toolboxMenu.hidden = true;
+      fpOpenExportModal();
+    });
+    document.getElementById('fpToolboxBackup').addEventListener('click', async ()=>{
+      toolboxMenu.hidden = true;
+      if(!fpBackupPayload()){ toast('Nothing to back up yet — edit your floor plan first.', true); return; }
+      const wrote = await runFpBackupDownload();
+      toast(wrote ? 'Backup saved.' : 'Already up to date — no changes since last backup.');
+    });
+    const toolboxLoadProjectInput = document.getElementById('fpToolboxLoadProjectInput');
+    document.getElementById('fpToolboxLoadProject').addEventListener('click', ()=>{
+      toolboxMenu.hidden = true;
+      toolboxLoadProjectInput.click();
+    });
+    toolboxLoadProjectInput.addEventListener('change', ()=>{
+      const file = toolboxLoadProjectInput.files && toolboxLoadProjectInput.files[0];
+      toolboxLoadProjectInput.value = '';
+      fpLoadProjectFromFile(file);
+    });
+    const toolboxRestoreInput = document.getElementById('fpToolboxRestoreInput');
+    document.getElementById('fpToolboxRestore').addEventListener('click', ()=>{
+      toolboxMenu.hidden = true;
+      openFpBackupRestorePicker(toolboxRestoreInput);
+    });
+    toolboxRestoreInput.addEventListener('change', ()=>{ importLatestFpBackupFromFiles(toolboxRestoreInput.files); });
 
     document.getElementById('fpModeGroup').addEventListener('click', (e)=>{
       const btn = e.target.closest('button[data-mode]');
@@ -3233,10 +3308,11 @@
     document.addEventListener('click', (e)=>{
       if(!openingDd.contains(e.target)) openingDdMenu.hidden = true;
       if(!copyDd.contains(e.target)) copyDdMenu.hidden = true;
+      if(!toolboxDd.contains(e.target)) toolboxMenu.hidden = true;
       if(!contextMenu.contains(e.target)) contextMenu.hidden = true;
     });
     document.addEventListener('keydown', (e)=>{
-      if(e.key==='Escape'){ openingDdMenu.hidden = true; copyDdMenu.hidden = true; contextMenu.hidden = true; }
+      if(e.key==='Escape'){ openingDdMenu.hidden = true; copyDdMenu.hidden = true; toolboxMenu.hidden = true; contextMenu.hidden = true; }
     });
     fpSyncToolActiveUI(); // initial state: Draw + the default "Solid line" tool, matching fpMode/fpDrawTool's defaults above
     document.getElementById('fpImageUploadInput').addEventListener('change', async (e)=>{
@@ -3250,8 +3326,6 @@
       fpState.notes.push('');
       fpSave(); fpRender();
     });
-    document.getElementById('fpGenerateFromPhotosBtn').addEventListener('click', fpOpenGenerateModal);
-
     document.getElementById('fpDeleteBtn').addEventListener('click', ()=> fpSetDeleteMode(!fpDeleteModeActive));
     document.getElementById('fpUndoBtn').addEventListener('click', fpUndo);
     document.getElementById('fpResetBtn').addEventListener('click', async ()=>{
