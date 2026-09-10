@@ -85,6 +85,26 @@
     color:var(--text); font-size:.82rem; font-weight:600; padding:.4rem .5rem; border-radius:6px; cursor:pointer;
   }
   .fp-opening-dd-item:hover{ background:var(--panel2); }
+  /* Right-click menu -- mirrors the key toolbar actions for convenience.
+     position:fixed + JS-set left/top (viewport-clamped) since it can open
+     anywhere the pointer is, not anchored to a specific toolbar button like
+     the dropdowns above. Every item is wired to literally .click() the real
+     toolbar button it mirrors (see fpOpenContextMenu()) rather than
+     reimplementing the action, so the toolbar's own active-state
+     highlighting (fpSyncToolActiveUI()) always stays correct no matter
+     which menu was used. */
+  .fp-context-menu{
+    position:fixed; z-index:50; min-width:11rem;
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25); padding:.3rem; display:flex; flex-direction:column; gap:.1rem;
+  }
+  .fp-context-menu[hidden]{ display:none; }
+  .fp-context-menu-item{
+    display:block; width:100%; text-align:left; background:transparent; border:none;
+    color:var(--text); font-size:.82rem; font-weight:600; padding:.45rem .6rem; border-radius:6px; cursor:pointer;
+  }
+  .fp-context-menu-item:hover:not(:disabled){ background:var(--panel2); }
+  .fp-context-menu-item:disabled{ opacity:.4; cursor:not-allowed; }
   .fp-layout{ display:grid; grid-template-columns:1fr; gap:.9rem; align-items:start; }
   @media (min-width:900px){ .fp-layout{ grid-template-columns:1fr 300px; } }
 
@@ -424,6 +444,16 @@
       <div class="divider"></div>
       <button class="btn" id="fpExportBtn" title="Save this plan as an image, DXF, PDF, or project file">Save As&hellip;</button>
       <div class="spacer"></div>
+      <div class="fp-opening-dd" id="fpCopyDd">
+        <button type="button" class="btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
+          Copy
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="fp-opening-dd-menu" id="fpCopyDdMenu" hidden>
+          <button type="button" class="fp-opening-dd-item" id="fpCopySelectionBtn">Copy</button>
+          <button type="button" class="fp-opening-dd-item" id="fpCopyAllBtn">Copy all</button>
+        </div>
+      </div>
       <button class="btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
@@ -445,6 +475,7 @@
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
           <div class="fp-canvas" id="fpCanvas"></div>
         </div>
+        <div class="fp-context-menu" id="fpContextMenu" hidden></div>
       </div>
 
       <aside class="fp-side">
@@ -535,7 +566,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+718fb2bc';
+  const APP_VERSION = '1.0+31ba52ae';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1553,6 +1584,50 @@
     if(selectBtn) selectBtn.classList.toggle('active', selectActive);
     if(toolSelect) toolSelect.classList.toggle('fp-tool-select-active', drawActive && !isOpeningTool);
     if(openingBtn) openingBtn.classList.toggle('fp-opening-dd-btn-active', drawActive && isOpeningTool);
+  }
+  // Right-click menu: every entry just .click()s the real toolbar button it
+  // mirrors (see the ids below) instead of reimplementing the action, so
+  // there's exactly one code path per action and the toolbar's own active-
+  // state highlighting is always correct regardless of which menu triggered
+  // it. Disabled state (Undo with no history, etc.) is read live from the
+  // real button each time the menu opens, so it never drifts out of sync.
+  const FP_CONTEXT_MENU_ITEMS = [
+    { label:'Draw', btn:'fpModeDrawBtn' },
+    { label:'Select', btn:'fpModeSelectBtn' },
+    { label:'Copy', btn:'fpCopySelectionBtn' },
+    { label:'Copy all', btn:'fpCopyAllBtn' },
+    { label:'Delete', btn:'fpDeleteBtn' },
+    { label:'Undo', btn:'fpUndoBtn' },
+    { label:'Save As…', btn:'fpExportBtn' },
+    { label:'Clear plan', btn:'fpResetBtn' },
+    { label:'Import Photo', btn:'fpGenerateFromPhotosBtn' },
+    { label:'Projects', btn:'fpProjectsBtn' },
+    { label:'New Project', btn:'fpNewProjectQuickBtn' },
+  ];
+  function fpOpenContextMenu(clientX, clientY){
+    const menu = document.getElementById('fpContextMenu');
+    menu.innerHTML = FP_CONTEXT_MENU_ITEMS.map(it=>{
+      const realBtn = document.getElementById(it.btn);
+      const disabled = !!(realBtn && realBtn.disabled);
+      return '<button type="button" class="fp-context-menu-item" data-target-btn="'+it.btn+'"'+(disabled?' disabled':'')+'>'+fpEscapeHtml(it.label)+'</button>';
+    }).join('');
+    menu.querySelectorAll('.fp-context-menu-item').forEach(node=>{
+      node.addEventListener('click', ()=>{
+        menu.hidden = true;
+        const realBtn = document.getElementById(node.dataset.targetBtn);
+        if(realBtn && !realBtn.disabled) realBtn.click();
+      });
+    });
+    menu.style.left = clientX+'px';
+    menu.style.top = clientY+'px';
+    menu.hidden = false;
+    // Clamp on-screen after layout -- a menu opened near the right/bottom
+    // edge would otherwise render partly off the viewport.
+    requestAnimationFrame(()=>{
+      const r = menu.getBoundingClientRect();
+      if(r.right > window.innerWidth) menu.style.left = Math.max(4, window.innerWidth - r.width - 8)+'px';
+      if(r.bottom > window.innerHeight) menu.style.top = Math.max(4, window.innerHeight - r.height - 8)+'px';
+    });
   }
   function fpSetDeleteMode(active){
     fpDeleteModeActive = active;
@@ -2766,11 +2841,54 @@
         document.getElementById('fpDrawToolSelect').value = '';
       });
     });
+
+    // Copy dropdown: exposes the existing Ctrl/Cmd+C (and Ctrl/Cmd+A "select
+    // all") clipboard-image copy as visible buttons, for anyone who wouldn't
+    // otherwise discover the keyboard shortcut -- "Copy" copies the current
+    // selection (or the whole plan if nothing's selected, same fallback
+    // fpCopyToClipboard() already has), "Copy all" always copies the whole
+    // plan regardless of any current selection, matching Ctrl/Cmd+A then
+    // Ctrl/Cmd+C.
+    const copyDd = document.getElementById('fpCopyDd');
+    const copyDdBtn = document.getElementById('fpCopyDdBtn');
+    const copyDdMenu = document.getElementById('fpCopyDdMenu');
+    copyDdBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      copyDdMenu.hidden = !copyDdMenu.hidden;
+    });
+    document.getElementById('fpCopySelectionBtn').addEventListener('click', ()=>{
+      copyDdMenu.hidden = true;
+      fpCopyToClipboard();
+    });
+    document.getElementById('fpCopyAllBtn').addEventListener('click', ()=>{
+      copyDdMenu.hidden = true;
+      fpSelectAllActive = true;
+      fpCopyToClipboard();
+    });
+
+    // Right-click anywhere on the plan opens the mirrored context menu (see
+    // FP_CONTEXT_MENU_ITEMS/fpOpenContextMenu() above) -- right-clicking a
+    // specific wall/object selects it first (lightweight, see fpSelect()'s
+    // own comment) so Copy/Delete from the menu act on it, same as a left-
+    // click would; right-clicking blank space clears any prior selection.
+    const contextMenu = document.getElementById('fpContextMenu');
+    document.getElementById('fpCanvasWrap').addEventListener('contextmenu', (e)=>{
+      e.preventDefault();
+      const elTarget = e.target.closest('.fp-el');
+      const itemTarget = e.target.closest('.fp-item');
+      if(elTarget) fpSelect('element', Number(elTarget.dataset.id));
+      else if(itemTarget) fpSelect('object', Number(itemTarget.dataset.id));
+      else if(fpSelectedId!=null){ fpDeselect(); fpRender(); }
+      fpOpenContextMenu(e.clientX, e.clientY);
+    });
+
     document.addEventListener('click', (e)=>{
       if(!openingDd.contains(e.target)) openingDdMenu.hidden = true;
+      if(!copyDd.contains(e.target)) copyDdMenu.hidden = true;
+      if(!contextMenu.contains(e.target)) contextMenu.hidden = true;
     });
     document.addEventListener('keydown', (e)=>{
-      if(e.key==='Escape') openingDdMenu.hidden = true;
+      if(e.key==='Escape'){ openingDdMenu.hidden = true; copyDdMenu.hidden = true; contextMenu.hidden = true; }
     });
     fpSyncToolActiveUI(); // initial state: Draw + the default "Solid line" tool, matching fpMode/fpDrawTool's defaults above
     document.getElementById('fpImageUploadInput').addEventListener('change', async (e)=>{
