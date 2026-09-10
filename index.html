@@ -667,7 +667,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+3d1d8259';
+  const APP_VERSION = '1.0+f8f41ac3';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3135,7 +3135,12 @@
         label.className = 'fp-item-label fp-room-label-text';
         label.textContent = (item.label && item.label.trim()) || 'Add room name';
         label.title = 'Tap to edit, drag to reposition';
-        Object.assign(label.style, { left:(pw/2)+'px', top:(pd/2)+'px', transform:'translate(-50%,-50%)' });
+        // right/bottom:'auto' clears the base .fp-item-label rule's own
+        // bottom:100% -- left unset, having both top AND bottom active at
+        // once forces the browser to stretch/squash height to fit between
+        // them instead of sizing to the text's actual content height, which
+        // was collapsing every measurement below to ~0.
+        Object.assign(label.style, { left:(pw/2)+'px', top:(pd/2)+'px', right:'auto', bottom:'auto', transform:'translate(-50%,-50%)' });
         let labelDragged = false;
         label.addEventListener('pointerdown', (e)=>{
           e.stopPropagation();
@@ -3274,6 +3279,27 @@
       });
 
       canvas.appendChild(el);
+
+      if(isLabelType){
+        // item.w/item.d started as a fixed nominal box (see
+        // fpEnsureRoomLabel()) unrelated to the text's actual length --
+        // .fp-item.selected's outline wraps that box, not the text, so it
+        // read as offset/mismatched. Now that el is in the live DOM and
+        // label's real rendered size is measurable, resize the box (and
+        // reposition the centered text within it) to hug the text plus a
+        // little padding, so the border always fits exactly around what it
+        // contains.
+        const padPx = 8;
+        const fitW = label.offsetWidth + padPx*2;
+        const fitH = label.offsetHeight + padPx*2;
+        const fitWIn = Math.max(6, (fitW/scale)*12);
+        const fitHIn = Math.max(4, (fitH/scale)*12);
+        if(Math.abs(fitWIn-item.w)>0.5 || Math.abs(fitHIn-item.d)>0.5){
+          item.w = fitWIn; item.d = fitHIn;
+          updateObjStyle(el, item);
+        }
+        Object.assign(label.style, { left:(fitW/2)+'px', top:(fitH/2)+'px', right:'auto', bottom:'auto' });
+      }
     });
 
     // Real drag-and-drop from the Objects/Images library panels onto the
