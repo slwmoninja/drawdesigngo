@@ -48,6 +48,49 @@
   .btn.active{ border-color:var(--accent); color:var(--accent); background:rgba(64,208,181,.12); }
   .btn:disabled{ opacity:.4; cursor:not-allowed; }
 
+  /* Key-action controls (Draw, Solid line, Opening, Select, Copy, Delete)
+     get a raised/beveled treatment to read as the toolbar's primary tools,
+     distinct from the plain flat secondary buttons (Undo, Clear plan, Save
+     As, etc). A light top edge + faint dark bottom edge (inset) simulates a
+     physically raised surface; the drop shadow beneath lifts it off the
+     toolbar. Applies to both <button>s and the "Solid line" <select>. */
+  .fp-key-btn{
+    background:linear-gradient(180deg, #ffffff, var(--panel2));
+    border-color:var(--border);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.9),
+      inset 0 -1px 0 rgba(0,0,0,.08),
+      0 2px 3px rgba(0,0,0,.12);
+  }
+  .fp-key-btn:hover{
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.9),
+      inset 0 -1px 0 rgba(0,0,0,.08),
+      0 3px 5px rgba(0,0,0,.16);
+  }
+  /* Pressed (mouse down) -- flips the gradient and swaps the outer lift for
+     an inset shadow, plus a 1px nudge down, so it reads as physically
+     pushed in for the moment it's held. */
+  .fp-key-btn:active{
+    transform:translateY(1px);
+    background:linear-gradient(180deg, var(--panel2), #ffffff);
+    box-shadow:inset 0 1px 3px rgba(0,0,0,.18);
+  }
+  /* Engaged/toggled-on (Draw or Select as the current mode, Solid line or
+     Opening as the current draw tool, Delete mode active) -- same pushed-in
+     treatment as :active above, but persistent rather than momentary, so an
+     engaged tool reads as "staying pressed" rather than merely hovered. The
+     accent/danger color fill itself still comes from .active/
+     .fp-tool-select-active/.fp-opening-dd-btn-active (see fpSyncToolActiveUI()) --
+     this only supplies the bevel-inversion on top of it. */
+  .fp-key-btn.active,
+  .fp-key-btn.fp-tool-select-active,
+  .fp-key-btn.fp-opening-dd-btn-active{
+    box-shadow:
+      inset 0 1px 3px rgba(0,0,0,.22),
+      inset 0 -1px 0 rgba(255,255,255,.5);
+  }
+
   .toolbar{
     display:flex; flex-wrap:wrap; gap:.5rem; align-items:center;
     background:var(--panel); border:1px solid var(--border); border-radius:12px;
@@ -85,6 +128,8 @@
     color:var(--text); font-size:.82rem; font-weight:600; padding:.4rem .5rem; border-radius:6px; cursor:pointer;
   }
   .fp-opening-dd-item:hover{ background:var(--panel2); }
+  .fp-opening-dd-item:disabled{ opacity:.4; cursor:not-allowed; }
+  .fp-opening-dd-item:disabled:hover{ background:transparent; }
   /* Right-click menu -- mirrors the key toolbar actions for convenience.
      position:fixed + JS-set left/top (viewport-clamped) since it can open
      anywhere the pointer is, not anchored to a specific toolbar button like
@@ -139,6 +184,11 @@
     box-shadow:0 12px 40px rgba(0,0,0,.18);
   }
   .fp-canvas.fp-draw-mode{ cursor:crosshair; }
+  /* Marquee/rubber-band drag-select rectangle (Select mode, drag on blank
+     canvas -- see fpWireCanvasInteraction()'s canvas.onpointerdown and
+     fpMarqueeSelect()). Positioned in feet*scale px, same coordinate space
+     as everything else inside #fpCanvas. */
+  .fp-marquee{ position:absolute; z-index:6; pointer-events:none; background:rgba(15,156,134,.12); border:1.5px dashed var(--accent); }
   .fp-canvas.fp-delete-mode,
   .fp-canvas.fp-delete-mode .fp-el,
   .fp-canvas.fp-delete-mode .fp-el .fp-el-shape,
@@ -426,9 +476,9 @@
   <section id="floorplanScreen">
     <div class="toolbar fp-toolbar">
       <div class="segGroup" id="fpModeGroup">
-        <button class="btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
+        <button class="btn fp-key-btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
       </div>
-      <select id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
+      <select class="fp-key-btn" id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
         <option value="line">Solid line</option>
         <option value="dashedline">Dashed line</option>
         <option value="rect">Rectangle</option>
@@ -437,7 +487,7 @@
         <option value="oval">Oval</option>
       </select>
       <div class="fp-opening-dd" id="fpOpeningDd">
-        <button type="button" class="btn" id="fpOpeningDdBtn" title="Draw an opening, window, or door -- click two points anywhere, including a blank area">
+        <button type="button" class="btn fp-key-btn" id="fpOpeningDdBtn" title="Draw an opening, window, or door -- click two points anywhere, including a blank area">
           <svg id="fpOpeningDdIcon" viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>
           <span id="fpOpeningDdLabel">+ Opening</span>
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -448,20 +498,22 @@
           <button type="button" class="fp-opening-dd-item" data-tool="door"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="3" x2="27" y2="3" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="27" y2="7" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/></svg>Door</button>
         </div>
       </div>
-      <button class="btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
+      <button class="btn fp-key-btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
       <div class="divider"></div>
       <div class="spacer"></div>
       <div class="fp-opening-dd" id="fpCopyDd">
-        <button type="button" class="btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
+        <button type="button" class="btn fp-key-btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
           Copy
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
         <div class="fp-opening-dd-menu" id="fpCopyDdMenu" hidden>
           <button type="button" class="fp-opening-dd-item" id="fpCopySelectionBtn">Copy</button>
           <button type="button" class="fp-opening-dd-item" id="fpCopyAllBtn">Copy all</button>
+          <button type="button" class="fp-opening-dd-item" id="fpPasteBtn" disabled title="Paste the last item copied with Copy">Paste</button>
+          <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
         </div>
       </div>
-      <button class="btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
+      <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
       <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions">Import Photo</button>
@@ -574,7 +626,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+d72daa28';
+  const APP_VERSION = '1.0+c3240635';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1545,7 +1597,26 @@
     fpState.objects.forEach(o=>{ o.cx+=dx; o.cy+=dy; });
   }
 
-  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; }
+  // fpMultiSelectedIds: array of {kind,id} picked out by a marquee drag (see
+  // fpMarqueeSelect()) -- a *subset* of the plan, distinct from fpSelectAllActive
+  // (literally everything). null when no marquee selection is active.
+  let fpMultiSelectedIds = null;
+  function fpDeselect(){ fpSelectedId = null; fpSelectedKind = null; fpSelectAllActive = false; fpMultiSelectedIds = null; }
+
+  // True if this (kind,id) is part of whatever's currently selected, in any
+  // of the three selection modes (select-all, marquee multi-select, or a
+  // plain single click-select). Shared by the render loop's own
+  // selected/isSelected checks so all three modes highlight consistently.
+  function fpIsPicked(kind, id){
+    if(fpSelectAllActive) return true;
+    if(fpMultiSelectedIds && fpMultiSelectedIds.some(x=>x.kind===kind && x.id===id)) return true;
+    return fpSelectedKind===kind && fpSelectedId===id;
+  }
+  // True whenever MORE than one item could be selected at once (select-all
+  // or a marquee multi-select) -- the render loop uses this to suppress
+  // per-item resize/rotate handles (see .fp-multi-selected in the CSS),
+  // since a handle set per item would be clutter across several of them.
+  function fpIsBulkSelected(){ return fpSelectAllActive || !!(fpMultiSelectedIds && fpMultiSelectedIds.length); }
 
   // Lightweight selection: toggles the CSS class on existing DOM nodes and
   // drops any stale node-handle layer, instead of a full fpRender() -- so
@@ -1555,11 +1626,11 @@
   // drag release), which is an acceptable one-step lag in exchange for
   // never rebuilding out from under a live drag.
   function fpSelect(kind, id){
-    fpSelectedKind = kind; fpSelectedId = id; fpSelectAllActive = false;
+    fpSelectedKind = kind; fpSelectedId = id; fpSelectAllActive = false; fpMultiSelectedIds = null;
     document.querySelectorAll('#fpCanvas .fp-item').forEach(node=>{
       node.classList.toggle('selected', kind==='object' && Number(node.dataset.id)===id);
-      // Left over from a prior select-all -- without removing it here, an
-      // object picked out of a select-all would keep its resize/rotate
+      // Left over from a prior select-all/marquee -- without removing it
+      // here, an object picked out of one would keep its resize/rotate
       // handles suppressed (see the CSS' :not(.fp-multi-selected)) even
       // though it's now a genuine single selection.
       node.classList.remove('fp-multi-selected');
@@ -1579,6 +1650,28 @@
   function fpSelectAll(){
     fpDeselect();
     fpSelectAllActive = true;
+    fpRender();
+  }
+
+  // Marquee (rubber-band) multi-select: everything whose bounding box falls
+  // fully inside the dragged rectangle (feet, not screen px) becomes the new
+  // selection -- see the Select-mode drag handling in fpWireCanvasInteraction()
+  // for where box comes from. A real fpRender() (like fpSelectAll() above),
+  // for the same reason: every affected item's selected state lives in the
+  // render loop, not something toggled node-by-node here.
+  function fpMarqueeSelect(box){
+    const picked = [];
+    fpState.elements.forEach(el=>{
+      const b = fpElementBounds(el);
+      if(b.minX>=box.x1 && b.maxX<=box.x2 && b.minY>=box.y1 && b.maxY<=box.y2) picked.push({kind:'element', id:el.id});
+    });
+    fpState.objects.forEach(o=>{
+      const b = fpObjectBoundsFeet(o);
+      if(b.minX>=box.x1 && b.maxX<=box.x2 && b.minY>=box.y1 && b.maxY<=box.y2) picked.push({kind:'object', id:o.id});
+    });
+    fpDeselect();
+    if(picked.length===1){ fpSelect(picked[0].kind, picked[0].id); fpRender(); return; }
+    if(picked.length>1) fpMultiSelectedIds = picked;
     fpRender();
   }
 
@@ -1609,36 +1702,52 @@
     if(toolSelect) toolSelect.classList.toggle('fp-tool-select-active', drawActive && !isOpeningTool);
     if(openingBtn) openingBtn.classList.toggle('fp-opening-dd-btn-active', drawActive && isOpeningTool);
   }
-  // Right-click menu: every entry just .click()s the real toolbar button it
-  // mirrors (see the ids below) instead of reimplementing the action, so
-  // there's exactly one code path per action and the toolbar's own active-
-  // state highlighting is always correct regardless of which menu triggered
-  // it. Disabled state (Undo with no history, etc.) is read live from the
-  // real button each time the menu opens, so it never drifts out of sync.
+  // Right-click menu: mirrors just the toolbar's 6 key-action controls (the
+  // same ones with the beveled .fp-key-btn treatment). Draw/Select/Delete
+  // and the Opening/Copy dropdown *triggers* work by literally .click()-ing
+  // the real button -- for Opening/Copy that opens their own dropdown (same
+  // as clicking them in the toolbar) rather than picking a default choice,
+  // so there's exactly one code path per action and the toolbar's own
+  // active-state highlighting is always correct regardless of which menu
+  // triggered it. "Solid line" is the one exception: it's a plain <select>
+  // option, not a button, and select.click() doesn't reliably open a native
+  // dropdown via script across browsers -- so it runs a custom action that
+  // sets the value and dispatches a real 'change' event instead, which
+  // still routes through the select's own existing change handler rather
+  // than duplicating what that handler does.
   const FP_CONTEXT_MENU_ITEMS = [
     { label:'Draw', btn:'fpModeDrawBtn' },
+    { label:'Solid line', run: ()=>{
+        const sel = document.getElementById('fpDrawToolSelect');
+        sel.value = 'line';
+        sel.dispatchEvent(new Event('change', { bubbles:true }));
+        fpSetMode('draw'); // the plain <select>'s own change handler only arms the tool, not the mode -- from the context menu, switch into Draw immediately too, same as "Opening" does
+      } },
+    { label:'Opening', btn:'fpOpeningDdBtn' },
     { label:'Select', btn:'fpModeSelectBtn' },
-    { label:'Copy', btn:'fpCopySelectionBtn' },
-    { label:'Copy all', btn:'fpCopyAllBtn' },
+    { label:'Copy', btn:'fpCopyDdBtn' },
     { label:'Delete', btn:'fpDeleteBtn' },
-    { label:'Undo', btn:'fpUndoBtn' },
-    { label:'Save As…', btn:'fpExportBtn' },
-    { label:'Clear plan', btn:'fpResetBtn' },
-    { label:'Import Photo', btn:'fpGenerateFromPhotosBtn' },
-    { label:'Projects', btn:'fpProjectsBtn' },
-    { label:'New Project', btn:'fpNewProjectQuickBtn' },
   ];
   function fpOpenContextMenu(clientX, clientY){
     const menu = document.getElementById('fpContextMenu');
-    menu.innerHTML = FP_CONTEXT_MENU_ITEMS.map(it=>{
-      const realBtn = document.getElementById(it.btn);
+    menu.innerHTML = FP_CONTEXT_MENU_ITEMS.map((it,i)=>{
+      const realBtn = it.btn ? document.getElementById(it.btn) : null;
       const disabled = !!(realBtn && realBtn.disabled);
-      return '<button type="button" class="fp-context-menu-item" data-target-btn="'+it.btn+'"'+(disabled?' disabled':'')+'>'+fpEscapeHtml(it.label)+'</button>';
+      return '<button type="button" class="fp-context-menu-item" data-idx="'+i+'"'+(disabled?' disabled':'')+'>'+fpEscapeHtml(it.label)+'</button>';
     }).join('');
     menu.querySelectorAll('.fp-context-menu-item').forEach(node=>{
-      node.addEventListener('click', ()=>{
+      node.addEventListener('click', (e)=>{
+        // Without this, the *original* click on this menu item keeps
+        // bubbling after realBtn.click() below (itself a separate, nested
+        // event) already opened the Opening/Copy dropdown -- reaching the
+        // document-level dismiss listener further down, which then closes
+        // that dropdown right back again since this menu item isn't inside
+        // it.
+        e.stopPropagation();
         menu.hidden = true;
-        const realBtn = document.getElementById(node.dataset.targetBtn);
+        const it = FP_CONTEXT_MENU_ITEMS[Number(node.dataset.idx)];
+        if(it.run){ it.run(); return; }
+        const realBtn = document.getElementById(it.btn);
         if(realBtn && !realBtn.disabled) realBtn.click();
       });
     });
@@ -1702,14 +1811,26 @@
     const pad = 2; // feet
     return { minX:minX-pad, minY:minY-pad, maxX:maxX+pad, maxY:maxY+pad };
   }
-  function fpSelectionBounds(){
-    if(fpSelectedId==null) return null;
-    if(fpSelectedKind==='element'){
-      const el = fpState.elements.find(e=>e.id===fpSelectedId);
+  function fpBoundsFor(kind, id){
+    if(kind==='element'){
+      const el = fpState.elements.find(e=>e.id===id);
       return el ? fpElementBounds(el) : null;
     }
-    const o = fpState.objects.find(x=>x.id===fpSelectedId);
+    const o = fpState.objects.find(x=>x.id===id);
     return o ? fpObjectBoundsFeet(o) : null;
+  }
+  function fpSelectionBounds(){
+    if(fpMultiSelectedIds && fpMultiSelectedIds.length){
+      let b = null;
+      fpMultiSelectedIds.forEach(({kind,id})=>{
+        const ib = fpBoundsFor(kind, id);
+        if(!ib) return;
+        b = b ? { minX:Math.min(b.minX,ib.minX), minY:Math.min(b.minY,ib.minY), maxX:Math.max(b.maxX,ib.maxX), maxY:Math.max(b.maxY,ib.maxY) } : ib;
+      });
+      return b;
+    }
+    if(fpSelectedId==null) return null;
+    return fpBoundsFor(fpSelectedKind, fpSelectedId);
   }
 
   // Builds a standalone, self-contained SVG string of the plan (or a region
@@ -1931,6 +2052,91 @@
     }catch(e){
       toast('Could not copy to clipboard in this browser.', true);
     }
+  }
+
+  // ---- In-app copy/paste: duplicates the actual selected item(s) back into
+  // the plan (any plan -- these are plain variables, untouched by switching
+  // projects, so copying in one project and pasting in another works for
+  // free). Separate from fpCopyToClipboard() above, which only ever
+  // produces a flat *image* for pasting into other apps -- this preserves
+  // real, re-editable data. fpClipboardSelection is always an array (1 item
+  // for a plain click-selection, several for a marquee multi-select);
+  // fpClipboardAll is a snapshot of the whole plan. fpLastCopyKind tracks
+  // which one Ctrl/Cmd+V should use (see the keydown handler below).
+  let fpClipboardSelection = null; // [{kind,data}] | null
+  let fpClipboardAll = null; // {elements:[...], objects:[...]} | null
+  let fpLastCopyKind = null; // 'selection' | 'all' | null
+  function fpUpdatePasteButtons(){
+    const pasteBtn = document.getElementById('fpPasteBtn');
+    const pasteAllBtn = document.getElementById('fpPasteAllBtn');
+    if(pasteBtn) pasteBtn.disabled = !(fpClipboardSelection && fpClipboardSelection.length);
+    if(pasteAllBtn) pasteAllBtn.disabled = !fpClipboardAll;
+  }
+  // Every currently-selected item (marquee multi-select, or a single click-
+  // selection), deep-cloned -- not select-all, which is Copy All's own
+  // concern below.
+  function fpCollectSelectedData(){
+    const picks = [];
+    if(fpMultiSelectedIds && fpMultiSelectedIds.length){
+      fpMultiSelectedIds.forEach(({kind,id})=>{
+        const src = kind==='element' ? fpState.elements.find(e=>e.id===id) : fpState.objects.find(o=>o.id===id);
+        if(src) picks.push({ kind, data:JSON.parse(JSON.stringify(src)) });
+      });
+    } else if(fpSelectedId!=null){
+      const src = fpSelectedKind==='element' ? fpState.elements.find(e=>e.id===fpSelectedId) : fpState.objects.find(o=>o.id===fpSelectedId);
+      if(src) picks.push({ kind:fpSelectedKind, data:JSON.parse(JSON.stringify(src)) });
+    }
+    return picks;
+  }
+  function fpCopySelectionInternal(){
+    const picks = fpCollectSelectedData();
+    if(!picks.length) return false;
+    fpClipboardSelection = picks;
+    fpLastCopyKind = 'selection';
+    fpUpdatePasteButtons();
+    return true;
+  }
+  function fpCopyAllInternal(){
+    fpClipboardAll = {
+      elements: JSON.parse(JSON.stringify(fpState.elements)),
+      objects: JSON.parse(JSON.stringify(fpState.objects)),
+    };
+    fpLastCopyKind = 'all';
+    fpUpdatePasteButtons();
+  }
+  // Shared by both Paste and Paste all -- adds a fresh copy of each entry
+  // (new id, nudged by offsetFt so it doesn't land exactly on top of
+  // whatever it was copied from) and selects the newly-pasted item(s).
+  function fpPasteEntries(entries, offsetFt){
+    if(!entries.length) return;
+    fpPushHistory();
+    const newlySelected = [];
+    entries.forEach(({kind,data})=>{
+      const copy = JSON.parse(JSON.stringify(data));
+      copy.id = fpIdSeq++;
+      if(kind==='element'){
+        if(fpIsLineType(copy.type)){ copy.x1+=offsetFt; copy.y1+=offsetFt; copy.x2+=offsetFt; copy.y2+=offsetFt; }
+        else { copy.cx+=offsetFt; copy.cy+=offsetFt; }
+        fpState.elements.push(copy);
+      } else {
+        copy.cx += offsetFt; copy.cy += offsetFt;
+        fpState.objects.push(copy);
+      }
+      newlySelected.push({ kind, id:copy.id });
+    });
+    fpDeselect();
+    if(newlySelected.length===1) fpSelect(newlySelected[0].kind, newlySelected[0].id);
+    else fpMultiSelectedIds = newlySelected;
+    fpSave(); fpRender();
+    toast(entries.length>1 ? `Pasted ${entries.length} items.` : 'Pasted.');
+  }
+  function fpPasteSelection(){ fpPasteEntries(fpClipboardSelection||[], 0.5); }
+  function fpPasteAll(){
+    if(!fpClipboardAll) return;
+    fpPasteEntries([
+      ...fpClipboardAll.elements.map(data=>({ kind:'element', data })),
+      ...fpClipboardAll.objects.map(data=>({ kind:'object', data })),
+    ], 1);
   }
 
   // ---- Recent Projects: up to 5, entirely internal (IndexedDB) -- click to
@@ -2294,8 +2500,45 @@
     canvas.onclick = null;
 
     if(fpMode!=='draw'){
+      // Select mode, pressing on blank canvas/grid (not an item -- those
+      // stopPropagation() in their own pointerdown handlers before this can
+      // fire): a plain click (no real movement) deselects as before; a real
+      // drag draws a marquee rectangle and, on release, selects every
+      // wall/shape/object whose bounding box falls fully inside it (see
+      // fpMarqueeSelect()) so it can be Copy'd/deleted as a group.
       canvas.onpointerdown = (e)=>{
-        if(e.target===canvas || e.target===svg){ fpDeselect(); fpRender(); }
+        if(e.target!==canvas && e.target!==svg) return;
+        if(e.button!=null && e.button!==0) return;
+        const startClientX = e.clientX, startClientY = e.clientY;
+        const rect0 = canvas.getBoundingClientRect();
+        const startX = (e.clientX-rect0.left)/scale, startY = (e.clientY-rect0.top)/scale; // feet, unsnapped for precise box math
+        let moved = false;
+        const marquee = document.createElement('div');
+        marquee.className = 'fp-marquee';
+        canvas.appendChild(marquee);
+        function updateMarquee(clientX, clientY){
+          const r = canvas.getBoundingClientRect();
+          const curX = (clientX-r.left)/scale, curY = (clientY-r.top)/scale;
+          const x1 = Math.min(startX,curX), y1 = Math.min(startY,curY);
+          const x2 = Math.max(startX,curX), y2 = Math.max(startY,curY);
+          marquee.style.left = (x1*scale)+'px'; marquee.style.top = (y1*scale)+'px';
+          marquee.style.width = ((x2-x1)*scale)+'px'; marquee.style.height = ((y2-y1)*scale)+'px';
+          return { x1, y1, x2, y2 };
+        }
+        function onMove(ev){
+          if(Math.abs(ev.clientX-startClientX) > 3 || Math.abs(ev.clientY-startClientY) > 3) moved = true;
+          updateMarquee(ev.clientX, ev.clientY);
+        }
+        function onUp(ev){
+          canvas.removeEventListener('pointermove', onMove);
+          canvas.removeEventListener('pointerup', onUp);
+          const box = updateMarquee(ev.clientX, ev.clientY);
+          marquee.remove();
+          if(!moved){ fpDeselect(); fpRender(); return; }
+          fpMarqueeSelect(box);
+        }
+        canvas.addEventListener('pointermove', onMove);
+        canvas.addEventListener('pointerup', onUp);
       };
       return;
     }
@@ -2420,7 +2663,7 @@
 
     // Structural elements (walls + shapes)
     fpState.elements.forEach(el=>{
-      const selected = fpSelectAllActive || (fpSelectedKind==='element' && el.id===fpSelectedId);
+      const selected = fpIsPicked('element', el.id);
       const g = fpSvgEl('g', { class:'fp-el'+(selected?' selected':''), 'data-id':el.id });
       let shape;
       let visibleRanges = null; // wall-only: sub-ranges NOT covered by an opening on top (see fpVisibleWallRanges)
@@ -2532,11 +2775,11 @@
       });
 
       svg.appendChild(g);
-      // Skip resize/rotate handles during a select-all (fpSelectAllActive) --
-      // one handle set per wall/shape would be visual clutter across a whole
-      // plan; the accent-colored stroke (.fp-el.selected above) is enough of
-      // a "this is selected" cue when everything's selected at once.
-      if(selected && fpMode==='select' && !fpSelectAllActive) fpAddElementNodes(svg, canvas, el, px, scale);
+      // Skip resize/rotate handles during a select-all or marquee multi-
+      // select -- one handle set per wall/shape would be visual clutter
+      // across several of them; the accent-colored stroke (.fp-el.selected
+      // above) is enough of a "this is selected" cue in that case.
+      if(selected && fpMode==='select' && !fpIsBulkSelected()) fpAddElementNodes(svg, canvas, el, px, scale);
 
       if(fpIsLineType(el.type)){
         const hasLineLabel = !!(el.label && el.label.trim());
@@ -2563,12 +2806,12 @@
     }
     fpState.objects.forEach(item=>{
       const el = document.createElement('div');
-      const isSelected = fpSelectAllActive || (fpSelectedKind==='object' && item.id===fpSelectedId);
+      const isSelected = fpIsPicked('object', item.id);
       // fp-multi-selected suppresses the resize/rotate handles (see CSS) --
-      // one handle set per object would be visual clutter across a whole
-      // plan during a select-all; the outline below (.fp-item.selected) is
-      // enough of a "this is selected" cue when everything's selected.
-      el.className = 'fp-item' + (isSelected ? ' selected' : '') + (fpSelectAllActive ? ' fp-multi-selected' : '');
+      // one handle set per object would be visual clutter across several of
+      // them during a select-all or marquee multi-select; the outline below
+      // (.fp-item.selected) is enough of a "this is selected" cue then.
+      el.className = 'fp-item' + (isSelected ? ' selected' : '') + (fpIsBulkSelected() ? ' fp-multi-selected' : '');
       el.dataset.id = item.id;
       updateObjStyle(el, item);
 
@@ -2890,13 +3133,24 @@
     });
     document.getElementById('fpCopySelectionBtn').addEventListener('click', ()=>{
       copyDdMenu.hidden = true;
+      fpCopySelectionInternal(); // remembers the actual item(s) for Paste, below
       fpCopyToClipboard();
     });
     document.getElementById('fpCopyAllBtn').addEventListener('click', ()=>{
       copyDdMenu.hidden = true;
+      fpCopyAllInternal(); // remembers the whole plan for Paste all, below
       fpSelectAll(); // visibly highlights every wall/shape/object, not just a silent flag flip -- see fpSelectAll()
       fpCopyToClipboard();
     });
+    document.getElementById('fpPasteBtn').addEventListener('click', ()=>{
+      copyDdMenu.hidden = true;
+      fpPasteSelection();
+    });
+    document.getElementById('fpPasteAllBtn').addEventListener('click', ()=>{
+      copyDdMenu.hidden = true;
+      fpPasteAll();
+    });
+    fpUpdatePasteButtons(); // initial state: both disabled until a real Copy/Copy all happens
 
     // Right-click anywhere on the plan opens the mirrored context menu (see
     // FP_CONTEXT_MENU_ITEMS/fpOpenContextMenu() above) -- right-clicking a
@@ -2980,9 +3234,20 @@
         return;
       }
       if(!typing && (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='c'){
-        if(fpSelectedId==null && !fpSelectAllActive) return; // nothing to copy, let the browser's own copy behave normally
+        const hasSomething = fpSelectedId!=null || fpSelectAllActive || (fpMultiSelectedIds && fpMultiSelectedIds.length);
+        if(!hasSomething) return; // nothing to copy, let the browser's own copy behave normally
         e.preventDefault();
+        if(fpSelectAllActive) fpCopyAllInternal(); else fpCopySelectionInternal();
         fpCopyToClipboard();
+        return;
+      }
+      if(!typing && (e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='v'){
+        const hasSel = fpClipboardSelection && fpClipboardSelection.length, hasAll = !!fpClipboardAll;
+        if(!hasSel && !hasAll) return; // nothing pasteable yet, let the browser's own paste behave normally
+        e.preventDefault();
+        if(fpLastCopyKind==='all' && hasAll) fpPasteAll();
+        else if(hasSel) fpPasteSelection();
+        else fpPasteAll();
       }
     });
   }
