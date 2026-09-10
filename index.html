@@ -154,6 +154,22 @@
   }
   .fp-context-menu-item:hover:not(:disabled){ background:var(--panel2); }
   .fp-context-menu-item:disabled{ opacity:.4; cursor:not-allowed; }
+  /* Nested flyout for context-menu items with their own sub-choices (Solid
+     line's other draw tools, Opening's Window/Door) -- the ▸ arrow denotes
+     an item fans out rather than acting immediately; clicking it toggles the
+     flyout instead of running an action. Flip classes (added in JS after
+     measuring) keep it on-screen near a viewport edge, mirroring how the
+     top-level menu itself is clamped in fpOpenContextMenu(). */
+  .fp-context-menu-row{ position:relative; }
+  .fp-context-submenu-arrow{ float:right; opacity:.55; margin-left:.7rem; }
+  .fp-context-submenu{
+    position:absolute; top:-.3rem; left:100%; margin-left:.3rem; z-index:51; min-width:9rem;
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25); padding:.3rem; display:flex; flex-direction:column; gap:.1rem;
+  }
+  .fp-context-submenu[hidden]{ display:none; }
+  .fp-context-submenu.fp-flip-x{ left:auto; right:100%; margin-left:0; margin-right:.3rem; }
+  .fp-context-submenu.fp-flip-y{ top:auto; bottom:-.3rem; }
   .fp-layout{ display:grid; grid-template-columns:1fr; gap:.9rem; align-items:start; }
   @media (min-width:900px){ .fp-layout{ grid-template-columns:1fr 300px; } }
 
@@ -642,7 +658,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+31ac0d3b';
+  const APP_VERSION = '1.0+ef177e92';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1766,27 +1782,68 @@
   // sets the value and dispatches a real 'change' event instead, which
   // still routes through the select's own existing change handler rather
   // than duplicating what that handler does.
+  // Sets the toolbar's draw-tool <select> and arms Draw mode -- shared by
+  // "Solid line"'s own top-level click and every entry in its submenu below,
+  // so picking any of them (including re-picking "Solid line" itself from
+  // the fanned-out list) goes through the select's own real 'change' handler
+  // rather than duplicating what it does.
+  function fpRunDrawToolChoice(tool){
+    const sel = document.getElementById('fpDrawToolSelect');
+    sel.value = tool;
+    sel.dispatchEvent(new Event('change', { bubbles:true }));
+    fpSetMode('draw');
+  }
   const FP_CONTEXT_MENU_ITEMS = [
     { label:'Draw', btn:'fpModeDrawBtn' },
-    { label:'Solid line', run: ()=>{
-        const sel = document.getElementById('fpDrawToolSelect');
-        sel.value = 'line';
-        sel.dispatchEvent(new Event('change', { bubbles:true }));
-        fpSetMode('draw'); // the plain <select>'s own change handler only arms the tool, not the mode -- from the context menu, switch into Draw immediately too, same as "Opening" does
-      } },
-    { label:'Opening', btn:'fpOpeningDdBtn' },
+    { label:'Solid line', submenu:[
+        { label:'Solid line', run:()=>fpRunDrawToolChoice('line') },
+        { label:'Dashed line', run:()=>fpRunDrawToolChoice('dashedline') },
+        { label:'Rectangle', run:()=>fpRunDrawToolChoice('rect') },
+        { label:'Square', run:()=>fpRunDrawToolChoice('square') },
+        { label:'Circle', run:()=>fpRunDrawToolChoice('circle') },
+        { label:'Oval', run:()=>fpRunDrawToolChoice('oval') },
+      ] },
+    { label:'Opening', btn:'fpOpeningDdBtn', submenu:[
+        // Each entry .click()s the real toolbar Opening-dropdown item (same
+        // single-source-of-truth approach as every other context-menu item)
+        // rather than reimplementing what that click already does.
+        { label:'Opening', run:()=>document.querySelector('#fpOpeningDdMenu .fp-opening-dd-item[data-tool="opening"]').click() },
+        { label:'Window', run:()=>document.querySelector('#fpOpeningDdMenu .fp-opening-dd-item[data-tool="window"]').click() },
+        { label:'Door', run:()=>document.querySelector('#fpOpeningDdMenu .fp-opening-dd-item[data-tool="door"]').click() },
+      ] },
     { label:'Select', btn:'fpModeSelectBtn' },
     { label:'Copy', btn:'fpCopyDdBtn' },
     { label:'Delete', btn:'fpDeleteBtn' },
   ];
+  // Keeps a fanned-out submenu on-screen: measures after layout and flips to
+  // the opposite side/edge (via CSS classes, see .fp-flip-x/.fp-flip-y
+  // above) if it would otherwise overflow the viewport near a right or
+  // bottom edge -- same idea as the top-level menu's own clamp below, just
+  // applied to a child flyout instead of the whole menu.
+  function fpPositionContextSubmenu(sm){
+    sm.classList.remove('fp-flip-x','fp-flip-y');
+    requestAnimationFrame(()=>{
+      const r = sm.getBoundingClientRect();
+      if(r.right > window.innerWidth) sm.classList.add('fp-flip-x');
+      if(r.bottom > window.innerHeight) sm.classList.add('fp-flip-y');
+    });
+  }
   function fpOpenContextMenu(clientX, clientY){
     const menu = document.getElementById('fpContextMenu');
     menu.innerHTML = FP_CONTEXT_MENU_ITEMS.map((it,i)=>{
       const realBtn = it.btn ? document.getElementById(it.btn) : null;
       const disabled = !!(realBtn && realBtn.disabled);
-      return '<button type="button" class="fp-context-menu-item" data-idx="'+i+'"'+(disabled?' disabled':'')+'>'+fpEscapeHtml(it.label)+'</button>';
+      const arrow = it.submenu ? ' <span class="fp-context-submenu-arrow">&#9656;</span>' : '';
+      let html = '<div class="fp-context-menu-row">' +
+        '<button type="button" class="fp-context-menu-item" data-idx="'+i+'"'+(disabled?' disabled':'')+'>'+fpEscapeHtml(it.label)+arrow+'</button>';
+      if(it.submenu){
+        html += '<div class="fp-context-submenu" data-parent-idx="'+i+'" hidden>' +
+          it.submenu.map((sub,j)=>'<button type="button" class="fp-context-menu-item" data-idx="'+i+'" data-sub-idx="'+j+'">'+fpEscapeHtml(sub.label)+'</button>').join('') +
+        '</div>';
+      }
+      return html + '</div>';
     }).join('');
-    menu.querySelectorAll('.fp-context-menu-item').forEach(node=>{
+    menu.querySelectorAll('.fp-context-menu-row > .fp-context-menu-item').forEach(node=>{
       node.addEventListener('click', (e)=>{
         // Without this, the *original* click on this menu item keeps
         // bubbling after realBtn.click() below (itself a separate, nested
@@ -1795,11 +1852,30 @@
         // that dropdown right back again since this menu item isn't inside
         // it.
         e.stopPropagation();
-        menu.hidden = true;
         const it = FP_CONTEXT_MENU_ITEMS[Number(node.dataset.idx)];
+        if(it.submenu){
+          // Top-level click on an item with sub-choices only fans them out
+          // (or folds them back in) -- it never runs an action itself, since
+          // every real action now lives one level down as a specific choice.
+          const sm = menu.querySelector('.fp-context-submenu[data-parent-idx="'+node.dataset.idx+'"]');
+          const wasHidden = sm.hidden;
+          menu.querySelectorAll('.fp-context-submenu').forEach(other=>{ other.hidden = true; });
+          sm.hidden = !wasHidden;
+          if(!sm.hidden) fpPositionContextSubmenu(sm);
+          return;
+        }
+        menu.hidden = true;
         if(it.run){ it.run(); return; }
         const realBtn = document.getElementById(it.btn);
         if(realBtn && !realBtn.disabled) realBtn.click();
+      });
+    });
+    menu.querySelectorAll('.fp-context-submenu .fp-context-menu-item').forEach(node=>{
+      node.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        menu.hidden = true;
+        const sub = FP_CONTEXT_MENU_ITEMS[Number(node.dataset.idx)].submenu[Number(node.dataset.subIdx)];
+        if(sub.run) sub.run();
       });
     });
     menu.style.left = clientX+'px';
