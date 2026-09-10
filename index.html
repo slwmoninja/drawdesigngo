@@ -97,8 +97,11 @@
     other, growing a little on every re-render (i.e. on every edit). */
   }
   .fp-title{
-    margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:var(--text);
+    margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:#228B22;
     outline:none; border-radius:6px; padding:.15rem .3rem; display:inline-block;
+    /* Embossed: a light highlight above-left plus a dark shadow below-right
+       reads as raised/pressed-into-the-page, rather than a flat drop shadow. */
+    text-shadow: -1px -1px 0 rgba(255,255,255,.55), 1px 1px 1.5px rgba(0,0,0,.45);
   }
   .fp-title:hover, .fp-title:focus{ background:var(--panel2); }
   .fp-zoom-row{
@@ -425,7 +428,8 @@
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
       <button class="btn" id="fpGenerateFromPhotosBtn" title="Generate a floor plan from room photos or dimensions">Import Photo</button>
-      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Project List</button>
+      <button class="btn" id="fpProjectsBtn" title="Switch between your 5 most recent floor plans">Projects</button>
+      <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
     </div>
 
     <div class="fp-layout">
@@ -531,7 +535,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+9e0848b8';
+  const APP_VERSION = '1.0+fd6796fe';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1907,8 +1911,18 @@
       await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
     }, 500);
   }
+  // Immediately persists the CURRENT project's latest state, bypassing the
+  // 500ms debounce above -- called right before switching away from it (new
+  // project or an existing one), so an edit made just before switching can't
+  // be lost to a debounce timer that hadn't fired yet.
+  async function fpFlushActiveProjectSave(){
+    if(fpProjectSaveDebounceId){ clearTimeout(fpProjectSaveDebounceId); fpProjectSaveDebounceId = null; }
+    if(!fpActiveProjectId) return;
+    await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
+  }
 
   async function fpStartNewProject(){
+    await fpFlushActiveProjectSave();
     fpActiveProjectId = fpNewProjectId();
     fpSetActiveProjectId(fpActiveProjectId);
     fpState = fpDefaultState();
@@ -1925,6 +1939,7 @@
     if(id===fpActiveProjectId) return;
     const record = await fpGetProject(id);
     if(!record) return;
+    await fpFlushActiveProjectSave();
     fpActiveProjectId = id;
     fpSetActiveProjectId(id);
     const parsed = record.state || {};
@@ -2662,11 +2677,35 @@
   }
 
   function initFloorPlan(){
+    // No active-project id yet means this is the very first time the app has
+    // ever been opened on this device -- every later open (even of a still-
+    // blank, never-renamed project) finds the id this run is about to set
+    // below, and just silently resumes it instead.
+    const isFirstEverOpen = !fpGetActiveProjectId();
     fpState = fpLoad();
     fpActiveProjectId = fpGetActiveProjectId() || fpNewProjectId();
     fpSetActiveProjectId(fpActiveProjectId);
     document.getElementById('fpTitle').textContent = fpState.title;
     fpRender();
+    if(isFirstEverOpen){
+      // Prompt for a project name immediately: focus the title field with
+      // its placeholder text selected, so a blinking cursor is ready and the
+      // very first keystroke replaces "Untitled Floor Plan" outright rather
+      // than requiring the user to clear it themselves first. Deferred a
+      // tick -- a focus() call made synchronously during initial page
+      // bootstrap is unreliable in some browsers (silently dropped before
+      // the document itself has taken focus); firing after the current
+      // task/paint settles is the standard fix.
+      setTimeout(()=>{
+        const titleEl = document.getElementById('fpTitle');
+        titleEl.focus();
+        const range = document.createRange();
+        range.selectNodeContents(titleEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }, 0);
+    }
     // Registers the just-loaded plan in Recent Projects even before its
     // first edit, so a fresh install's default/empty plan still shows up.
     fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
@@ -2677,6 +2716,11 @@
     });
 
     document.getElementById('fpProjectsBtn').addEventListener('click', fpOpenProjectsModal);
+    document.getElementById('fpNewProjectQuickBtn').addEventListener('click', async ()=>{
+      const ok = await fpConfirmModal('Start a new blank project? Your current one is saved first, and stays in Recent Projects.', 'Start new');
+      if(!ok) return;
+      await fpStartNewProject();
+    });
     document.getElementById('fpExportBtn').addEventListener('click', fpOpenExportModal);
 
     document.getElementById('fpModeGroup').addEventListener('click', (e)=>{
