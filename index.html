@@ -257,6 +257,15 @@
     padding:0; cursor:pointer;
   }
   .fp-item-label.placeholder{ color:var(--dim); font-style:italic; font-weight:500; }
+  /* Room-name label objects (see fpEnsureRoomLabel()) read as a heading, not
+     a furniture caption -- bigger, bold, forest-green/embossed to match
+     #fpTitle's own styling, and not ellipsis-truncated since a room name is
+     the whole point of the object rather than an aside next to a shape. */
+  .fp-room-label-text{
+    font-size:1.05rem; font-weight:800; color:#228B22;
+    text-shadow:0 1px 0 rgba(255,255,255,.5), 0 -1px 0 rgba(0,0,0,.15);
+    max-width:none; overflow:visible; white-space:pre;
+  }
   .fp-item-label:hover, .fp-item-label:focus{ white-space:normal; }
   .fp-rotate-handle{
     position:absolute; top:-18px; left:50%; transform:translateX(-50%);
@@ -658,7 +667,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+7ee92cb6';
+  const APP_VERSION = '1.0+3d1d8259';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1546,6 +1555,39 @@
     nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
   }
 
+  // Room-name label objects (item.type==='label', see fpEnsureRoomLabel())
+  // get their own lighter modal -- just the name, no width/depth/auto-detect
+  // fields, since the label IS the object. Editing/saving here only ever
+  // touches this one object's item.label, never fpState.title -- that's
+  // what lets Russ rename an individual room without renaming the project,
+  // and copy/paste this object (same Copy/Copy all/marquee system as
+  // everything else) to label additional rooms independently.
+  function fpOpenRoomLabelModal(item){
+    const wrap = openModal('Room Name', `
+      <label class="mini" style="display:block; margin-bottom:.6rem;">Name
+        <input type="text" id="fpRoomLabelInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(item.label||'')}">
+      </label>
+      <div style="display:flex; gap:.5rem;">
+        <button class="btn" id="fpRoomLabelDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
+        <button class="btn-primary" id="fpRoomLabelSaveBtn" type="button" style="flex:1;">Save</button>
+      </div>
+    `);
+    const nameInput = wrap.querySelector('#fpRoomLabelInput');
+    nameInput.focus(); nameInput.select();
+    wrap.querySelector('#fpRoomLabelDeleteBtn').addEventListener('click', ()=>{
+      fpDeleteItem('object', item.id);
+      wrap.remove();
+    });
+    function save(){
+      fpPushHistory();
+      item.label = nameInput.value.trim();
+      fpSave(); fpRender();
+      wrap.remove();
+    }
+    wrap.querySelector('#fpRoomLabelSaveBtn').addEventListener('click', save);
+    nameInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
+  }
+
   // Any structural line -- wall, dashed wall, or a drawn opening/window/door
   // -- gets the same Name + Length treatment furniture objects get. Length
   // is the only "measurement" a line has; changing it keeps the start point
@@ -2008,6 +2050,15 @@
       const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
       const [x,y] = px(item.cx-item.w/24, item.cy-item.d/24);
       const [cx,cy] = px(item.cx,item.cy);
+      if(item.type==='label'){
+        // Room-name labels bake straight into Print/PDF/PNG/JPG/Copy-all as a
+        // real heading -- no icon artwork, and left-anchored (not centered)
+        // so it reads like a title sitting at its placed point rather than a
+        // furniture caption floating below a shape.
+        const text = (item.label && item.label.trim()) || 'Untitled Room';
+        body += `<text x="${x}" y="${cy}" text-anchor="start" dominant-baseline="middle" font-size="18" font-weight="700" fill="#1f6b2c" font-family="sans-serif">${fpEscapeHtml(text)}</text>`;
+        return;
+      }
       body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="0 0 ${item.w} ${item.d}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
       if(item.label && item.label.trim()){
         body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
@@ -2353,11 +2404,30 @@
     await fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
   }
 
+  // Seeds a single editable "room name" text object at the top-left of a
+  // fresh plan, defaulted to the project title -- exists so Print/PDF/PNG/
+  // JPG/Copy all bake a real room label into the exported plan (see
+  // fpBuildExportSvg()'s type==='label' branch), independent of the project
+  // title itself (editing it never touches fpState.title, and vice versa --
+  // see fpOpenRoomLabelModal()). Guarded by roomLabelSeeded, persisted on
+  // fpState itself, so this only ever runs once per project: it backfills
+  // existing plans saved before this feature existed exactly once, and never
+  // re-adds one a user has since deleted.
+  function fpEnsureRoomLabel(){
+    if(fpState.roomLabelSeeded) return;
+    fpState.roomLabelSeeded = true;
+    fpState.objects.push({
+      id: fpIdSeq++, type:'label', label: fpState.title || 'Untitled Floor Plan',
+      w:36, d:10, shape:'rect', icon:'plain', img:null,
+      cx:3, cy:1, rot:0,
+    });
+  }
   async function fpStartNewProject(){
     await fpFlushActiveProjectSave();
     fpActiveProjectId = fpNewProjectId();
     fpSetActiveProjectId(fpActiveProjectId);
     fpState = fpDefaultState();
+    fpEnsureRoomLabel();
     fpDeselect();
     fpHistory = [];
     document.getElementById('fpUndoBtn').disabled = true;
@@ -2385,6 +2455,7 @@
       fpState = Object.assign({}, fpBlankState(), parsed);
       fpIdSeq = parsed.__idSeq || 1000;
       delete fpState.__idSeq;
+      fpEnsureRoomLabel();
       fpDeselect();
       fpHistory = [];
       document.getElementById('fpUndoBtn').disabled = true;
@@ -2410,6 +2481,7 @@
     fpState = Object.assign({}, fpDefaultState(), parsed);
     fpIdSeq = parsed.__idSeq || 1000;
     delete fpState.__idSeq;
+    fpEnsureRoomLabel();
     fpDeselect();
     fpHistory = [];
     document.getElementById('fpUndoBtn').disabled = true;
@@ -2649,6 +2721,7 @@
   // per-render handlers, since this runs on every fpRender() and the canvas
   // DOM node itself is reused across renders -- addEventListener here would
   // silently stack duplicate handlers on every re-render.
+  const FP_LONG_PRESS_MS = 450; // hold-still threshold before a press in Draw mode commits to box-select instead of the active tool's own drag
   function fpWireCanvasInteraction(canvas, svg, px, scale){
     function feetFromEvent(e){
       const rect = canvas.getBoundingClientRect();
@@ -2658,56 +2731,110 @@
     canvas.onpointermove = null;
     canvas.onclick = null;
 
+    // Marquee/box-select drag: draws a rectangle from the pointerdown point
+    // to wherever the pointer is released, then selects every wall/shape/
+    // object whose bounding box falls fully inside it (fpMarqueeSelect()) so
+    // the group can be Copy'd/deleted together. Shared by both entry points
+    // below -- Select mode starts this on any drag, immediately; Draw mode
+    // (see fpArmLongPressMarquee below) starts it only on a genuine long
+    // press, since a plain drag there already does something else (draws a
+    // shape) that this would otherwise fight with.
+    function fpBeginMarqueeDrag(e){
+      const startClientX = e.clientX, startClientY = e.clientY;
+      const rect0 = canvas.getBoundingClientRect();
+      const startX = (e.clientX-rect0.left)/scale, startY = (e.clientY-rect0.top)/scale; // feet, unsnapped for precise box math
+      let moved = false;
+      const marquee = document.createElement('div');
+      marquee.className = 'fp-marquee';
+      canvas.appendChild(marquee);
+      // Pointer capture keeps pointermove/pointerup firing on canvas even
+      // once the real cursor drifts outside its exact bounding box mid-
+      // drag (easy to do -- .fp-canvas is a precisely-sized rectangle
+      // inside a padded, scrollable wrapper) -- without it the browser
+      // simply stops delivering events to these listeners the moment the
+      // pointer leaves canvas, silently killing the drag with no error.
+      try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+      function updateMarquee(clientX, clientY){
+        const r = canvas.getBoundingClientRect();
+        const curX = (clientX-r.left)/scale, curY = (clientY-r.top)/scale;
+        const x1 = Math.min(startX,curX), y1 = Math.min(startY,curY);
+        const x2 = Math.max(startX,curX), y2 = Math.max(startY,curY);
+        marquee.style.left = (x1*scale)+'px'; marquee.style.top = (y1*scale)+'px';
+        marquee.style.width = ((x2-x1)*scale)+'px'; marquee.style.height = ((y2-y1)*scale)+'px';
+        return { x1, y1, x2, y2 };
+      }
+      updateMarquee(e.clientX, e.clientY); // immediate feedback that a long press was recognized, even before any movement
+      function onMove(ev){
+        if(Math.abs(ev.clientX-startClientX) > 3 || Math.abs(ev.clientY-startClientY) > 3) moved = true;
+        updateMarquee(ev.clientX, ev.clientY);
+      }
+      function onUp(ev){
+        canvas.removeEventListener('pointermove', onMove);
+        canvas.removeEventListener('pointerup', onUp);
+        try{ canvas.releasePointerCapture(ev.pointerId); }catch(err){}
+        const box = updateMarquee(ev.clientX, ev.clientY);
+        marquee.remove();
+        if(!moved){ fpDeselect(); fpRender(); return; }
+        fpMarqueeSelect(box);
+      }
+      canvas.addEventListener('pointermove', onMove);
+      canvas.addEventListener('pointerup', onUp);
+    }
+
     if(fpMode!=='draw'){
       // Select mode, pressing on blank canvas/grid (not an item -- those
       // stopPropagation() in their own pointerdown handlers before this can
       // fire): a plain click (no real movement) deselects as before; a real
-      // drag draws a marquee rectangle and, on release, selects every
-      // wall/shape/object whose bounding box falls fully inside it (see
-      // fpMarqueeSelect()) so it can be Copy'd/deleted as a group.
+      // drag starts the marquee immediately.
       canvas.onpointerdown = (e)=>{
         if(e.target!==canvas && e.target!==svg) return;
         if(e.button!=null && e.button!==0) return;
-        const startClientX = e.clientX, startClientY = e.clientY;
-        const rect0 = canvas.getBoundingClientRect();
-        const startX = (e.clientX-rect0.left)/scale, startY = (e.clientY-rect0.top)/scale; // feet, unsnapped for precise box math
-        let moved = false;
-        const marquee = document.createElement('div');
-        marquee.className = 'fp-marquee';
-        canvas.appendChild(marquee);
-        // Pointer capture keeps pointermove/pointerup firing on canvas even
-        // once the real cursor drifts outside its exact bounding box mid-
-        // drag (easy to do -- .fp-canvas is a precisely-sized rectangle
-        // inside a padded, scrollable wrapper) -- without it the browser
-        // simply stops delivering events to these listeners the moment the
-        // pointer leaves canvas, silently killing the drag with no error.
-        try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
-        function updateMarquee(clientX, clientY){
-          const r = canvas.getBoundingClientRect();
-          const curX = (clientX-r.left)/scale, curY = (clientY-r.top)/scale;
-          const x1 = Math.min(startX,curX), y1 = Math.min(startY,curY);
-          const x2 = Math.max(startX,curX), y2 = Math.max(startY,curY);
-          marquee.style.left = (x1*scale)+'px'; marquee.style.top = (y1*scale)+'px';
-          marquee.style.width = ((x2-x1)*scale)+'px'; marquee.style.height = ((y2-y1)*scale)+'px';
-          return { x1, y1, x2, y2 };
-        }
-        function onMove(ev){
-          if(Math.abs(ev.clientX-startClientX) > 3 || Math.abs(ev.clientY-startClientY) > 3) moved = true;
-          updateMarquee(ev.clientX, ev.clientY);
-        }
-        function onUp(ev){
-          canvas.removeEventListener('pointermove', onMove);
-          canvas.removeEventListener('pointerup', onUp);
-          try{ canvas.releasePointerCapture(ev.pointerId); }catch(err){}
-          const box = updateMarquee(ev.clientX, ev.clientY);
-          marquee.remove();
-          if(!moved){ fpDeselect(); fpRender(); return; }
-          fpMarqueeSelect(box);
-        }
-        canvas.addEventListener('pointermove', onMove);
-        canvas.addEventListener('pointerup', onUp);
+        fpBeginMarqueeDrag(e);
       };
       return;
+    }
+
+    // Draw mode: races a long-press-and-hold against real movement. Move
+    // past a few px before FP_LONG_PRESS_MS elapses and onNoLongPress() runs
+    // (the tool's normal drag behavior, unaffected); hold still past the
+    // threshold and it pre-empts that, starting the same box-select drag
+    // Select mode gets -- so long-pressing works for Copy no matter which
+    // draw tool happens to be armed, without switching to Select first.
+    function fpArmLongPressMarquee(e, onNoLongPress){
+      if(e.target.closest('.fp-item, .fp-node, .fp-rotate-node')) return;
+      if(e.button!=null && e.button!==0) return;
+      const startClientX = e.clientX, startClientY = e.clientY;
+      let settled = false;
+      const timer = setTimeout(()=>{
+        if(settled) return;
+        settled = true;
+        canvas.removeEventListener('pointermove', earlyMove);
+        canvas.removeEventListener('pointerup', earlyUp);
+        fpBeginMarqueeDrag(e);
+      }, FP_LONG_PRESS_MS);
+      function earlyMove(ev){
+        if(settled) return;
+        if(Math.abs(ev.clientX-startClientX) > 3 || Math.abs(ev.clientY-startClientY) > 3){
+          settled = true;
+          clearTimeout(timer);
+          canvas.removeEventListener('pointermove', earlyMove);
+          canvas.removeEventListener('pointerup', earlyUp);
+          onNoLongPress();
+        }
+      }
+      function earlyUp(){
+        if(settled) return;
+        settled = true;
+        clearTimeout(timer);
+        canvas.removeEventListener('pointermove', earlyMove);
+        canvas.removeEventListener('pointerup', earlyUp);
+        // Released quickly with no real movement and no long press -- a
+        // plain tap. Nothing to do here; for line tools the browser's own
+        // native 'click' event (never suppressed above) still fires and
+        // reaches canvas.onclick below exactly as before.
+      }
+      canvas.addEventListener('pointermove', earlyMove);
+      canvas.addEventListener('pointerup', earlyUp);
     }
 
     const isLineTool = fpIsLineType(fpDrawTool);
@@ -2726,6 +2853,7 @@
           previewLine.setAttribute('x2', px(mx)); previewLine.setAttribute('y2', px(my));
         };
       }
+      canvas.onpointerdown = (e)=> fpArmLongPressMarquee(e, ()=>{}); // line tools have no drag behavior of their own to fall back to -- just arms the long press
       canvas.onclick = (e)=>{
         if(e.target.closest('.fp-item, .fp-node, .fp-rotate-node')) return;
         const [mx,my] = feetFromEvent(e);
@@ -2747,9 +2875,7 @@
     }
 
     // Shape tools: drag from one grid-snapped corner/center to another
-    canvas.onpointerdown = (e)=>{
-      if(e.target.closest('.fp-item, .fp-node, .fp-rotate-node')) return;
-      if(e.button!=null && e.button!==0) return;
+    function fpBeginShapeDrag(e){
       const [sx,sy] = feetFromEvent(e);
       const isCircle = fpDrawTool==='circle', isOval = fpDrawTool==='oval';
       const previewShape = fpSvgEl(isCircle?'circle':isOval?'ellipse':'rect', {
@@ -2800,7 +2926,8 @@
       }
       canvas.addEventListener('pointermove', onMove);
       canvas.addEventListener('pointerup', onUp);
-    };
+    }
+    canvas.onpointerdown = (e)=> fpArmLongPressMarquee(e, ()=> fpBeginShapeDrag(e));
   }
 
   function fpRender(){
@@ -2974,6 +3101,7 @@
     fpState.objects.forEach(item=>{
       const el = document.createElement('div');
       const isSelected = fpIsPicked('object', item.id);
+      const isLabelType = item.type==='label';
       // fp-multi-selected suppresses the resize/rotate handles (see CSS) --
       // one handle set per object would be visual clutter across several of
       // them during a select-all or marquee multi-select; the outline below
@@ -2982,74 +3110,122 @@
       el.dataset.id = item.id;
       updateObjStyle(el, item);
 
-      const icon = document.createElementNS(SVG_NS, 'svg');
-      icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
-      icon.setAttribute('preserveAspectRatio', 'none');
-      icon.setAttribute('class', 'fp-item-icon');
-      icon.innerHTML = fpIconMarkup(item);
-      el.appendChild(icon);
+      if(!isLabelType){
+        const icon = document.createElementNS(SVG_NS, 'svg');
+        icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
+        icon.setAttribute('preserveAspectRatio', 'none');
+        icon.setAttribute('class', 'fp-item-icon');
+        icon.innerHTML = fpIconMarkup(item);
+        el.appendChild(icon);
+      }
 
-      // No label by default (an item from the library doesn't force its
-      // catalog name onto the plan) -- shown only once the user sets one, or
-      // while selected (as an editable placeholder), and drawn snug against
-      // the object itself rather than a separate chip that eats canvas space.
-      const hasLabel = !!(item.label && item.label.trim());
-      const label = document.createElement('div');
-      label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
-      label.style.display = (hasLabel || isSelected) ? '' : 'none';
-      label.spellcheck = false;
-      label.textContent = hasLabel ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : 'Add label';
-      label.title = 'Tap to edit name/dimensions, drag to reposition';
       const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
-      fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item));
-      el.appendChild(label);
-
-      const rotHandle = document.createElement('div');
-      rotHandle.className = 'fp-rotate-handle';
-      el.appendChild(rotHandle);
-
-      // Resize/reshape nodes, center-anchored (mirrors the structural-
-      // element node-resize in fpAddElementNodes): the 4 corners resize
-      // both width and depth together; the 4 edge midpoints resize just
-      // one axis, so stretching a single side -- turning a square table
-      // into a rectangle, or a circle into an oval -- doesn't require
-      // dragging a corner at an exact diagonal to avoid nudging the other
-      // axis too. All 8 resize the same way otherwise (symmetric about
-      // cx/cy, honoring rotation).
-      const RESIZE_NODES = { nw:{w:1,d:1}, ne:{w:1,d:1}, sw:{w:1,d:1}, se:{w:1,d:1}, n:{d:1}, s:{d:1}, e:{w:1}, w:{w:1} };
-      Object.keys(RESIZE_NODES).forEach(corner=>{
-        const axes = RESIZE_NODES[corner];
-        const node = document.createElement('div');
-        node.className = 'fp-obj-node ' + corner;
-        node.addEventListener('pointerdown', (e)=>{
+      const label = document.createElement('div');
+      if(isLabelType){
+        // A room-name label IS the object -- shown plain (no dimension
+        // suffix, no placeholder styling), always visible. Unlike a
+        // furniture caption (fpWireDraggableLabel below, which drags a
+        // separate labelDx/labelDy offset from its shape), there's no
+        // separate shape here for the text to float next to -- so dragging
+        // the text moves item.cx/cy directly, the same coordinate export
+        // (fpBuildExportSvg) reads, rather than an offset export wouldn't
+        // know about. Editing it (fpOpenRoomLabelModal) only ever touches
+        // this object's own item.label, never fpState.title -- see
+        // fpEnsureRoomLabel().
+        label.className = 'fp-item-label fp-room-label-text';
+        label.textContent = (item.label && item.label.trim()) || 'Add room name';
+        label.title = 'Tap to edit, drag to reposition';
+        Object.assign(label.style, { left:(pw/2)+'px', top:(pd/2)+'px', transform:'translate(-50%,-50%)' });
+        let labelDragged = false;
+        label.addEventListener('pointerdown', (e)=>{
+          e.stopPropagation();
+          if(fpDeleteModeActive){ e.preventDefault(); fpDeleteItem('object', item.id); return; }
           if(fpMode!=='select') return;
-          e.stopPropagation(); e.preventDefault();
           fpSelect('object', item.id);
           fpPushHistory();
-          const rad = (item.rot||0)*Math.PI/180;
-          const cr = Math.cos(-rad), sr = Math.sin(-rad);
-          try{ node.setPointerCapture(e.pointerId); }catch(err){}
+          labelDragged = false;
+          const startX = e.clientX, startY = e.clientY, ocx = item.cx, ocy = item.cy;
+          try{ label.setPointerCapture(e.pointerId); }catch(err){}
           function onMove(ev){
-            const rect = canvas.getBoundingClientRect();
-            const mx = (ev.clientX-rect.left)/scale, my = (ev.clientY-rect.top)/scale;
-            const dxr = mx-item.cx, dyr = my-item.cy; // feet, relative to center
-            const lx = dxr*cr - dyr*sr, ly = dxr*sr + dyr*cr; // feet, in the item's local (unrotated) axes
-            if(axes.w) item.w = Math.max(2, Math.round(Math.abs(lx)*12))*2;
-            if(axes.d) item.d = Math.max(2, Math.round(Math.abs(ly)*12))*2;
+            if(Math.hypot(ev.clientX-startX, ev.clientY-startY)>3) labelDragged = true;
+            item.cx = fpSnap(ocx + (ev.clientX-startX)/scale);
+            item.cy = fpSnap(ocy + (ev.clientY-startY)/scale);
             updateObjStyle(el, item);
-            icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
-            icon.innerHTML = fpIconMarkup(item);
           }
           function onUp(){
-            node.removeEventListener('pointermove', onMove);
-            node.removeEventListener('pointerup', onUp);
-            fpSave(); fpRender();
+            label.removeEventListener('pointermove', onMove);
+            label.removeEventListener('pointerup', onUp);
+            if(labelDragged){ fpSave(); fpRender(); }
+            else{ fpHistory.pop(); document.getElementById('fpUndoBtn').disabled = fpHistory.length===0; }
           }
-          node.addEventListener('pointermove', onMove);
-          node.addEventListener('pointerup', onUp);
+          label.addEventListener('pointermove', onMove);
+          label.addEventListener('pointerup', onUp);
         });
-        el.appendChild(node);
-      });
+        label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!labelDragged) fpOpenRoomLabelModal(item); });
+      } else {
+        // No label by default (an item from the library doesn't force its
+        // catalog name onto the plan) -- shown only once the user sets one, or
+        // while selected (as an editable placeholder), and drawn snug against
+        // the object itself rather than a separate chip that eats canvas space.
+        const hasLabel = !!(item.label && item.label.trim());
+        label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
+        label.style.display = (hasLabel || isSelected) ? '' : 'none';
+        label.textContent = hasLabel ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : 'Add label';
+        label.title = 'Tap to edit name/dimensions, drag to reposition';
+        fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item));
+      }
+      label.spellcheck = false;
+      el.appendChild(label);
+
+      let rotHandle = null;
+      if(!isLabelType){
+        rotHandle = document.createElement('div');
+        rotHandle.className = 'fp-rotate-handle';
+        el.appendChild(rotHandle);
+
+        // Resize/reshape nodes, center-anchored (mirrors the structural-
+        // element node-resize in fpAddElementNodes): the 4 corners resize
+        // both width and depth together; the 4 edge midpoints resize just
+        // one axis, so stretching a single side -- turning a square table
+        // into a rectangle, or a circle into an oval -- doesn't require
+        // dragging a corner at an exact diagonal to avoid nudging the other
+        // axis too. All 8 resize the same way otherwise (symmetric about
+        // cx/cy, honoring rotation).
+        const RESIZE_NODES = { nw:{w:1,d:1}, ne:{w:1,d:1}, sw:{w:1,d:1}, se:{w:1,d:1}, n:{d:1}, s:{d:1}, e:{w:1}, w:{w:1} };
+        Object.keys(RESIZE_NODES).forEach(corner=>{
+          const axes = RESIZE_NODES[corner];
+          const node = document.createElement('div');
+          node.className = 'fp-obj-node ' + corner;
+          node.addEventListener('pointerdown', (e)=>{
+            if(fpMode!=='select') return;
+            e.stopPropagation(); e.preventDefault();
+            fpSelect('object', item.id);
+            fpPushHistory();
+            const rad = (item.rot||0)*Math.PI/180;
+            const cr = Math.cos(-rad), sr = Math.sin(-rad);
+            try{ node.setPointerCapture(e.pointerId); }catch(err){}
+            function onMove(ev){
+              const rect = canvas.getBoundingClientRect();
+              const mx = (ev.clientX-rect.left)/scale, my = (ev.clientY-rect.top)/scale;
+              const dxr = mx-item.cx, dyr = my-item.cy; // feet, relative to center
+              const lx = dxr*cr - dyr*sr, ly = dxr*sr + dyr*cr; // feet, in the item's local (unrotated) axes
+              if(axes.w) item.w = Math.max(2, Math.round(Math.abs(lx)*12))*2;
+              if(axes.d) item.d = Math.max(2, Math.round(Math.abs(ly)*12))*2;
+              updateObjStyle(el, item);
+              icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
+              icon.innerHTML = fpIconMarkup(item);
+            }
+            function onUp(){
+              node.removeEventListener('pointermove', onMove);
+              node.removeEventListener('pointerup', onUp);
+              fpSave(); fpRender();
+            }
+            node.addEventListener('pointermove', onMove);
+            node.addEventListener('pointerup', onUp);
+          });
+          el.appendChild(node);
+        });
+      }
 
       el.addEventListener('pointerdown', (e)=>{
         if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('object', item.id); return; }
@@ -3074,7 +3250,7 @@
         el.addEventListener('pointerup', onUp);
       });
 
-      rotHandle.addEventListener('pointerdown', (e)=>{
+      if(rotHandle) rotHandle.addEventListener('pointerdown', (e)=>{
         if(fpMode!=='select') return;
         e.stopPropagation();
         e.preventDefault();
@@ -3202,6 +3378,7 @@
     fpState = fpLoad();
     fpActiveProjectId = fpGetActiveProjectId() || fpNewProjectId();
     fpSetActiveProjectId(fpActiveProjectId);
+    fpEnsureRoomLabel();
     document.getElementById('fpTitle').textContent = fpState.title;
     fpRender();
     if(isFirstEverOpen){
@@ -3407,6 +3584,7 @@
       if(!ok) return;
       fpPushHistory();
       fpState = fpDefaultState();
+      fpEnsureRoomLabel();
       fpDeselect();
       document.getElementById('fpTitle').textContent = fpState.title;
       fpSave(); fpRender();
@@ -4125,6 +4303,7 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
     fpState = Object.assign({}, blank, parsed);
     fpIdSeq = parsed.__idSeq || 1000;
     delete fpState.__idSeq;
+    fpEnsureRoomLabel();
     fpDeselect();
     fpHistory = [];
     document.getElementById('fpUndoBtn').disabled = true;
