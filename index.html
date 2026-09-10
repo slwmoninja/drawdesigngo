@@ -531,7 +531,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+fa912727';
+  const APP_VERSION = '1.0+9e0848b8';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1043,7 +1043,7 @@
       { label:'Dryer', shape:'rect', w:27, d:27, icon:'image', img:'./library/dryer.png' },
       { label:'Bar Setup', shape:'rect', w:48, d:18, icon:'image', img:'./library/bar-setup.png' },
     ]},
-    { name:'Office & Patio', items:[
+    { name:'Home Office', items:[
       { label:'Desk (executive)', shape:'rect', w:72, d:36, icon:'image', img:'./library/desk-executive.png' },
       { label:'Writing Desk', shape:'rect', w:48, d:24, icon:'image', img:'./library/writing-desk.png' },
       { label:'L-Shaped Desk', shape:'lshape', w:60, d:60, icon:'image', img:'./library/l-shaped-desk.png' },
@@ -1052,8 +1052,69 @@
       { label:'Bookshelf', shape:'rect', w:36, d:12, icon:'image', img:'./library/bookshelf.png' },
       { label:'Credenza', shape:'rect', w:66, d:20, icon:'image', img:'./library/credenza.png' },
       { label:'Dining Hutch', shape:'rect', w:42, d:18, icon:'image', img:'./library/dining-hutch.png' },
+    ]},
+    { name:'Patio & Garden', items:[
       { label:'Patio Chair', shape:'rect', w:30, d:30, icon:'image', img:'./library/patio-chair.png' },
       { label:'Patio Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/patio-table.png' },
+      { label:'Large Rectangular Patio Table', shape:'rect', w:96, d:42, icon:'image', img:'./library/outdoor-large-rectangular-patio-table.png' },
+      { label:'Round Patio Table', shape:'circle', w:60, d:60, icon:'image', img:'./library/outdoor-round-patio-table.png' },
+      { label:'Oval Teak Dining Table', shape:'oval', w:84, d:44, icon:'image', img:'./library/outdoor-oval-teak-dining-table.png' },
+      { label:'Square Patio Bistro Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/outdoor-square-patio-bistro-table.png' },
+      { label:'Large Patio Umbrella', shape:'circle', w:108, d:108, icon:'image', img:'./library/outdoor-large-patio-umbrella.png' },
+      { label:'Cantilever Patio Umbrella', shape:'circle', w:120, d:120, icon:'image', img:'./library/outdoor-cantilever-patio-umbrella.png' },
+      { label:'Outdoor Sectional Sofa', shape:'lshape', w:96, d:96, icon:'image', img:'./library/outdoor-outdoor-sectional-sofa.png' },
+      { label:'Patio Daybed', shape:'rect', w:80, d:48, icon:'image', img:'./library/outdoor-patio-daybed.png' },
+      { label:'Hanging Egg Chair', shape:'circle', w:40, d:40, icon:'image', img:'./library/outdoor-hanging-egg-chair.png' },
+      { label:'Chaise Lounge (Outdoor)', shape:'rect', w:78, d:26, icon:'image', img:'./library/outdoor-chaise-lounge.png' },
+    ]},
+    { name:'Pools & Water Features', items:[
+      { label:'Rectangular Swimming Pool', shape:'rect', w:240, d:120, icon:'image', img:'./library/outdoor-rectangular-swimming-pool.png' },
+      { label:'Kidney-Shaped Pool', shape:'oval', w:216, d:144, icon:'image', img:'./library/outdoor-kidney-shaped-pool.png' },
+      { label:'Plunge Pool', shape:'rect', w:96, d:96, icon:'image', img:'./library/outdoor-plunge-pool.png' },
+      { label:'Hot Tub / Spa', shape:'rect', w:84, d:84, icon:'image', img:'./library/outdoor-hot-tub-spa.png' },
+      { label:'Poolside Shower', shape:'rect', w:12, d:12, icon:'image', img:'./library/outdoor-poolside-shower.png' },
+      { label:'Pool Slide', shape:'rect', w:48, d:96, icon:'image', img:'./library/outdoor-pool-slide.png' },
+      { label:'Water Fountain', shape:'circle', w:48, d:48, icon:'image', img:'./library/outdoor-water-fountain.png' },
+      { label:'Koi Pond', shape:'oval', w:96, d:72, icon:'image', img:'./library/outdoor-koi-pond.png' },
+      { label:'Infinity Edge Detail', shape:'rect', w:120, d:59, icon:'image', img:'./library/outdoor-infinity-edge-detail.png' },
+      { label:'Swim-up Bar Stools', shape:'rect', w:60, d:24, icon:'image', img:'./library/outdoor-swim-up-bar-stools.png' },
+    ]},
+    { name:'Garden Planting', items:[
+      { label:'Large Rectangular Planter', shape:'rect', w:48, d:18, icon:'image', img:'./library/outdoor-large-rectangular-planter.png' },
+      { label:'Large Round Planter', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-large-round-planter.png' },
+      { label:'Tapered Square Planter', shape:'rect', w:20, d:20, icon:'image', img:'./library/outdoor-tapered-square-planter.png' },
+      { label:'Tiered Herb Garden Planter', shape:'rect', w:24, d:16, icon:'image', img:'./library/outdoor-tiered-herb-garden-planter.png' },
+      { label:'Flower Box', shape:'rect', w:36, d:10, icon:'image', img:'./library/outdoor-flower-box.png' },
+      { label:'Raised Garden Bed', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-raised-garden-bed.png' },
+      { label:'Trellis', shape:'rect', w:36, d:40, icon:'image', img:'./library/outdoor-trellis.png' },
+      { label:'Arbor (Square Top)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-a.png' },
+      { label:'Arbor (Arched)', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-arbor-b.png' },
+      { label:'Potted Palm Tree', shape:'circle', w:24, d:24, icon:'image', img:'./library/outdoor-potted-palm-tree.png' },
+      { label:'Hedge', shape:'rect', w:72, d:26, icon:'image', img:'./library/outdoor-hedge.png' },
+    ]},
+    { name:'Hardscape & Fencing', items:[
+      { label:'Paver Pathway', shape:'rect', w:48, d:36, icon:'image', img:'./library/outdoor-paver-pathway.png' },
+      { label:'Stepping Stones', shape:'rect', w:60, d:36, icon:'image', img:'./library/outdoor-stepping-stones.png' },
+      { label:'Gravel Path', shape:'rect', w:48, d:36, icon:'image', img:'./library/outdoor-gravel-path.png' },
+      { label:'Wood Privacy Fence', shape:'rect', w:72, d:47, icon:'image', img:'./library/outdoor-wood-privacy-fence.png' },
+      { label:'Picket Fence', shape:'rect', w:60, d:43, icon:'image', img:'./library/outdoor-picket-fence.png' },
+      { label:'Wrought Iron Fence', shape:'rect', w:72, d:46, icon:'image', img:'./library/outdoor-wrought-iron-fence.png' },
+      { label:'Gabion Wall', shape:'rect', w:48, d:29, icon:'image', img:'./library/outdoor-gabion-wall.png' },
+      { label:'Garden Gate', shape:'rect', w:36, d:22, icon:'image', img:'./library/outdoor-garden-gate.png' },
+      { label:'Retaining Wall', shape:'rect', w:72, d:42, icon:'image', img:'./library/outdoor-retaining-wall.png' },
+      { label:'Staircase', shape:'rect', w:48, d:36, icon:'image', img:'./library/outdoor-staircase.png' },
+    ]},
+    { name:'Outdoor Living & Fire', items:[
+      { label:'Decking', shape:'rect', w:144, d:120, icon:'image', img:'./library/outdoor-decking.png' },
+      { label:'Outdoor Kitchen Island', shape:'rect', w:96, d:24, icon:'image', img:'./library/outdoor-outdoor-kitchen-island.png' },
+      { label:'Fire Pit', shape:'rect', w:36, d:36, icon:'image', img:'./library/outdoor-fire-pit.png' },
+      { label:'Wood-Burning Fire Pit', shape:'circle', w:36, d:36, icon:'image', img:'./library/outdoor-wood-burning-fire-pit.png' },
+      { label:'Pizza Oven', shape:'rect', w:36, d:30, icon:'image', img:'./library/outdoor-pizza-oven.png' },
+      { label:'Storage Deck Box', shape:'rect', w:48, d:24, icon:'image', img:'./library/outdoor-storage-deck-box.png' },
+      { label:'Hammock', shape:'rect', w:120, d:48, icon:'image', img:'./library/outdoor-hammock.png' },
+      { label:'Standing Patio Heater', shape:'circle', w:20, d:20, icon:'image', img:'./library/outdoor-standing-patio-heater.png' },
+      { label:'String Lights', shape:'rect', w:180, d:97, icon:'image', img:'./library/outdoor-string-lights.png' },
+      { label:'Garden Bench', shape:'rect', w:48, d:22, icon:'image', img:'./library/outdoor-garden-bench.png' },
     ]},
   ];
 
@@ -2597,7 +2658,6 @@
     fpMode = mode;
     fpDrawPending = null;
     fpSetDeleteMode(false); // also calls fpSyncToolActiveUI(), now that fpMode is up to date
-    document.getElementById('fpDrawToolSelect').style.display = mode==='draw' ? '' : 'none';
     fpRender();
   }
 
