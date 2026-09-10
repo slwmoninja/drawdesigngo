@@ -626,7 +626,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+60b6e76d';
+  const APP_VERSION = '1.0+7dcb596f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1210,6 +1210,68 @@
       { label:'Standing Patio Heater', shape:'circle', w:20, d:20, icon:'image', img:'./library/outdoor-standing-patio-heater.png' },
       { label:'String Lights', shape:'rect', w:48, d:26, icon:'image', img:'./library/outdoor-string-lights.png' },
       { label:'Garden Bench', shape:'rect', w:48, d:22, icon:'image', img:'./library/outdoor-garden-bench.png' },
+    ]},
+    { name:'Ceiling Lighting', items:[
+      { label:'Recessed Light (4-inch)', shape:'circle', w:4, d:4, icon:'image', img:'./library/lf-recessed-light-4-inch.png' },
+      { label:'Recessed Light (6-inch)', shape:'circle', w:6, d:7, icon:'image', img:'./library/lf-recessed-light-6-inch.png' },
+      { label:'Flush Mount (Circular)', shape:'circle', w:13, d:14, icon:'image', img:'./library/lf-flush-mount-circular.png' },
+      { label:'Flush Mount (Square)', shape:'rect', w:13, d:14, icon:'image', img:'./library/lf-flush-mount-square.png' },
+      { label:'Semi-Flush Mount (Traditional)', shape:'rect', w:16, d:14, icon:'image', img:'./library/lf-semi-flush-mount-traditional.png' },
+      { label:'Semi-Flush Mount (Modern)', shape:'rect', w:16, d:13, icon:'image', img:'./library/lf-semi-flush-mount-modern.png' },
+      { label:'Track Light (3-Head)', shape:'rect', w:36, d:16, icon:'image', img:'./library/lf-track-light-3-head.png' },
+      { label:'Track Light (Rail)', shape:'rect', w:36, d:17, icon:'image', img:'./library/lf-track-light-rail.png' },
+      { label:'Chandelier (Round Small)', shape:'circle', w:20, d:23, icon:'image', img:'./library/lf-chandelier-round-small.png' },
+      { label:'Chandelier (Crystal Large)', shape:'circle', w:30, d:32, icon:'image', img:'./library/lf-chandelier-crystal-large.png' },
+      { label:'Chandelier (Modern Linear)', shape:'rect', w:40, d:18, icon:'image', img:'./library/lf-chandelier-modern-linear.png' },
+    ]},
+    { name:'Lamps, Sconces & Fans', items:[
+      { label:'Pendant Light A', shape:'circle', w:10, d:18, icon:'image', img:'./library/lf-pendant-light-a.png' },
+      { label:'Pendant Light B', shape:'circle', w:14, d:17, icon:'image', img:'./library/lf-pendant-light-b.png' },
+      { label:'Pendant Light C', shape:'circle', w:10, d:19, icon:'image', img:'./library/lf-pendant-light-c.png' },
+      { label:'Wall Sconce (Classic)', shape:'rect', w:6, d:8, icon:'image', img:'./library/lf-wall-sconce-classic.png' },
+      { label:'Wall Sconce (Modern Bar)', shape:'rect', w:5, d:8, icon:'image', img:'./library/lf-wall-sconce-modern-bar.png' },
+      { label:'Table Lamp (Bedside)', shape:'circle', w:12, d:20, icon:'image', img:'./library/lf-table-lamp-bedside.png' },
+      { label:'Floor Lamp (Arc)', shape:'circle', w:16, d:20, icon:'image', img:'./library/lf-floor-lamp-arc.png' },
+      { label:'Floor Lamp (Torchiere)', shape:'circle', w:12, d:33, icon:'image', img:'./library/lf-floor-lamp-torchiere.png' },
+      { label:'Desk Lamp (Articulated)', shape:'rect', w:14, d:19, icon:'image', img:'./library/lf-desk-lamp-articulated.png' },
+      { label:'Ceiling Fan (Standard)', shape:'circle', w:52, d:29, icon:'image', img:'./library/lf-ceiling-fan-standard.png' },
+      { label:'Ceiling Fan with Light (Modern)', shape:'circle', w:52, d:30, icon:'image', img:'./library/lf-ceiling-fan-with-light-modern.png' },
+    ]},
+    { name:'Accent & Outdoor Lighting', items:[
+      { label:'Outdoor Wall Light (Traditional)', shape:'rect', w:8, d:14, icon:'image', img:'./library/lf-outdoor-wall-light-traditional.png' },
+      { label:'Outdoor Post Light', shape:'circle', w:6, d:16, icon:'image', img:'./library/lf-outdoor-post-light.png' },
+      { label:'Landscape Path Light', shape:'circle', w:5, d:12, icon:'image', img:'./library/lf-landscape-path-light.png' },
+      { label:'Step Light', shape:'rect', w:5, d:4, icon:'image', img:'./library/lf-step-light.png' },
+      { label:'Under-Cabinet LED Strip', shape:'rect', w:24, d:6, icon:'image', img:'./library/lf-under-cabinet-led-strip.png' },
+      { label:'Cove Lighting (Recessed Profile)', shape:'rect', w:24, d:11, icon:'image', img:'./library/lf-cove-lighting-recessed-profile.png' },
+      { label:'LED Panel Light', shape:'rect', w:24, d:13, icon:'image', img:'./library/lf-led-panel-light.png' },
+      { label:'Accent Spot Light A', shape:'circle', w:6, d:5, icon:'image', img:'./library/lf-accent-spot-light-a.png' },
+      { label:'Accent Spot Light B', shape:'circle', w:6, d:7, icon:'image', img:'./library/lf-accent-spot-light-b.png' },
+      { label:'Smart Bulb', shape:'circle', w:3, d:5, icon:'image', img:'./library/lf-smart-bulb.png' },
+    ]},
+    { name:'Wood & Stone Flooring', items:[
+      { label:'Oak Hardwood Plank (Light)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-oak-hardwood-plank-light.png' },
+      { label:'Walnut Hardwood Plank (Dark)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-walnut-hardwood-plank-dark.png' },
+      { label:'Herringbone Wood Floor', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-herringbone-wood-floor.png' },
+      { label:'Chevron Wood Floor (Walnut)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-chevron-wood-floor-walnut.png' },
+      { label:'Polished Concrete', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-polished-concrete.png' },
+      { label:'Terrazzo (Small Chip)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-terrazzo-small-chip.png' },
+      { label:'Large Format Porcelain Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-large-format-porcelain-tile.png' },
+      { label:'Marble Slab (Calacatta)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-marble-slab-calacatta.png' },
+      { label:'Travertine Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-travertine-tile.png' },
+      { label:'Slate Tile (Riven)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-slate-tile-riven.png' },
+    ]},
+    { name:'Tile, Carpet & Specialty Flooring', items:[
+      { label:'Mosaic Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-mosaic-tile.png' },
+      { label:'Penny Round Tile', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-penny-round-tile.png' },
+      { label:'Subway Tile (Stacked)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-subway-tile-stacked.png' },
+      { label:'Subway Tile (Running Bond)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-subway-tile-running-bond.png' },
+      { label:'Carpet (Berber)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-carpet-berber.png' },
+      { label:'Carpet (Plush)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-carpet-plush.png' },
+      { label:'Woven Area Rug', shape:'rect', w:96, d:70, icon:'image', img:'./library/lf-woven-area-rug.png' },
+      { label:'Bamboo Flooring', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-bamboo-flooring.png' },
+      { label:'Cork Flooring', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-cork-flooring.png' },
+      { label:'Rubber Flooring (Studded)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-rubber-flooring-studded.png' },
     ]},
   ];
 
