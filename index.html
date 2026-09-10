@@ -64,6 +64,10 @@
     background:var(--panel2); border:1px solid var(--border); color:var(--text);
     border-radius:8px; padding:.45rem .6rem; font-size:.82rem;
   }
+  /* Mirrors .btn.active -- lets the draw-tool <select> show the same green
+     "in use" border as every other active-tool control (see
+     fpSyncToolActiveUI()) when its own value is the current fpDrawTool. */
+  .fp-toolbar select.fp-tool-select-active{ border-color:var(--accent); color:var(--accent); background:rgba(64,208,181,.12); }
 
   /* ---------- Opening/Window/Door tool dropdown (custom, not <select>, so
      each option can show a small line-style icon next to its label). ---------- */
@@ -124,10 +128,24 @@
   .fp-el .fp-el-shape{ cursor:grab; }
   .fp-el.selected .fp-el-shape{ stroke:var(--accent) !important; }
   .fp-el.selected .fp-el-shape-secondary{ stroke:var(--accent) !important; }
+  /* Hide-under-opening (see fpVisibleWallRanges()): a wall's real shape
+     stays in the DOM as an invisible full-span hit-target so it's still
+     selectable/draggable across its whole original length, while the
+     decorative .fp-el-shape-visible segments draw only what isn't covered. */
+  .fp-el-shape.fp-hidden-under-opening{ opacity:0; }
   .fp-node, .fp-rotate-node{
     fill:var(--accent); stroke:#0a1512; stroke-width:1.5px; cursor:pointer; pointer-events:auto;
   }
   .fp-rotate-node{ fill:var(--warn); }
+  /* Draw mode always means "place the next thing," even when the pointer
+     happens to be over an existing wall/opening/object -- a hand/grab
+     cursor there implied you could drag it, which conflicted with the very
+     common case of tracing an opening/window/door directly on top of a
+     wall. Higher specificity than the plain .fp-el-shape/.fp-item rules
+     above, so this wins regardless of source order (mirrors the existing
+     .fp-canvas.fp-delete-mode override pattern). */
+  .fp-canvas.fp-draw-mode .fp-el .fp-el-shape,
+  .fp-canvas.fp-draw-mode .fp-item{ cursor:crosshair; }
 
   .fp-item{
     position:absolute; cursor:grab; touch-action:none; user-select:none;
@@ -160,6 +178,8 @@
   .fp-item.selected .fp-obj-node{ display:block; }
   .fp-obj-node.nw{ left:0; top:0; } .fp-obj-node.ne{ left:100%; top:0; }
   .fp-obj-node.sw{ left:0; top:100%; } .fp-obj-node.se{ left:100%; top:100%; }
+  .fp-obj-node.n{ left:50%; top:0; } .fp-obj-node.s{ left:50%; top:100%; }
+  .fp-obj-node.e{ left:100%; top:50%; } .fp-obj-node.w{ left:0; top:50%; }
 
   .fp-hint{ margin:.6rem 0 0; font-size:.74rem; color:var(--dim); }
   .fp-edit-bar{ display:flex; gap:.5rem; margin-top:.8rem; }
@@ -511,7 +531,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+98d88c85';
+  const APP_VERSION = '1.0+fa912727';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -907,7 +927,67 @@
     window:  { stroke:'#b8860b', dash:'9,6' },              // dark yellow/goldenrod, dashed
     door:    { stroke:'#7a4a24', dash:null, double:true },  // brown, solid double line
   };
+  // Plain walls (line/dashedline) render thinner than opening/window/door --
+  // a wall is the base layer everything else sits on top of, so it should
+  // read as lighter-weight than the fixtures placed into it.
+  const FP_WALL_STROKE_WIDTH = 2;
+  const FP_OPENING_STROKE_WIDTH = 3;
   function fpIsLineType(type){ return type==='line' || type==='dashedline' || !!FP_LINE_TYPE_STYLE[type]; }
+
+  // How close an opening/window/door has to sit to a wall's own infinite
+  // line (perpendicular distance, in feet) to count as "on" that wall for
+  // the hide-the-wall-underneath effect below -- generous enough to
+  // tolerate each element being independently snapped to the 0.5ft grid,
+  // tight enough not to falsely match a different, merely-parallel wall a
+  // few feet away.
+  const FP_COVER_TOL = 0.15;
+  function fpLineDir(el){
+    const dx = el.x2-el.x1, dy = el.y2-el.y1, len = Math.hypot(dx,dy);
+    return len>1e-6 ? {dx:dx/len, dy:dy/len, len} : {dx:0, dy:0, len:0};
+  }
+  // Sub-ranges of `wall` (t in [0,1], t=0 at (x1,y1), t=1 at (x2,y2)) that
+  // are NOT covered by any opening/window/door element sitting on top of
+  // it -- lets a plain wall visually "disappear" wherever the user has laid
+  // an opening over it (see the render loop and fpBuildExportSvg below).
+  // Purely a render-time computation, never touches the wall's own
+  // x1/y1/x2/y2, so moving or deleting the covering opening (which just
+  // triggers the next render) makes the wall whole again automatically --
+  // no separate "restore" step needed.
+  function fpVisibleWallRanges(wall, allElements){
+    const w = fpLineDir(wall);
+    if(w.len < 1e-6) return [[0,1]];
+    const covered = [];
+    allElements.forEach(other=>{
+      if(other===wall || !FP_LINE_TYPE_STYLE[other.type]) return; // opening/window/door only
+      const o = fpLineDir(other);
+      if(o.len < 1e-6) return;
+      const cross = Math.abs(w.dx*o.dy - w.dy*o.dx);
+      if(cross > 0.02) return; // not parallel to the wall -- can't be "on" it
+      const perp1 = (other.x1-wall.x1)*(-w.dy) + (other.y1-wall.y1)*w.dx;
+      const perp2 = (other.x2-wall.x1)*(-w.dy) + (other.y2-wall.y1)*w.dx;
+      if(Math.abs(perp1) > FP_COVER_TOL || Math.abs(perp2) > FP_COVER_TOL) return; // not on the wall's line
+      const t1 = ((other.x1-wall.x1)*w.dx + (other.y1-wall.y1)*w.dy)/w.len;
+      const t2 = ((other.x2-wall.x1)*w.dx + (other.y2-wall.y1)*w.dy)/w.len;
+      const lo = Math.max(0, Math.min(t1,t2)), hi = Math.min(1, Math.max(t1,t2));
+      if(hi > lo) covered.push([lo,hi]);
+    });
+    if(!covered.length) return [[0,1]];
+    covered.sort((a,b)=>a[0]-b[0]);
+    const merged = [covered[0].slice()];
+    for(let i=1;i<covered.length;i++){
+      const last = merged[merged.length-1];
+      if(covered[i][0] <= last[1]) last[1] = Math.max(last[1], covered[i][1]);
+      else merged.push(covered[i].slice());
+    }
+    const visible = [];
+    let cursor = 0;
+    merged.forEach(([lo,hi])=>{
+      if(lo > cursor) visible.push([cursor, lo]);
+      cursor = Math.max(cursor, hi);
+    });
+    if(cursor < 1 - 1e-9) visible.push([cursor, 1]);
+    return visible;
+  }
 
   // Object library: grouped for browsing/sorting only -- labels here are not
   // forced onto the canvas (an object's on-plan label is blank until the
@@ -921,8 +1001,8 @@
       { label:'Sm table', shape:'rect', w:72, d:36, icon:'image', img:'./library/6-seat-table.png' },
       { label:'Square Table', shape:'rect', w:36, d:36, icon:'image', img:'./library/square-table.png' },
       { label:'Round Table', shape:'circle', w:42, d:42, icon:'image', img:'./library/round-table.png' },
-      { label:'Coffee Table', shape:'rect', w:48, d:24, icon:'image', img:'./library/coffee-table.png' },
-      { label:'Round Coffee Table', shape:'circle', w:34, d:34, icon:'image', img:'./library/round-coffee-table.png' },
+      { label:'Coffee Table', shape:'rect', w:48, d:24, icon:'image', img:'./library/round-coffee-table.png' }, // the two coffee-table PNGs are swapped on disk: this one is actually square-shaped
+      { label:'Round Coffee Table', shape:'circle', w:34, d:34, icon:'image', img:'./library/coffee-table.png' }, // ...and this one is actually the round one (see feedback_drawdesigngo_label_check)
       { label:'Console Table', shape:'rect', w:48, d:16, icon:'image', img:'./library/console-table.png' },
       { label:'TV Stand', shape:'rect', w:60, d:18, icon:'image', img:'./library/tv-stand.png' },
       { label:'Sectional', shape:'lshape', w:100, d:100, icon:'image', img:'./library/sectional.png' },
@@ -982,9 +1062,14 @@
   // Image library and the furniture-catalog entries wired up over time) --
   // no invented outline or decoration for anything that doesn't have real
   // artwork yet; it places and resizes normally, just with no icon drawn.
+  // preserveAspectRatio="none" (not the default "meet") is deliberate: the
+  // resize nodes above let a user stretch just one axis -- square into
+  // rectangle, circle into oval -- and the artwork needs to actually
+  // stretch with it rather than staying locked to its own native aspect
+  // ratio and letterboxing inside the new footprint.
   function fpIconMarkup(item){
     if(item.icon==='image' && item.img){
-      return `<image href="${item.img}" x="0" y="0" width="${item.w}" height="${item.d}" preserveAspectRatio="xMidYMid meet" />`;
+      return `<image href="${item.img}" x="0" y="0" width="${item.w}" height="${item.d}" preserveAspectRatio="none" />`;
     }
     return '';
   }
@@ -1005,16 +1090,30 @@
   // (see the image branch in fpIconMarkup) instead of a vector icon. Persisted
   // in localStorage so uploads -- and the seeded example -- survive a reload.
   const FP_IMAGE_LIB_KEY = 'floorplanner-image-library';
-  const FP_IMAGE_DEFAULT_EDGE_IN = 24; // in -- longer side of a freshly-added image; resizable afterward like any object
+  const FP_IMAGE_DEFAULT_EDGE_IN = 16.8; // in -- longer side of a freshly-uploaded image (30% smaller than the original 24in default); resizable afterward like any object. The seeded SBI logo below is sized independently, deliberately larger.
   const FP_IMAGE_MAX_EDGE_PX = 900; // downscale uploads so a phone photo doesn't balloon storage for what's ultimately a small icon
+  const FP_SBI_LOGO_SEED = { id:'seed-sbi-logo', label:'Simply Beautiful Interiors', img:'./SBI_Logo_transparent.png', w:36, d:7.05 };
   function fpGetImageLibrary(){
+    let list;
     try{
       const raw = localStorage.getItem(FP_IMAGE_LIB_KEY);
-      if(raw) return JSON.parse(raw);
+      if(raw) list = JSON.parse(raw);
     }catch(e){}
-    const seeded = [{ id:'seed-sbi-logo', label:'Simply Beautiful Interiors', img:'./SBI_Logo.png', w:24, d:4.7 }];
-    try{ localStorage.setItem(FP_IMAGE_LIB_KEY, JSON.stringify(seeded)); }catch(e){}
-    return seeded;
+    if(!list){
+      list = [Object.assign({}, FP_SBI_LOGO_SEED)];
+      fpSaveImageLibrary(list);
+      return list;
+    }
+    // One-time self-heal for the seeded SBI logo entry specifically -- picks
+    // up the transparent artwork + the ~50% larger default placement size
+    // even for a library that was already seeded (in localStorage) with the
+    // old opaque-background image/size before this change.
+    const sbi = list.find(x=>x.id==='seed-sbi-logo');
+    if(sbi && sbi.img!==FP_SBI_LOGO_SEED.img){
+      Object.assign(sbi, FP_SBI_LOGO_SEED);
+      fpSaveImageLibrary(list);
+    }
+    return list;
   }
   function fpSaveImageLibrary(list){ try{ localStorage.setItem(FP_IMAGE_LIB_KEY, JSON.stringify(list)); }catch(e){} }
 
@@ -1368,6 +1467,28 @@
   // stays on so several items can be removed in a row; tapping the Delete
   // button again (or switching to Select/Draw) turns it back off.
   let fpDeleteModeActive = false;
+  // Single source of truth for which toolbar control(s) show the green
+  // "in use" border -- called after anything that can change fpMode,
+  // fpDrawTool, or fpDeleteModeActive, so exactly one story is ever true at
+  // once: Delete active means only Delete is highlighted (everything else
+  // below is suppressed regardless of what Draw/Select tool was active
+  // underneath); otherwise Select alone is highlighted in Select mode, and
+  // in Draw mode both the Draw button AND whichever specific placement tool
+  // is armed (the plain line/shape <select> or the Opening/Window/Door
+  // dropdown, never both) are highlighted together.
+  function fpSyncToolActiveUI(){
+    const drawActive = fpMode==='draw' && !fpDeleteModeActive;
+    const selectActive = fpMode==='select' && !fpDeleteModeActive;
+    const isOpeningTool = fpDrawTool==='opening' || fpDrawTool==='window' || fpDrawTool==='door';
+    const drawBtn = document.getElementById('fpModeDrawBtn');
+    const selectBtn = document.getElementById('fpModeSelectBtn');
+    const toolSelect = document.getElementById('fpDrawToolSelect');
+    const openingBtn = document.getElementById('fpOpeningDdBtn');
+    if(drawBtn) drawBtn.classList.toggle('active', drawActive);
+    if(selectBtn) selectBtn.classList.toggle('active', selectActive);
+    if(toolSelect) toolSelect.classList.toggle('fp-tool-select-active', drawActive && !isOpeningTool);
+    if(openingBtn) openingBtn.classList.toggle('fp-opening-dd-btn-active', drawActive && isOpeningTool);
+  }
   function fpSetDeleteMode(active){
     fpDeleteModeActive = active;
     const btn = document.getElementById('fpDeleteBtn');
@@ -1375,6 +1496,7 @@
     const canvas = document.getElementById('fpCanvas');
     if(canvas) canvas.classList.toggle('fp-delete-mode', active);
     if(active) fpDeselect();
+    fpSyncToolActiveUI();
   }
   function fpDeleteItem(kind, id){
     fpPushHistory();
@@ -1438,17 +1560,25 @@
     let body = '';
     fpState.elements.forEach(el=>{
       if(fpIsLineType(el.type)){
-        const [x1,y1] = px(el.x1,el.y1), [x2,y2] = px(el.x2,el.y2);
         const lineStyle = FP_LINE_TYPE_STYLE[el.type];
         const stroke = lineStyle ? lineStyle.stroke : '#2a2f36';
         const dash = lineStyle ? lineStyle.dash : (el.type==='dashedline' ? '10,7' : null);
-        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;
+        const strokeWidth = lineStyle ? FP_OPENING_STROKE_WIDTH : FP_WALL_STROKE_WIDTH;
+        // Plain walls skip whatever range an opening/window/door on top of
+        // them covers, same as the live canvas (see fpVisibleWallRanges()) --
+        // exported art shouldn't show a solid wall poking through a door.
+        const ranges = lineStyle ? [[0,1]] : fpVisibleWallRanges(el, fpState.elements);
+        ranges.forEach(([lo,hi])=>{
+          const [x1,y1] = px(el.x1+(el.x2-el.x1)*lo, el.y1+(el.y2-el.y1)*lo);
+          const [x2,y2] = px(el.x1+(el.x2-el.x1)*hi, el.y1+(el.y2-el.y1)*hi);
+          body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;
+        });
         if(lineStyle && lineStyle.double){
           const dxr = el.x2-el.x1, dyr = el.y2-el.y1, len = Math.hypot(dxr,dyr)||1;
           const off = 2.5/scale;
           const [ox1,oy1] = px(el.x1-dyr/len*off, el.y1+dxr/len*off);
           const [ox2,oy2] = px(el.x2-dyr/len*off, el.y2+dxr/len*off);
-          body += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" stroke="${stroke}" stroke-width="3" stroke-linecap="round"/>`;
+          body += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
         }
       } else if(el.type==='circle'){
         const [cx,cy] = px(el.cx,el.cy);
@@ -1466,7 +1596,7 @@
       const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
       const [x,y] = px(item.cx-item.w/24, item.cy-item.d/24);
       const [cx,cy] = px(item.cx,item.cy);
-      body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="-4 -4 ${item.w+8} ${item.d+8}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
+      body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="0 0 ${item.w} ${item.d}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
       if(item.label && item.label.trim()){
         body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
       }
@@ -1892,6 +2022,16 @@
       h.addEventListener('pointerdown', (e)=>{
         e.preventDefault(); e.stopPropagation();
         fpPushHistory();
+        // See the matching comment in the whole-element drag handler above --
+        // a wall's decorative visible sub-segments (hide-under-opening
+        // effect) are a static snapshot that won't track a live endpoint
+        // drag, so show the plain full line for the move and let the next
+        // fpRender() at drag-end recompute the split.
+        if(shapeNode && shapeNode.classList.contains('fp-hidden-under-opening')){
+          shapeNode.classList.remove('fp-hidden-under-opening');
+          shapeNode.removeAttribute('pointer-events');
+          svg.querySelectorAll(`.fp-el[data-id="${el.id}"] .fp-el-shape-visible`).forEach(n=>n.remove());
+        }
         try{ h.setPointerCapture(e.pointerId); }catch(err){}
         function move(ev){
           const [mx,my] = feetFromClient(ev.clientX, ev.clientY);
@@ -2108,11 +2248,15 @@
       const selected = fpSelectedKind==='element' && el.id===fpSelectedId;
       const g = fpSvgEl('g', { class:'fp-el'+(selected?' selected':''), 'data-id':el.id });
       let shape;
+      let visibleRanges = null; // wall-only: sub-ranges NOT covered by an opening on top (see fpVisibleWallRanges)
       if(el.type==='line' || el.type==='dashedline' || FP_LINE_TYPE_STYLE[el.type]){
         const lineStyle = FP_LINE_TYPE_STYLE[el.type];
+        const strokeColor = lineStyle ? lineStyle.stroke : (el.color||'#8b8d8e');
+        const strokeWidth = lineStyle ? FP_OPENING_STROKE_WIDTH : FP_WALL_STROKE_WIDTH;
+        if(!lineStyle) visibleRanges = fpVisibleWallRanges(el, fpState.elements);
         shape = fpSvgEl('line', {
           x1:px(el.x1), y1:px(el.y1), x2:px(el.x2), y2:px(el.y2),
-          stroke: lineStyle ? lineStyle.stroke : (el.color||'#8b8d8e'), 'stroke-width':3, 'stroke-linecap':'round',
+          stroke: strokeColor, 'stroke-width':strokeWidth, 'stroke-linecap':'round',
         });
         if(el.type==='dashedline') shape.setAttribute('stroke-dasharray','10,7');
         if(lineStyle && lineStyle.dash) shape.setAttribute('stroke-dasharray', lineStyle.dash);
@@ -2125,7 +2269,7 @@
           const ox = -dy/len*off, oy = dx/len*off;
           const secondary = fpSvgEl('line', {
             x1:px(el.x1+ox), y1:px(el.y1+oy), x2:px(el.x2+ox), y2:px(el.y2+oy),
-            stroke: lineStyle.stroke, 'stroke-width':3, 'stroke-linecap':'round',
+            stroke: lineStyle.stroke, 'stroke-width':strokeWidth, 'stroke-linecap':'round',
             class:'fp-el-shape-secondary',
           });
           g.appendChild(secondary);
@@ -2151,6 +2295,29 @@
       shape.setAttribute('class','fp-el-shape');
       g.appendChild(shape);
 
+      // Wall hidden (fully or partially) under an opening/window/door on
+      // top of it: `shape` becomes an invisible full-span hit-target (so
+      // the wall stays selectable/draggable across its whole original
+      // length, same as before) while separate, non-interactive line(s)
+      // draw only the uncovered range(s) -- see fpVisibleWallRanges().
+      const isFullyVisible = !visibleRanges || (visibleRanges.length===1 && visibleRanges[0][0]<=1e-9 && visibleRanges[0][1]>=1-1e-9);
+      if(!isFullyVisible){
+        shape.classList.add('fp-hidden-under-opening');
+        shape.setAttribute('pointer-events','stroke');
+        const dash = shape.getAttribute('stroke-dasharray');
+        visibleRanges.forEach(([lo,hi])=>{
+          const seg = fpSvgEl('line', {
+            x1:px(el.x1+(el.x2-el.x1)*lo), y1:px(el.y1+(el.y2-el.y1)*lo),
+            x2:px(el.x1+(el.x2-el.x1)*hi), y2:px(el.y1+(el.y2-el.y1)*hi),
+            stroke: shape.getAttribute('stroke'), 'stroke-width': shape.getAttribute('stroke-width'), 'stroke-linecap':'round',
+            class:'fp-el-shape-visible',
+          });
+          if(dash) seg.setAttribute('stroke-dasharray', dash);
+          seg.setAttribute('pointer-events','none');
+          g.appendChild(seg);
+        });
+      }
+
       g.addEventListener('pointerdown', (e)=>{
         if(fpDeleteModeActive){ e.preventDefault(); e.stopPropagation(); fpDeleteItem('element', el.id); return; }
         if(fpMode!=='select') return;
@@ -2158,6 +2325,16 @@
         e.preventDefault(); e.stopPropagation();
         fpSelect('element', el.id);
         fpPushHistory();
+        // The decorative visible sub-segments above are a static snapshot
+        // from this render and won't track a live drag -- show the plain
+        // full line for the move instead of letting them go stale; the
+        // next fpRender() at drag-end recomputes the correct split for
+        // wherever this wall lands.
+        if(shape.classList.contains('fp-hidden-under-opening')){
+          shape.classList.remove('fp-hidden-under-opening');
+          shape.removeAttribute('pointer-events');
+          g.querySelectorAll('.fp-el-shape-visible').forEach(n=>n.remove());
+        }
         const startX=e.clientX, startY=e.clientY;
         const orig = JSON.parse(JSON.stringify(el));
         function onMove(ev){
@@ -2213,7 +2390,7 @@
       updateObjStyle(el, item);
 
       const icon = document.createElementNS(SVG_NS, 'svg');
-      icon.setAttribute('viewBox', `-4 -4 ${item.w+8} ${item.d+8}`);
+      icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
       icon.setAttribute('preserveAspectRatio', 'none');
       icon.setAttribute('class', 'fp-item-icon');
       icon.innerHTML = fpIconMarkup(item);
@@ -2238,10 +2415,17 @@
       rotHandle.className = 'fp-rotate-handle';
       el.appendChild(rotHandle);
 
-      // Resize/reshape nodes: 4 corners, center-anchored (mirrors the
-      // structural-element node-resize in fpAddElementNodes) -- dragging a
-      // corner grows/shrinks item.w/item.d symmetrically around cx/cy.
-      ['nw','ne','sw','se'].forEach(corner=>{
+      // Resize/reshape nodes, center-anchored (mirrors the structural-
+      // element node-resize in fpAddElementNodes): the 4 corners resize
+      // both width and depth together; the 4 edge midpoints resize just
+      // one axis, so stretching a single side -- turning a square table
+      // into a rectangle, or a circle into an oval -- doesn't require
+      // dragging a corner at an exact diagonal to avoid nudging the other
+      // axis too. All 8 resize the same way otherwise (symmetric about
+      // cx/cy, honoring rotation).
+      const RESIZE_NODES = { nw:{w:1,d:1}, ne:{w:1,d:1}, sw:{w:1,d:1}, se:{w:1,d:1}, n:{d:1}, s:{d:1}, e:{w:1}, w:{w:1} };
+      Object.keys(RESIZE_NODES).forEach(corner=>{
+        const axes = RESIZE_NODES[corner];
         const node = document.createElement('div');
         node.className = 'fp-obj-node ' + corner;
         node.addEventListener('pointerdown', (e)=>{
@@ -2257,11 +2441,10 @@
             const mx = (ev.clientX-rect.left)/scale, my = (ev.clientY-rect.top)/scale;
             const dxr = mx-item.cx, dyr = my-item.cy; // feet, relative to center
             const lx = dxr*cr - dyr*sr, ly = dxr*sr + dyr*cr; // feet, in the item's local (unrotated) axes
-            const halfWIn = Math.max(2, Math.round(Math.abs(lx)*12));
-            const halfHIn = Math.max(2, Math.round(Math.abs(ly)*12));
-            item.w = halfWIn*2; item.d = halfHIn*2;
+            if(axes.w) item.w = Math.max(2, Math.round(Math.abs(lx)*12))*2;
+            if(axes.d) item.d = Math.max(2, Math.round(Math.abs(ly)*12))*2;
             updateObjStyle(el, item);
-            icon.setAttribute('viewBox', `-4 -4 ${item.w+8} ${item.d+8}`);
+            icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
             icon.innerHTML = fpIconMarkup(item);
           }
           function onUp(){
@@ -2378,7 +2561,7 @@
           const btn = document.createElement('button');
           btn.type = 'button'; btn.className = 'fp-lib-item'; btn.draggable = true;
           btn.title = `${tpl.label} (${tpl.w}×${tpl.d}in) — drag onto the grid, or tap to add at center`;
-          btn.innerHTML = `<svg viewBox="-4 -4 ${tpl.w+8} ${tpl.d+8}" preserveAspectRatio="xMidYMid meet">${fpIconMarkup(tpl)}</svg><span>${fpEscapeHtml(tpl.label)}</span>`;
+          btn.innerHTML = `<svg viewBox="0 0 ${tpl.w} ${tpl.d}" preserveAspectRatio="xMidYMid meet">${fpIconMarkup(tpl)}</svg><span>${fpEscapeHtml(tpl.label)}</span>`;
           btn.addEventListener('click', ()=> fpAddObjectFromTemplate(tpl));
           btn.addEventListener('dragstart', (e)=>{
             e.dataTransfer.setData('application/json', JSON.stringify(tpl));
@@ -2413,9 +2596,7 @@
   function fpSetMode(mode){
     fpMode = mode;
     fpDrawPending = null;
-    fpSetDeleteMode(false);
-    document.getElementById('fpModeSelectBtn').classList.toggle('active', mode==='select');
-    document.getElementById('fpModeDrawBtn').classList.toggle('active', mode==='draw');
+    fpSetDeleteMode(false); // also calls fpSyncToolActiveUI(), now that fpMode is up to date
     document.getElementById('fpDrawToolSelect').style.display = mode==='draw' ? '' : 'none';
     fpRender();
   }
@@ -2446,7 +2627,7 @@
     document.getElementById('fpDrawToolSelect').addEventListener('change', (e)=>{
       fpDrawTool = e.target.value;
       fpDrawPending = null;
-      document.getElementById('fpOpeningDdBtn').classList.remove('fp-opening-dd-btn-active');
+      fpSyncToolActiveUI();
       fpRender();
     });
 
@@ -2468,11 +2649,17 @@
       item.addEventListener('click', ()=>{
         const tool = item.dataset.tool;
         fpDrawTool = tool;
-        fpSetMode('draw');
+        fpSetMode('draw'); // also calls fpSyncToolActiveUI(), which marks this dropdown active now that fpDrawTool is opening/window/door
         openingDdIcon.innerHTML = item.querySelector('svg').innerHTML;
         openingDdLabel.textContent = OPENING_DD_LABELS[tool];
-        openingDdBtn.classList.add('fp-opening-dd-btn-active');
         openingDdMenu.hidden = true;
+        // Desync the toolbar <select> from its last real option -- picking
+        // Opening/Window/Door here never touches that <select>, so without
+        // this, re-picking the *same* <select> option afterward (e.g.
+        // "Solid line" right after "Opening") fires no 'change' event at
+        // all (the browser sees no value change) and fpDrawTool silently
+        // stays stuck on 'opening'/'window'/'door'.
+        document.getElementById('fpDrawToolSelect').value = '';
       });
     });
     document.addEventListener('click', (e)=>{
@@ -2481,6 +2668,7 @@
     document.addEventListener('keydown', (e)=>{
       if(e.key==='Escape') openingDdMenu.hidden = true;
     });
+    fpSyncToolActiveUI(); // initial state: Draw + the default "Solid line" tool, matching fpMode/fpDrawTool's defaults above
     document.getElementById('fpImageUploadInput').addEventListener('change', async (e)=>{
       const files = Array.from(e.target.files || []);
       e.target.value = ''; // allow re-selecting the same file later
