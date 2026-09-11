@@ -651,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+8edef030';
+  const APP_VERSION = '1.0+d44f09b7';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3724,6 +3724,42 @@
     fpRenderSidePanels();
   }
 
+  // Auto-scrolls the page while dragging a library item (from the Objects/
+  // Images sidebar) near the top/bottom edge of the window. Native HTML5
+  // drag-and-drop's own browser auto-scroll is inconsistent over a plain
+  // document with no single overflow:auto ancestor, which is this layout --
+  // so grabbing an item from a long, scrolled-down sidebar and carrying it
+  // up to the grid could get stuck with no way to reach it. `dragover` fires
+  // continuously on every element the cursor passes over during a drag
+  // (drop-target or not) without needing preventDefault, so a document-level
+  // listener sees it regardless of what's under the cursor; the actual
+  // scrolling runs on a rAF loop off the last seen clientY rather than
+  // directly in the event handler, since dragover firing can be throttled.
+  const FP_DRAG_SCROLL_EDGE_PX = 72;
+  const FP_DRAG_SCROLL_MAX_PX = 22;
+  let fpDragScrollClientY = null;
+  let fpDragScrollRaf = null;
+  function fpDragScrollTick(){
+    if(fpDragScrollClientY==null){ fpDragScrollRaf = null; return; }
+    const vh = window.innerHeight;
+    let dy = 0;
+    if(fpDragScrollClientY < FP_DRAG_SCROLL_EDGE_PX){
+      dy = -FP_DRAG_SCROLL_MAX_PX * (1 - fpDragScrollClientY/FP_DRAG_SCROLL_EDGE_PX);
+    } else if(fpDragScrollClientY > vh - FP_DRAG_SCROLL_EDGE_PX){
+      dy = FP_DRAG_SCROLL_MAX_PX * (1 - (vh-fpDragScrollClientY)/FP_DRAG_SCROLL_EDGE_PX);
+    }
+    if(dy) window.scrollBy(0, dy);
+    fpDragScrollRaf = requestAnimationFrame(fpDragScrollTick);
+  }
+  function fpWireDragAutoScroll(){
+    document.addEventListener('dragover', (e)=>{
+      fpDragScrollClientY = e.clientY;
+      if(fpDragScrollRaf==null) fpDragScrollRaf = requestAnimationFrame(fpDragScrollTick);
+    });
+    document.addEventListener('dragend', ()=>{ fpDragScrollClientY = null; });
+    document.addEventListener('drop', ()=>{ fpDragScrollClientY = null; });
+  }
+
   function fpRenderSidePanels(){
     // Objects: category accordion, built once. Each item is a draggable
     // (real HTML5 DnD onto the grid) icon card; a plain click/tap is a
@@ -4617,6 +4653,7 @@
 
   // ---------- PWA: bootstrap ----------
   syncInstallUI();
+  fpWireDragAutoScroll();
   initFloorPlan(); // reads FP_STORAGE_KEY via fpLoad() -- must run before the empty-state check below
   maybeOfferFpAutoRestore(); // resolves "restore your data?" first (Step 7a) if warranted, then itself chains into maybeShowInstallPrompt()
   checkForUpdate();
