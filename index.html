@@ -651,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+9acaeb6f';
+  const APP_VERSION = '1.0+41c40f41';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2332,6 +2332,13 @@
     });
     if(!resp.ok){
       const errBody = await resp.text().catch(()=>'');
+      if(resp.status === 429){
+        // Image-output models like this one commonly carry a Free-tier quota of
+        // zero -- the very first call 429s, it's not usage building up over time.
+        // Billing on the linked Cloud project (not necessarily spending anything)
+        // is what unlocks a real quota. See aistudio.google.com/rate-limit.
+        throw new Error(`This Gemini model (${FP_GEMINI_IMAGE_MODEL}) may not be available on your key's Free tier -- image models often have a quota of 0 there, so even a first-ever call fails. Check aistudio.google.com/rate-limit for this model, and enable billing on the linked Google Cloud project if it shows 0.`);
+      }
       throw new Error('Gemini API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,300) : ''));
     }
     const data = await resp.json();
