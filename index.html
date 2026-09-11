@@ -249,6 +249,16 @@
   .fp-fav-heart-btn.is-fav{ color:var(--danger); }
   .fp-fav-heart-btn:hover:not(.is-fav){ color:var(--text); }
 
+  /* Live length readout shown near the midpoint of the in-progress preview
+     line while drawing a wall/opening/window/door (see fpWireCanvasInteraction) --
+     positioned by JS (left/top, feet*scale px), not by this rule. */
+  .fp-draw-length-hint{
+    position:absolute; transform:translate(-50%,-50%); z-index:4;
+    background:var(--panel); border:1px solid var(--border); border-radius:6px;
+    padding:.1rem .4rem; font-size:.72rem; font-weight:600; color:var(--text);
+    pointer-events:none; white-space:nowrap;
+  }
+
   /* The one and only background box for the whole workspace -- title row and
      canvas both sit directly on this single light-grey panel, rather than
      each having their own separately-colored box (which read as redundant
@@ -354,7 +364,7 @@
      #fpTitle's own styling, and not ellipsis-truncated since a room name is
      the whole point of the object rather than an aside next to a shape. */
   .fp-room-label-text{
-    font-size:1.05rem; font-weight:800; color:#228B22;
+    font-size:.74rem; font-weight:800; color:#228B22; /* 30% smaller than the original 1.05rem */
     text-shadow:0 1px 0 rgba(255,255,255,.5), 0 -1px 0 rgba(0,0,0,.15);
     max-width:none; overflow:visible; white-space:pre;
   }
@@ -783,7 +793,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+ad4987a5';
+  const APP_VERSION = '1.0+c37358f9';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1177,6 +1187,12 @@
   const FP_WALL_STROKE_WIDTH = 2;
   const FP_OPENING_STROKE_WIDTH = 3;
   function fpIsLineType(type){ return type==='line' || type==='dashedline' || !!FP_LINE_TYPE_STYLE[type]; }
+
+  // Starting real-world height estimate (inches) for a newly-drawn wall/
+  // opening/window/door -- editable afterward in fpOpenLineDetailsModal,
+  // same as length. Deliberately separate from the unrelated `h` field
+  // rect/square freeform shapes already use for their own 2D depth.
+  const FP_DEFAULT_HEIGHT_IN = { line:108, dashedline:108, opening:80, window:36, door:80 }; // 9ft wall, 6ft8in door/opening, 3ft window
 
   // How close an opening/window/door has to sit to a wall's own infinite
   // line (perpendicular distance, in feet) to count as "on" that wall for
@@ -1763,15 +1779,20 @@
     return reposition;
   }
 
+  // Starting height estimate (inches) for a furniture object with no
+  // heightIn yet (existing FP_LIBRARY/upload items predate this field) --
+  // a generic table/counter-ish height, refined per-item via Auto-detect or
+  // manual edit rather than researched individually for ~150 catalog items.
+  const FP_DEFAULT_OBJ_HEIGHT_IN = 30;
+
   // Asks OpenAI (text-only, via a small CORS proxy Worker -- see
-  // cloudflare-worker/README.md) for a typical real-world width x depth
-  // given just an item's name -- no photo involved, this is a plain text
-  // completion.
+  // cloudflare-worker/README.md) for typical real-world L x W x H given just
+  // an item's name -- no photo involved, this is a plain text completion.
   async function fpDetectObjectDimensions(name){
     const proxyUrl = fpGetOpenAiProxyUrl();
     if(!proxyUrl) throw new Error('Set your OpenAI proxy Worker URL first (see cloudflare-worker/README.md).');
     if(!fpGetOpenAiKey()) throw new Error('Set your OpenAI API key first (open Settings to add one).');
-    const prompt = `You are estimating typical real-world dimensions for a piece of furniture or fixture based on its name. Item: "${name}". Respond with ONLY a JSON object, no markdown fences, no commentary: {"w": number, "d": number} -- width and depth in INCHES, typical for this item as sold/used in a home. If the name is vague, pick a reasonable common size.`;
+    const prompt = `You are estimating typical real-world dimensions for a piece of furniture or fixture based on its name. Item: "${name}". Respond with ONLY a JSON object, no markdown fences, no commentary: {"w": number, "d": number, "h": number} -- length(w)/width(d)/height(h) in INCHES, typical for this item as sold/used in a home. If the name is vague, pick a reasonable common size.`;
     const resp = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'content-type':'application/json', 'authorization':'Bearer ' + fpGetOpenAiKey() },
@@ -1789,7 +1810,11 @@
     const data = await resp.json();
     const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
     const result = fpExtractJson(text);
-    return { w: Math.max(1, Number(result.w)||24), d: Math.max(1, Number(result.d)||24) };
+    return {
+      w: Math.max(1, Number(result.w)||24),
+      d: Math.max(1, Number(result.d)||24),
+      h: Math.max(1, Number(result.h)||FP_DEFAULT_OBJ_HEIGHT_IN),
+    };
   }
 
   // ---------- Every physical-measurement field in the app (furniture size,
@@ -1817,17 +1842,30 @@
     const total = (isNaN(ft)?0:ft)*12 + (isNaN(inch)?0:inch);
     return total>0 ? total : fallbackInches;
   }
+  // Same whole-feet+inches convention as the fields above, but as a short
+  // read-only string (e.g. "8 ft 6 in", or just "6 in" under a foot) for the
+  // live length readout shown while drawing a wall/opening/window/door.
+  function fpFormatFeetIn(feet){
+    const totalInches = Math.round(Math.max(0, feet)*12);
+    const ft = Math.floor(totalInches/12), inch = totalInches - ft*12;
+    if(ft===0) return `${inch} in`;
+    if(inch===0) return `${ft} ft`;
+    return `${ft} ft ${inch} in`;
+  }
 
   function fpOpenObjectDetailsModal(item){
     const wrap = openModal('Object Details', `
       <label class="mini" style="display:block; margin-bottom:.6rem;">Name
         <input type="text" id="fpObjNameInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(item.label||'')}">
       </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Width
+      <label class="mini" style="display:block; margin-bottom:.6rem;">L
         ${fpFtInFieldsHtml('fpObjWidth', item.w)}
       </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Depth
+      <label class="mini" style="display:block; margin-bottom:.6rem;">W
         ${fpFtInFieldsHtml('fpObjDepth', item.d)}
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">H
+        ${fpFtInFieldsHtml('fpObjHeight', item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN)}
       </label>
       <button class="btn" id="fpObjAutoDetectBtn" type="button" style="width:100%; margin-bottom:.6rem; border-color:var(--accent); color:var(--accent);">&#10024; Auto-detect dimensions</button>
       <p class="fp-hint" id="fpObjDetectStatus" style="margin:0 0 .6rem;"></p>
@@ -1844,6 +1882,7 @@
         const dims = await fpDetectObjectDimensions(name);
         fpSetFtInFields(wrap, 'fpObjWidth', dims.w);
         fpSetFtInFields(wrap, 'fpObjDepth', dims.d);
+        fpSetFtInFields(wrap, 'fpObjHeight', dims.h);
         status.textContent = 'Done -- adjust if needed.';
       }catch(err){
         status.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
@@ -1854,6 +1893,7 @@
       item.label = nameInput.value.trim();
       item.w = Math.max(1, fpReadFtInFields(wrap, 'fpObjWidth', item.w));
       item.d = Math.max(1, fpReadFtInFields(wrap, 'fpObjDepth', item.d));
+      item.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpObjHeight', item.heightIn||FP_DEFAULT_OBJ_HEIGHT_IN));
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -1904,8 +1944,11 @@
       <label class="mini" style="display:block; margin-bottom:.6rem;">Name
         <input type="text" id="fpLineNameInput" class="fp-detail-input" style="width:100%; margin-top:.25rem;" value="${fpEscapeHtml(el.label||'')}">
       </label>
-      <label class="mini" style="display:block; margin-bottom:.6rem;">Length
+      <label class="mini" style="display:block; margin-bottom:.6rem;">L
         ${fpFtInFieldsHtml('fpLineLen', lenFt*12)}
+      </label>
+      <label class="mini" style="display:block; margin-bottom:.6rem;">H
+        ${fpFtInFieldsHtml('fpLineHeight', el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96))}
       </label>
       <div style="display:flex; gap:.5rem;">
         <button class="btn" id="fpLineDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
@@ -1928,6 +1971,7 @@
       const curLen = Math.hypot(el.x2-el.x1, el.y2-el.y1) || 1;
       const ux = (el.x2-el.x1)/curLen, uy = (el.y2-el.y1)/curLen;
       el.x2 = el.x1 + ux*newLenFt; el.y2 = el.y1 + uy*newLenFt;
+      el.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpLineHeight', el.heightIn||FP_DEFAULT_HEIGHT_IN[el.type]||96));
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -3040,21 +3084,25 @@
   }
 
   // Seeds a single editable "room name" text object at the top-left of a
-  // fresh plan, defaulted to the project title -- exists so Print/PDF/PNG/
-  // JPG/Copy all bake a real room label into the exported plan (see
-  // fpBuildExportSvg()'s type==='label' branch), independent of the project
-  // title itself (editing it never touches fpState.title, and vice versa --
-  // see fpOpenRoomLabelModal()). Guarded by roomLabelSeeded, persisted on
-  // fpState itself, so this only ever runs once per project: it backfills
-  // existing plans saved before this feature existed exactly once, and never
-  // re-adds one a user has since deleted.
+  // fresh plan, defaulted to a generic placeholder (NOT the project title --
+  // the two are deliberately independent, see below) -- exists so Print/PDF/
+  // PNG/JPG/Copy all bake a real room label into the exported plan (see
+  // fpBuildExportSvg()'s type==='label' branch). Editing it never touches
+  // fpState.title, and vice versa (see fpOpenRoomLabelModal()). Guarded by
+  // roomLabelSeeded, persisted on fpState itself, so this only ever runs
+  // once per project: it backfills existing plans saved before this feature
+  // existed exactly once, and never re-adds one a user has since deleted.
   function fpEnsureRoomLabel(){
     if(fpState.roomLabelSeeded) return;
     fpState.roomLabelSeeded = true;
     fpState.objects.push({
-      id: fpIdSeq++, type:'label', label: fpState.title || 'Untitled Floor Plan',
+      // cx/cy is this object's CENTER -- 1.5/0.42 (half its own w/d, in feet)
+      // puts its top-left corner flush against the grid's own (0,0) origin
+      // by default. Purely a starting position: dragging it (like any
+      // object) just moves cx/cy from there, same as everything else.
+      id: fpIdSeq++, type:'label', label: 'Room/Area Name',
       w:36, d:10, shape:'rect', icon:'plain', img:null,
-      cx:3, cy:1, rot:0,
+      cx:1.5, cy:0.42, rot:0,
     });
   }
   async function fpStartNewProject(){
@@ -3489,9 +3537,20 @@
           'stroke-dasharray': previewStyle ? (previewStyle.dash||'none') : (fpDrawTool==='dashedline' ? '8,6' : 'none'),
         });
         svg.appendChild(previewLine);
+        // Live length readout while dragging out the second point -- same
+        // whole-feet+inches format as every measurement field in the app,
+        // so the actual real-world length is visible before you commit to
+        // it with the second click, not just guessable from grid lines.
+        const lengthHint = document.createElement('div');
+        lengthHint.className = 'fp-draw-length-hint';
+        canvas.appendChild(lengthHint);
         canvas.onpointermove = (e)=>{
           const [mx,my] = feetFromEvent(e);
           previewLine.setAttribute('x2', px(mx)); previewLine.setAttribute('y2', px(my));
+          const lengthFt = Math.hypot(mx-fpDrawPending.x1, my-fpDrawPending.y1);
+          lengthHint.textContent = fpFormatFeetIn(lengthFt);
+          lengthHint.style.left = (px((fpDrawPending.x1+mx)/2))+'px';
+          lengthHint.style.top = (px((fpDrawPending.y1+my)/2))+'px';
         };
       }
       canvas.onpointerdown = (e)=> fpArmLongPressMarquee(e, ()=>{}); // line tools have no drag behavior of their own to fall back to -- just arms the long press
@@ -3506,7 +3565,7 @@
           fpDrawPending = null;
           if(Math.hypot(mx-start.x1, my-start.y1) >= FP_GRID_STEP){
             fpPushHistory();
-            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, x1:start.x1, y1:start.y1, x2:mx, y2:my, color:'#8b8d8e' });
+            fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, x1:start.x1, y1:start.y1, x2:mx, y2:my, color:'#8b8d8e', heightIn:FP_DEFAULT_HEIGHT_IN[fpDrawTool]||96 });
             fpSave();
           }
           fpRender();
@@ -3731,14 +3790,25 @@
       if(selected && fpMode==='select' && !fpIsBulkSelected()) fpAddElementNodes(svg, canvas, el, px, scale);
 
       if(fpIsLineType(el.type)){
+        // Same L x H visibility as furniture objects (see the comment on
+        // that below) -- every wall/opening/window/door shows its own
+        // length x height as long as Dimensions is on, whether or not it
+        // has a name, so an exported image of the plan carries real-world
+        // scale for these too, not just furniture.
         const hasLineLabel = !!(el.label && el.label.trim());
-        if(fpGetShowLabels() && (hasLineLabel || selected)){
+        const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
+        const heightIn = el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96);
+        const dims = fpGetShowDimensions() ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
+        const nameText = (fpGetShowLabels() && hasLineLabel) ? el.label : '';
+        const combined = [nameText, dims && `(${dims})`].filter(Boolean).join(' ');
+        const showPlaceholder = fpGetShowLabels() && selected && !combined;
+        if(combined || showPlaceholder){
           const midX = (el.x1+el.x2)/2, midY = (el.y1+el.y2)/2;
           const lineLabel = document.createElement('div');
-          lineLabel.className = 'fp-item-label' + (hasLineLabel ? '' : ' placeholder');
+          lineLabel.className = 'fp-item-label' + (combined ? '' : ' placeholder');
           lineLabel.spellcheck = false;
-          lineLabel.textContent = hasLineLabel ? el.label : 'Add label';
-          lineLabel.title = 'Tap to edit name/length, drag to reposition';
+          lineLabel.textContent = combined || 'Add label';
+          lineLabel.title = 'Tap to edit name/length/height, drag to reposition';
           fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected);
           canvas.appendChild(lineLabel);
         }
@@ -3830,16 +3900,33 @@
         });
         label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!labelDragged) fpOpenRoomLabelModal(item); });
       } else {
-        // No label by default (an item from the library doesn't force its
-        // catalog name onto the plan) -- shown only once the user sets one, or
-        // while selected (as an editable placeholder), and drawn snug against
-        // the object itself rather than a separate chip that eats canvas space.
+        // No name by default (an item from the library doesn't force its
+        // catalog name onto the plan) -- shown only once the user sets one,
+        // or while selected (as an editable placeholder). Dimensions are
+        // independent of that: every object shows its own (LxWxH in) as long
+        // as the Dimensions toggle is on, whether or not it has a name --
+        // baked visibly into the plan (and so into any exported image of it)
+        // is deliberate: it's what lets an image-only AI like Gemini infer
+        // each object's real-world scale for a 3D interpretation, since
+        // there's currently no separate structured-data channel to it.
         const hasLabel = !!(item.label && item.label.trim());
-        label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
-        label.style.display = (fpGetShowLabels() && (hasLabel || isSelected)) ? '' : 'none';
-        label.textContent = hasLabel
-          ? (fpGetShowDimensions() ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : item.label)
-          : 'Add label';
+        const heightIn = item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN;
+        const dims = fpGetShowDimensions() ? `${Math.round(item.w)}×${Math.round(item.d)}×${Math.round(heightIn)} in` : '';
+        const nameText = (fpGetShowLabels() && hasLabel) ? item.label : '';
+        const combined = [nameText, dims && `(${dims})`].filter(Boolean).join(' ');
+        if(combined){
+          label.className = 'fp-item-label';
+          label.style.display = '';
+          label.textContent = combined;
+        } else if(fpGetShowLabels() && isSelected){
+          label.className = 'fp-item-label placeholder';
+          label.style.display = '';
+          label.textContent = 'Add label';
+        } else {
+          label.className = 'fp-item-label';
+          label.style.display = 'none';
+          label.textContent = '';
+        }
         label.title = 'Tap to edit name/dimensions, drag to reposition';
         repositionLabel = fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item), isSelected);
       }
