@@ -24,44 +24,28 @@
   }
   /* The toolbar (Draw/Select/Copy/Delete/Clear plan/etc, moved in from the
      floor plan screen -- see the header markup below) now lives inside this
-     sticky header, so it stays permanently on-screen while scrolling instead
-     of disappearing with the rest of the page. Row 1 (headerTitleRow) holds
-     just the Install/Toolbox/Print/Settings icons now -- the project title
-     itself moved back down to sit above the canvas (see .fp-title-row). The
-     house-mark logo sits beside a stretched two-row column (icon row, then
-     toolbar row) via align-items:stretch, rather than its own row. */
+     sticky header as its own full-width row directly under headerTop, so it
+     stays permanently on-screen while scrolling instead of disappearing with
+     the rest of the page, AND left-justifies flush with the logo's own left
+     edge above it (rather than being indented to start under the wordmark,
+     which is what nesting it inside a narrower side-by-side column used to
+     do). The project title itself lives above the canvas now, not here --
+     see .fp-title-row. */
   header{
     display:flex; flex-direction:column; padding:.4rem 1rem;
     border-bottom:1px solid var(--border); background:var(--panel);
     position:sticky; top:0; z-index:20;
   }
-  header .headerTop{ display:flex; align-items:stretch; gap:.6rem; }
+  header .headerTop{ display:flex; align-items:center; gap:.6rem; }
   header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; flex:none; }
   header h1 img{ height:2.38rem; width:auto; display:block; border-radius:6px; } /* 30% smaller than the original 3.4rem, to free up header space */
   header h1 .header-mark{ height:4.19rem; width:4.19rem; border-radius:50%; flex:none; } /* 30% smaller than the original 5.98rem */
   header .spacer{flex:1;}
-  header .headerRight{
-    display:flex; flex-direction:column; justify-content:space-between;
-    flex:1; min-width:0; gap:.2rem;
-  }
-  header .headerTitleRow{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
-  /* Below the desktop breakpoint there usually isn't room for title + every
-     view-toggle + every icon on one line -- without this, the zoom/Grid/
-     Labels/Dimensions group gets squeezed into whatever sliver is left
-     between them instead of wrapping, and being a wrapping flex container
-     itself, it then piles its 7 buttons into many stacked internal rows,
-     ballooning the (sticky!) header to cover most of the screen. Giving it
-     the full row's width instead makes it wrap at most once, as its own
-     single line under the title. */
   @media (max-width:899px){
-    .fp-zoom-row{ flex-basis:100%; justify-content:flex-start; }
     /* Below the desktop breakpoint, the wordmark logo alone is wide enough
-       to leave almost no room for title+toggles+icons squeezed into the
-       same row beside it -- stack the logo above that block instead of
-       fighting it for space, so headerRight gets the full row width. */
-    header .headerTop{ flex-direction:column; align-items:center; }
-    header h1{ align-self:stretch; justify-content:center; }
-    header .headerRight{ width:100%; }
+       to leave almost no room for the icon row squeezed in beside it --
+       stack the logo above that row instead of fighting it for space. */
+    header .headerTop{ flex-wrap:wrap; justify-content:center; }
   }
   /* The toolbar's own default card look (background/border/margin, see
      .toolbar) is redundant a second time nested inside the header panel --
@@ -70,7 +54,7 @@
      too (smaller padding/font than the base .btn/.fp-key-btn), so this
      always-visible sticky row stays thin rather than eating a lot of the
      screen's height permanently. */
-  header .fp-toolbar{ margin-bottom:0; justify-content:flex-start; gap:.35rem; padding:.3rem .5rem .3rem .3rem; }
+  header .fp-toolbar{ margin:.3rem 0 0; justify-content:flex-start; gap:.35rem; padding:.3rem .5rem; }
   header .fp-toolbar .btn, header .fp-toolbar select{ padding:.28rem .55rem; font-size:.74rem; }
 
   /* Left-justified (not auto-centered) and much wider than before -- with
@@ -592,33 +576,31 @@
 <header>
   <div class="headerTop">
     <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
-    <div class="headerRight">
-      <div class="headerTitleRow">
-        <div class="spacer"></div>
-        <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
-        <div class="fp-opening-dd" id="fpToolboxDd">
-          <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Projects, Save As, Backup, Restore">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-          </button>
-          <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
-            <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
-            <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
-            <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
-            <button type="button" class="fp-opening-dd-item" id="fpToolboxBackup">Backup</button>
-            <button type="button" class="fp-opening-dd-item" id="fpToolboxRestore">Restore&hellip;</button>
-            <input type="file" id="fpToolboxLoadProjectInput" accept="application/json,.json" style="display:none;">
-            <input type="file" id="fpToolboxRestoreInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">
-          </div>
-        </div>
-        <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        </button>
-        <button class="btn topbar-icon-btn" id="infoBtn" title="Settings">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
+    <div class="spacer"></div>
+    <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
+    <div class="fp-opening-dd" id="fpToolboxDd">
+      <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Projects, Save As, Backup, Restore">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+      </button>
+      <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxBackup">Backup</button>
+        <button type="button" class="fp-opening-dd-item" id="fpToolboxRestore">Restore&hellip;</button>
+        <input type="file" id="fpToolboxLoadProjectInput" accept="application/json,.json" style="display:none;">
+        <input type="file" id="fpToolboxRestoreInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">
       </div>
+    </div>
+    <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    </button>
+    <button class="btn topbar-icon-btn" id="infoBtn" title="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
 
-      <div class="toolbar fp-toolbar">
+  <div class="toolbar fp-toolbar">
         <div class="segGroup" id="fpModeGroup">
           <button class="btn fp-key-btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
         </div>
@@ -671,10 +653,8 @@
             <path fill="url(#fpGeminiGrad)" d="M12 2c0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10 0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10Z"/>
           </svg>
         </button>
-        <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
-        <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
-      </div>
-    </div>
+    <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
+    <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
   </div>
 </header>
 
@@ -803,7 +783,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+402f1dd7';
+  const APP_VERSION = '1.0+ad4987a5';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
