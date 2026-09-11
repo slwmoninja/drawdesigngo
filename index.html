@@ -354,23 +354,6 @@
   .fp-lib-item.fp-lib-add svg{ width:1.5rem; height:1.5rem; color:var(--dim); }
   .fp-lib-item.fp-lib-add:hover svg{ color:var(--accent); }
 
-  /* ---------- Generate-from-photos modal ---------- */
-  .fp-photo-drop{
-    border:1.5px dashed var(--border); border-radius:10px; padding:1.2rem;
-    text-align:center; color:var(--dim); font-size:.82rem; cursor:pointer;
-  }
-  .fp-photo-drop:hover, .fp-photo-drop.drag{ border-color:var(--accent); color:var(--text); }
-  .fp-photo-thumbs{ display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.6rem; }
-  .fp-photo-thumb{ position:relative; width:64px; height:64px; border-radius:6px; overflow:hidden; border:1px solid var(--border); }
-  .fp-photo-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .fp-photo-thumb button{
-    position:absolute; top:2px; right:2px; width:16px; height:16px; border-radius:50%;
-    background:rgba(20,22,26,.85); color:#fff; border:none; font-size:.6rem; line-height:1; cursor:pointer;
-  }
-  #fpKnownDims{
-    width:100%; background:var(--panel2); border:1px solid var(--border); color:var(--text);
-    border-radius:8px; padding:.5rem .6rem; font-size:.82rem; font-family:inherit; resize:vertical;
-  }
   .fp-detail-input{
     background:var(--panel2); border:1px solid var(--border); color:#1a3a8f;
     border-radius:6px; padding:.4rem .55rem; font-size:.85rem; font-weight:600;
@@ -491,11 +474,10 @@
     <div class="spacer"></div>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
     <div class="fp-opening-dd" id="fpToolboxDd">
-      <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Import Photo, Projects, Save As, Backup, Restore">
+      <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Projects, Save As, Backup, Restore">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
       </button>
       <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxImportPhoto">Import Photo</button>
         <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
         <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
         <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
@@ -555,7 +537,7 @@
           <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
         </div>
       </div>
-      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Instant 3D isometric view of this plan -- free, no API call">
+      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Generate a photorealistic 3D isometric render of this plan (Gemini, needs your API key)">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M12 2 L12 22"/><path d="M3 7 L12 12 L21 7"/></svg>
         3D View
       </button>
@@ -569,7 +551,7 @@
 
     <div class="fp-layout">
       <div class="fp-main">
-        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Room/Area Name</h2>
+        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Project Title</h2>
         <div class="fp-zoom-row">
           <button class="btn fp-zoom-btn" id="fpZoomOut" title="Zoom out">&minus;</button>
           <span class="mini" id="fpZoomLabel">100%</span>
@@ -607,7 +589,6 @@
 
 <div id="fpPrintContainer"></div>
 
-<script src="./vendor/pdfjs/pdf.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -618,8 +599,6 @@
   const printBtn = document.getElementById('printBtn');
   printBtn.addEventListener('click', ()=> fpExportPdf());
   document.getElementById('fp3dViewBtn').addEventListener('click', ()=> fp3dOpenViewModal());
-
-  if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdfjs/pdf.worker.min.js';
 
   // ---------- Utility ----------
   function toast(msg, isErr){
@@ -672,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+754b6c81';
+  const APP_VERSION = '1.0+a6c59fe1';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -829,21 +808,20 @@
         '<div style="margin-top:.6rem;"><a href="#" id="resetInstallLink" style="color:var(--dim); font-size:.78rem;">Not on your Home Screen? Reset install status</a></div>'
         : '') +
       '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
-        '<div style="font-weight:600; margin-bottom:.5rem;">AI provider (used for Import Photo)</div>' +
-        '<div id="fpSettingsProviderWrap"></div>' +
+        '<div style="font-weight:600; margin-bottom:.5rem;">OpenAI (auto-size custom objects)</div>' +
+        '<div id="fpSettingsOpenAiWrap"></div>' +
       '</div>' +
       '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
         '<div style="font-weight:600; margin-bottom:.5rem;">Photoreal 3D (Gemini)</div>' +
         '<div id="fpSettingsGeminiWrap"></div>' +
       '</div>'
     );
-    function renderSettingsProvider(){
-      const provider = fpGetProvider();
-      const container = wrap.querySelector('#fpSettingsProviderWrap');
-      container.innerHTML = fpBuildProviderConfigHtml(provider);
-      fpWireProviderConfig(container, provider, renderSettingsProvider);
+    function renderSettingsOpenAi(){
+      const container = wrap.querySelector('#fpSettingsOpenAiWrap');
+      container.innerHTML = fpOpenAiKeyRowHtml();
+      fpWireOpenAiConfig(container, renderSettingsOpenAi);
     }
-    renderSettingsProvider();
+    renderSettingsOpenAi();
     function renderSettingsGemini(){
       const container = wrap.querySelector('#fpSettingsGeminiWrap');
       container.innerHTML = fpGeminiKeyRowHtml();
@@ -1471,15 +1449,14 @@
     label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!dragged) onClick(); });
   }
 
-  // Asks OpenAI (text-only, via the same CORS proxy the photo-generation
-  // path uses) for a typical real-world width x depth given just an item's
-  // name -- no photo involved, this is a plain text completion. Always
-  // OpenAI specifically (not whichever provider is set for photo import),
-  // per how this was asked for.
+  // Asks OpenAI (text-only, via a small CORS proxy Worker -- see
+  // cloudflare-worker/README.md) for a typical real-world width x depth
+  // given just an item's name -- no photo involved, this is a plain text
+  // completion.
   async function fpDetectObjectDimensions(name){
     const proxyUrl = fpGetOpenAiProxyUrl();
     if(!proxyUrl) throw new Error('Set your OpenAI proxy Worker URL first (see cloudflare-worker/README.md).');
-    if(!fpGetOpenAiKey()) throw new Error('Set your OpenAI API key first (open "Import Photo" to add one).');
+    if(!fpGetOpenAiKey()) throw new Error('Set your OpenAI API key first (open Settings to add one).');
     const prompt = `You are estimating typical real-world dimensions for a piece of furniture or fixture based on its name. Item: "${name}". Respond with ONLY a JSON object, no markdown fences, no commentary: {"w": number, "d": number} -- width and depth in INCHES, typical for this item as sold/used in a home. If the name is vague, pick a reasonable common size.`;
     const resp = await fetch(proxyUrl, {
       method: 'POST',
@@ -1646,7 +1623,7 @@
 
   function fpDefaultState(){
     return {
-      title: 'Room/Area Name',
+      title: 'Project Title',
       elements: [],
       objects: [],
       notes: [],
@@ -2355,59 +2332,55 @@
     return `data:${imgPart.inlineData.mimeType || 'image/png'};base64,${imgPart.inlineData.data}`;
   }
 
+  // The schematic wireframe (fp3dBuildSvg) is never shown to the user --
+  // client feedback was that flat-shaded massing boxes aren't a usable
+  // format for them or their clients. It still exists purely as Gemini's
+  // structural reference image (see fp3dGeneratePhotoreal), passed as
+  // inline image data and never rendered into the page.
   function fp3dOpenViewModal(){
     if(!fpState || (!fpState.elements.length && !fpState.objects.length)){
       toast('Draw or import a floor plan first.', true);
       return;
     }
-    const svg = fp3dBuildSvg();
+    if(!fpGetGeminiKey() || !fpGetGeminiProxyUrl()){
+      const wrap = openModal('3D View',
+        '<p class="fp-hint" style="margin-top:0;">This turns your plan into a photorealistic 3D isometric render, using your own Gemini API key.</p>' +
+        '<p class="fp-hint">No Gemini key saved yet. <a href="#" id="fp3dOpenSettingsLink">Set it up in Settings</a>.</p>'
+      );
+      wrap.querySelector('#fp3dOpenSettingsLink').addEventListener('click', (e)=>{ e.preventDefault(); wrap.remove(); infoBtn.click(); });
+      return;
+    }
     const wrap = openModal('3D View',
-      '<p class="fp-hint" style="margin:0 0 .7rem;">Free instant massing view, built straight from this plan\'s own numbers -- no API call.</p>' +
-      '<div id="fp3dStage" style="background:linear-gradient(180deg,#dce8ef,#eef2ef); border-radius:8px; overflow:auto; max-height:65vh;"></div>' +
-      '<div style="margin-top:.7rem; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; justify-content:flex-end;">' +
-        '<span id="fp3dPhotorealStatus" class="fp-hint" style="margin:0; flex:1;"></span>' +
-        '<button type="button" class="btn" id="fp3dPhotorealBtn" style="border-color:var(--accent); color:var(--accent);">Generate Photoreal 3D (Gemini)</button>' +
-        '<button type="button" class="btn" id="fp3dDownloadBtn">Download PNG</button>' +
-      '</div>' +
-      '<div id="fp3dPhotorealResult" style="margin-top:.8rem;"></div>'
+      '<p class="fp-hint" id="fp3dStatus" style="margin-top:0;">Generating a photorealistic 3D isometric render with Gemini -- this can take up to a minute...</p>' +
+      '<div id="fp3dResult"></div>'
     );
-    wrap.querySelector('#fp3dStage').appendChild(svg);
-    wrap.querySelector('#fp3dDownloadBtn').addEventListener('click', async ()=>{
-      const w = Number(svg.getAttribute('width')), h = Number(svg.getAttribute('height'));
-      const canvas = await fpRasterizeSvg(svg.outerHTML, w, h);
-      const blob = await new Promise(res=>canvas.toBlob(res, 'image/png'));
-      if(!blob){ toast('Could not create the image.', true); return; }
-      await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-3d.png`, 'PNG image', {'image/png':['.png']});
-    });
-    wrap.querySelector('#fp3dPhotorealBtn').addEventListener('click', async ()=>{
-      const btn = wrap.querySelector('#fp3dPhotorealBtn');
-      const status = wrap.querySelector('#fp3dPhotorealStatus');
-      const resultWrap = wrap.querySelector('#fp3dPhotorealResult');
-      if(!fpGetGeminiKey() || !fpGetGeminiProxyUrl()){
-        status.innerHTML = 'No Gemini key saved yet. <a href="#" id="fp3dOpenSettingsLink">Set it up in Settings</a>.';
-        const link = wrap.querySelector('#fp3dOpenSettingsLink');
-        if(link) link.addEventListener('click', (e)=>{ e.preventDefault(); wrap.remove(); infoBtn.click(); });
-        return;
-      }
-      btn.disabled = true;
-      status.textContent = 'Generating with Gemini -- this can take up to a minute...';
+    async function run(){
+      const status = wrap.querySelector('#fp3dStatus');
+      const resultWrap = wrap.querySelector('#fp3dResult');
+      status.textContent = 'Generating a photorealistic 3D isometric render with Gemini -- this can take up to a minute...';
       resultWrap.innerHTML = '';
       try{
+        const svg = fp3dBuildSvg();
         const dataUrl = await fp3dGeneratePhotoreal(svg);
-        status.textContent = 'Done.';
-        resultWrap.innerHTML = '<img id="fp3dPhotorealImg" style="max-width:100%; border-radius:8px; display:block;">' +
-          '<div style="margin-top:.5rem; text-align:right;"><button type="button" class="btn" id="fp3dPhotorealDownloadBtn">Download photoreal PNG</button></div>';
-        resultWrap.querySelector('#fp3dPhotorealImg').src = dataUrl;
-        resultWrap.querySelector('#fp3dPhotorealDownloadBtn').addEventListener('click', async ()=>{
+        status.textContent = '';
+        resultWrap.innerHTML = '<img id="fp3dImg" style="max-width:100%; border-radius:8px; display:block;">' +
+          '<div style="margin-top:.6rem; display:flex; gap:.5rem; justify-content:flex-end;">' +
+            '<button type="button" class="btn" id="fp3dRetryBtn">Regenerate</button>' +
+            '<button type="button" class="btn" id="fp3dDownloadBtn" style="border-color:var(--accent); color:var(--accent);">Download PNG</button>' +
+          '</div>';
+        resultWrap.querySelector('#fp3dImg').src = dataUrl;
+        resultWrap.querySelector('#fp3dDownloadBtn').addEventListener('click', async ()=>{
           const blob = await (await fetch(dataUrl)).blob();
-          await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-photoreal.png`, 'PNG image', {'image/png':['.png']});
+          await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-3d.png`, 'PNG image', {'image/png':['.png']});
         });
+        resultWrap.querySelector('#fp3dRetryBtn').addEventListener('click', run);
       }catch(err){
         status.textContent = (err && err.message) || 'Something went wrong.';
-      }finally{
-        btn.disabled = false;
+        resultWrap.innerHTML = '<div style="text-align:right;"><button type="button" class="btn" id="fp3dRetryBtn">Try again</button></div>';
+        resultWrap.querySelector('#fp3dRetryBtn').addEventListener('click', run);
       }
-    });
+    }
+    run();
   }
 
   function fpSafeFileName(title){
@@ -3469,7 +3442,13 @@
         // once forces the browser to stretch/squash height to fit between
         // them instead of sizing to the text's actual content height, which
         // was collapsing every measurement below to ~0.
-        Object.assign(label.style, { left:(pw/2)+'px', top:(pd/2)+'px', right:'auto', bottom:'auto', transform:'translate(-50%,-50%)' });
+        // Anchored at the object's own left edge (local x=0) and only
+        // vertically centered -- matches fpBuildExportSvg's text-anchor
+        // "start" at this same point (item.cx - halfWidth), so the text
+        // only ever grows rightward, into the room, instead of centering on
+        // cx and bleeding an unbounded (max-width:none) string half off the
+        // left edge of the grid when cx is close to x=0.
+        Object.assign(label.style, { left:'0px', top:(pd/2)+'px', right:'auto', bottom:'auto', transform:'translate(0,-50%)' });
         let labelDragged = false;
         label.addEventListener('pointerdown', (e)=>{
           e.stopPropagation();
@@ -3739,7 +3718,7 @@
     if(isFirstEverOpen){
       // Prompt for a project name immediately: focus the title field with
       // its placeholder text selected, so a blinking cursor is ready and the
-      // very first keystroke replaces "Room/Area Name" outright rather
+      // very first keystroke replaces "Project Title" outright rather
       // than requiring the user to clear it themselves first. Deferred a
       // tick -- a focus() call made synchronously during initial page
       // bootstrap is unreliable in some browsers (silently dropped before
@@ -3760,7 +3739,7 @@
     fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
 
     document.getElementById('fpTitle').addEventListener('blur', (e)=>{
-      fpState.title = e.target.textContent.trim() || 'Room/Area Name';
+      fpState.title = e.target.textContent.trim() || 'Project Title';
       fpSave();
     });
 
@@ -3770,20 +3749,15 @@
       await fpStartNewProject();
     });
 
-    // Toolbox: all file-management actions (Import Photo, Projects, Load
-    // Project, Save As, Backup, Restore) live here as one dropdown, to the
-    // left of Print in the header, rather than scattered across the toolbar
-    // and Settings.
+    // Toolbox: all file-management actions (Projects, Load Project, Save
+    // As, Backup, Restore) live here as one dropdown, to the left of Print
+    // in the header, rather than scattered across the toolbar and Settings.
     const toolboxDd = document.getElementById('fpToolboxDd');
     const toolboxBtn = document.getElementById('fpToolboxBtn');
     const toolboxMenu = document.getElementById('fpToolboxDdMenu');
     toolboxBtn.addEventListener('click', (e)=>{
       e.stopPropagation();
       toolboxMenu.hidden = !toolboxMenu.hidden;
-    });
-    document.getElementById('fpToolboxImportPhoto').addEventListener('click', ()=>{
-      toolboxMenu.hidden = true;
-      fpOpenGenerateModal();
     });
     document.getElementById('fpToolboxProjects').addEventListener('click', ()=>{
       toolboxMenu.hidden = true;
@@ -3995,21 +3969,12 @@
     });
   }
 
-  // ---------- Floor Plan: generate from photos (Claude vision API) ----------
-  // Runs entirely client-side: the photo(s) go straight from this browser to
-  // Anthropic's API using a key Russ enters and stores himself (localStorage,
-  // this device only) -- never something typed into chat with Claude Code.
-  const FP_API_KEY_STORAGE = 'floorplanner-anthropic-key';
-  function fpGetApiKey(){ try{ return localStorage.getItem(FP_API_KEY_STORAGE) || ''; }catch(e){ return ''; } }
-  function fpSetApiKey(key){ try{ if(key) localStorage.setItem(FP_API_KEY_STORAGE, key); else localStorage.removeItem(FP_API_KEY_STORAGE); }catch(e){} }
-
+  // ---------- OpenAI: used only for fpDetectObjectDimensions (auto-sizing a
+  // custom-named object) -- a plain text completion, no photos involved.
   // OpenAI has no CORS support for direct browser calls, so it's reached
   // through a small proxy Worker you deploy yourself (see
   // cloudflare-worker/README.md) -- your key still only ever lives here and
   // in that Worker's memory for a single request, never a third party.
-  const FP_PROVIDER_STORAGE = 'floorplanner-ai-provider';
-  function fpGetProvider(){ try{ return localStorage.getItem(FP_PROVIDER_STORAGE) || 'openai'; }catch(e){ return 'openai'; } }
-  function fpSetProvider(p){ try{ localStorage.setItem(FP_PROVIDER_STORAGE, p); }catch(e){} }
   const FP_OPENAI_KEY_STORAGE = 'floorplanner-openai-key';
   function fpGetOpenAiKey(){ try{ return localStorage.getItem(FP_OPENAI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
   function fpSetOpenAiKey(key){ try{ if(key) localStorage.setItem(FP_OPENAI_KEY_STORAGE, key); else localStorage.removeItem(FP_OPENAI_KEY_STORAGE); }catch(e){} }
@@ -4019,10 +3984,10 @@
   function fpSetOpenAiProxyUrl(url){ try{ if(url) localStorage.setItem(FP_OPENAI_PROXY_STORAGE, url); else localStorage.removeItem(FP_OPENAI_PROXY_STORAGE); }catch(e){} }
 
   // Gemini key/proxy, used only by the "Photoreal 3D" button (see the 3D
-  // View section above) -- a separate credential from the Import Photo
-  // provider above since it's a different feature or Google's Generative
-  // Language API also has no CORS support for direct browser calls, so it
-  // needs the same kind of passthrough Worker as OpenAI's.
+  // View section above) -- a separate credential from the OpenAI one above
+  // since it's a different feature. Google's Generative Language API also
+  // has no CORS support for direct browser calls, so it needs the same kind
+  // of passthrough Worker as OpenAI's.
   const FP_GEMINI_KEY_STORAGE = 'floorplanner-gemini-key';
   function fpGetGeminiKey(){ try{ return localStorage.getItem(FP_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
   function fpSetGeminiKey(key){ try{ if(key) localStorage.setItem(FP_GEMINI_KEY_STORAGE, key); else localStorage.removeItem(FP_GEMINI_KEY_STORAGE); }catch(e){} }
@@ -4039,105 +4004,6 @@
   const FP_OPENAI_DATASHARING_ACK = 'floorplanner-openai-datasharing-ack';
   function fpGetDataSharingAck(){ try{ return localStorage.getItem(FP_OPENAI_DATASHARING_ACK) === '1'; }catch(e){ return false; } }
   function fpSetDataSharingAck(v){ try{ localStorage.setItem(FP_OPENAI_DATASHARING_ACK, v ? '1' : '0'); }catch(e){} }
-
-  function fpFileToBase64(file){
-    return new Promise((resolve,reject)=>{
-      const reader = new FileReader();
-      reader.onload = ()=> resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
-  // Downscale + re-encode as JPEG before sending to either provider -- phone
-  // photos can be several MB each, and neither provider needs more than
-  // ~1568px on the long edge for room/furniture recognition (Anthropic
-  // downscales server-side above that anyway, so sending less doesn't cost
-  // accuracy, just less upload data and fewer image tokens billed).
-  const FP_IMAGE_MAX_DIM = 1568;
-  const FP_IMAGE_QUALITY = 0.82;
-  function fpDownscaleImage(file){
-    return new Promise((resolve, reject)=>{
-      const label = (file.name||'photo') + (file.type ? ' ('+file.type+')' : '');
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = ()=>{
-        URL.revokeObjectURL(url);
-        const scale = Math.min(1, FP_IMAGE_MAX_DIM / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob(blob=>{
-          if(blob) resolve(blob); else reject(new Error('Could not encode '+label+'.'));
-        }, 'image/jpeg', FP_IMAGE_QUALITY);
-      };
-      // Most commonly hit for HEIC/HEIF photos -- iOS Safari auto-converts
-      // those to JPEG on picking, but Android Chrome (and some other
-      // browsers) have no built-in HEIC decoder at all, so the <img> simply
-      // fails to load with no more specific reason given by the browser.
-      img.onerror = ()=>{
-        URL.revokeObjectURL(url);
-        const isHeic = /hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name||'');
-        const hint = isHeic
-          ? ' -- likely a HEIC/HEIF photo, which this browser can\'t display. Try a photo saved as JPEG or PNG instead.'
-          : ' -- this browser could not decode it. Try a different photo (JPEG/PNG work everywhere).';
-        reject(new Error('Could not load '+label+hint));
-      };
-      img.src = url;
-    });
-  }
-  async function fpFileToDownscaledBase64(file){
-    const blob = await fpDownscaleImage(file);
-    return fpFileToBase64(blob);
-  }
-
-  // Renders each page of a PDF to a PNG File (via pdf.js, vendored under
-  // ./vendor/pdfjs so this keeps working offline once installed) so a
-  // scanned/exported floor-plan PDF can flow through the exact same
-  // photo-analysis pipeline as a regular photo -- no separate code path.
-  // Capped at 6 pages: this is meant for a floor plan, not a whole document.
-  const FP_PDF_MAX_PAGES = 6;
-  const FP_PDF_RENDER_SCALE = 2;
-  async function fpPdfFileToImageFiles(file){
-    if(!window.pdfjsLib) throw new Error('PDF support failed to load -- try again after reloading the page.');
-    const baseName = (file.name||'plan').replace(/\.pdf$/i,'');
-    const data = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data }).promise;
-    const pageCount = Math.min(pdf.numPages, FP_PDF_MAX_PAGES);
-    const files = [];
-    for(let i=1; i<=pageCount; i++){
-      const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: FP_PDF_RENDER_SCALE });
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width; canvas.height = viewport.height;
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-      const blob = await new Promise(res=> canvas.toBlob(res, 'image/png'));
-      if(blob) files.push(new File([blob], `${baseName}-p${i}.png`, { type:'image/png' }));
-    }
-    if(!files.length) throw new Error('Could not render any pages from '+(file.name||'that PDF')+'.');
-    return files;
-  }
-
-  // Shared by every photo-input path (file picker, drag-drop) -- expands any
-  // PDF into its rendered page images first, so everything downstream only
-  // ever deals in actual images.
-  async function fpExpandPickedFiles(fileList, statusEl){
-    const out = [];
-    for(const f of fileList){
-      if(f.type==='application/pdf' || /\.pdf$/i.test(f.name||'')){
-        if(statusEl) statusEl.textContent = 'Converting '+(f.name||'PDF')+'…';
-        try{ out.push(...await fpPdfFileToImageFiles(f)); }
-        catch(err){ toast(err.message || 'Could not convert that PDF.', true); }
-      } else {
-        out.push(f);
-      }
-    }
-    if(statusEl) statusEl.textContent = '';
-    return out;
-  }
 
   // Shows just enough of a saved key (prefix + last 4 chars) for the user
   // to visually confirm it matches what they actually copied, without this
@@ -4160,83 +4026,51 @@
   // autocapitalize are all disabled so mobile keyboards can't mangle a
   // paste either.
   const FP_KEY_INPUT_ATTRS = `type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"`;
-  function fpKeyRowHtml(provider){
-    if(provider === 'openai'){
-      const key = fpGetOpenAiKey();
-      const proxyUrl = fpGetOpenAiProxyUrl();
-      return `
-        <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL
-          <input type="text" id="fpProxyInput" placeholder="https://your-proxy.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
-        </label>
-        <div class="fp-key-row" style="margin-top:.4rem;">
-          ${key
-            ? `<span>Key set: <code>${fpEscapeHtml(fpMaskKey(key))}</code></span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-            : `<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get an OpenAI key</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
-        </div>
-        <label class="mini" style="display:flex; align-items:flex-start; gap:.4rem; margin-top:.3rem; color:var(--dim);">
-          <input type="checkbox" id="fpDataSharingAck" ${fpGetDataSharingAck() ? 'checked' : ''} style="margin-top:.2rem;">
-          <span>I've enabled OpenAI's <a href="https://platform.openai.com/settings/organization/data-controls" target="_blank" rel="noopener">data-sharing</a> discount.</span>
-        </label>
-      `;
-    }
-    const key = fpGetApiKey();
+  // OpenAI key/proxy setup for fpDetectObjectDimensions -- same shape as
+  // fpGeminiKeyRowHtml below, one fixed provider, no toggle needed.
+  function fpOpenAiKeyRowHtml(){
+    const key = fpGetOpenAiKey();
+    const proxyUrl = fpGetOpenAiProxyUrl();
     return `
-      <div class="fp-key-row">
+      <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL
+        <input type="text" id="fpProxyInput" placeholder="https://your-proxy.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
+      </label>
+      <div class="fp-key-row" style="margin-top:.4rem;">
         ${key
           ? `<span>Key set: <code>${fpEscapeHtml(fpMaskKey(key))}</code></span><button class="fp-row-remove" id="fpKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
-          : `<a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get an Anthropic key</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-ant-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
+          : `<a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get an OpenAI key</a><input ${FP_KEY_INPUT_ATTRS} id="fpKeyInput" placeholder="sk-..."><button class="btn" id="fpKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
       </div>
+      <label class="mini" style="display:flex; align-items:flex-start; gap:.4rem; margin-top:.3rem; color:var(--dim);">
+        <input type="checkbox" id="fpDataSharingAck" ${fpGetDataSharingAck() ? 'checked' : ''} style="margin-top:.2rem;">
+        <span>I've enabled OpenAI's <a href="https://platform.openai.com/settings/organization/data-controls" target="_blank" rel="noopener">data-sharing</a> discount.</span>
+      </label>
     `;
   }
-
-  // Shared by the Settings modal's "AI Provider" section -- the provider
-  // toggle plus everything fpKeyRowHtml() renders (proxy URL, key entry,
-  // data-sharing ack). Import Photo only shows a one-line status pointing
-  // here instead of the full setup UI inline.
-  function fpBuildProviderConfigHtml(provider){
-    return `
-      <div class="mini" style="display:flex; gap:.4rem; margin-bottom:.5rem;">
-        <button class="btn fp-provider-btn" data-provider="anthropic" style="${provider==='anthropic'?'border-color:var(--accent); color:var(--accent);':''}">Claude (Anthropic)</button>
-        <button class="btn fp-provider-btn" data-provider="openai" style="${provider==='openai'?'border-color:var(--accent); color:var(--accent);':''}">OpenAI</button>
-      </div>
-      <div id="fpKeyRowWrap">${fpKeyRowHtml(provider)}</div>
-    `;
-  }
-  function fpWireProviderConfig(container, provider, onProviderChange){
-    container.querySelectorAll('.fp-provider-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{ fpSetProvider(btn.dataset.provider); onProviderChange(btn.dataset.provider); });
-    });
+  function fpWireOpenAiConfig(container, onChange){
     const proxyInput = container.querySelector('#fpProxyInput');
     if(proxyInput) proxyInput.addEventListener('change', ()=> fpSetOpenAiProxyUrl(proxyInput.value.trim()));
     const dataSharingAck = container.querySelector('#fpDataSharingAck');
     if(dataSharingAck){
-      dataSharingAck.addEventListener('change', ()=>{
-        fpSetDataSharingAck(dataSharingAck.checked);
-        const statusEl = container.querySelector('#fpDataSharingStatus');
-        if(statusEl) statusEl.textContent = dataSharingAck.checked ? 'Recorded: data-sharing acknowledged.' : 'Not yet acknowledged.';
-      });
+      dataSharingAck.addEventListener('change', ()=> fpSetDataSharingAck(dataSharingAck.checked));
     }
     const keySave = container.querySelector('#fpKeySave');
     if(keySave){
       keySave.addEventListener('click', ()=>{
         const v = container.querySelector('#fpKeyInput').value.trim();
         if(!v){ toast('Enter a key first.', true); return; }
-        if(provider==='openai') fpSetOpenAiKey(v); else fpSetApiKey(v);
-        onProviderChange(provider);
+        fpSetOpenAiKey(v);
+        onChange();
       });
     }
     const keyClear = container.querySelector('#fpKeyClear');
     if(keyClear){
-      keyClear.addEventListener('click', ()=>{
-        if(provider==='openai') fpSetOpenAiKey(''); else fpSetApiKey('');
-        onProviderChange(provider);
-      });
+      keyClear.addEventListener('click', ()=>{ fpSetOpenAiKey(''); onChange(); });
     }
   }
 
   // Gemini key/proxy setup for the "Photoreal 3D" button -- same shape as
-  // fpKeyRowHtml/fpWireProviderConfig above but for a single fixed provider
-  // (no toggle needed, this feature only ever uses Gemini).
+  // fpOpenAiKeyRowHtml above but for a single fixed provider (no toggle
+  // needed, this feature only ever uses Gemini).
   function fpGeminiKeyRowHtml(){
     const key = fpGetGeminiKey();
     const proxyUrl = fpGetGeminiProxyUrl();
@@ -4269,122 +4103,6 @@
     }
   }
 
-  function fpOpenGenerateModal(){
-    // Provider/key setup lives in Settings now (Russ sets the default there,
-    // not per-import) -- this modal just uses whatever's configured and
-    // points there if something's missing.
-    const provider = fpGetProvider();
-    const hasKey = provider==='openai' ? !!fpGetOpenAiKey() : !!fpGetApiKey();
-    const providerName = provider==='openai' ? 'OpenAI' : 'Claude (Anthropic)';
-    const wrap = openModal('Import Photo', `
-      <p class="fp-hint" style="margin-top:0;">Take 3&ndash;4 photos of the room from different corners, so every wall shows in at least one shot, and/or just describe the room's dimensions below &mdash; photos are optional if you give exact measurements. PDFs (e.g. a scanned or exported floor plan) work too -- each page converts to an image automatically.</p>
-      <div class="fp-photo-drop" id="fpPhotoDrop">Tap to choose photos or a PDF, or drag them here</div>
-      <input type="file" id="fpPhotoInput" accept="image/*,application/pdf" multiple style="display:none;">
-      <button class="btn" type="button" id="fpCameraBtn" style="margin-top:.4rem; width:100%;">&#128247; Take a photo instead</button>
-      <input type="file" id="fpCameraInput" accept="image/*" capture="environment" style="display:none;">
-      <p class="fp-hint" id="fpPhotoConvertStatus" style="margin:.4rem 0 0;"></p>
-      <div id="fpPhotoThumbs" class="fp-photo-thumbs"></div>
-      <div style="margin-top:.7rem; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap;">
-        <button class="btn" id="fpGenerateBtn" style="border-color:var(--accent); color:var(--accent);">Generate floor plan</button>
-        <span id="fpGenerateStatus" class="fp-hint" style="margin:0;"></span>
-      </div>
-      <label class="mini" style="display:block; margin-top:.9rem; color:var(--dim);">Known dimensions or notes (required if no photos)
-        <textarea id="fpKnownDims" rows="3" placeholder="e.g. back wall is about 22 feet, ceilings are 9 feet"></textarea>
-      </label>
-      <p class="fp-hint" id="fpProviderStatusHint" style="margin-top:.9rem;">${hasKey ? `Using ${providerName}.` : `No ${providerName} API key saved yet.`} <a href="#" id="fpOpenSettingsLink">Manage in Settings</a></p>
-    `);
-
-    wrap.querySelector('#fpOpenSettingsLink').addEventListener('click', (e)=>{
-      e.preventDefault();
-      wrap.remove();
-      infoBtn.click();
-    });
-
-    const picked = [];
-    const drop = wrap.querySelector('#fpPhotoDrop');
-    const input = wrap.querySelector('#fpPhotoInput');
-    const thumbs = wrap.querySelector('#fpPhotoThumbs');
-    const convertStatus = wrap.querySelector('#fpPhotoConvertStatus');
-    function renderThumbs(){
-      thumbs.innerHTML = '';
-      picked.forEach((f,i)=>{
-        const t = document.createElement('div'); t.className='fp-photo-thumb';
-        const img = document.createElement('img'); img.src = URL.createObjectURL(f);
-        const rm = document.createElement('button'); rm.type='button'; rm.textContent='×';
-        rm.addEventListener('click', ()=>{ picked.splice(i,1); renderThumbs(); });
-        t.appendChild(img); t.appendChild(rm); thumbs.appendChild(t);
-      });
-    }
-    drop.addEventListener('click', ()=> input.click());
-    const cameraBtn = wrap.querySelector('#fpCameraBtn');
-    const cameraInput = wrap.querySelector('#fpCameraInput');
-    cameraBtn.addEventListener('click', ()=> cameraInput.click());
-    cameraInput.addEventListener('change', (e)=>{
-      [...e.target.files].forEach(f=> picked.push(f));
-      cameraInput.value = '';
-      renderThumbs();
-    });
-    input.addEventListener('change', async (e)=>{
-      const files = [...e.target.files];
-      input.value = '';
-      picked.push(...await fpExpandPickedFiles(files, convertStatus));
-      renderThumbs();
-    });
-    drop.addEventListener('dragover', (e)=>{ e.preventDefault(); drop.classList.add('drag'); });
-    drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
-    drop.addEventListener('drop', async (e)=>{
-      e.preventDefault(); drop.classList.remove('drag');
-      const files = [...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/') || f.type==='application/pdf' || /\.pdf$/i.test(f.name||''));
-      picked.push(...await fpExpandPickedFiles(files, convertStatus));
-      renderThumbs();
-    });
-
-    wrap.querySelector('#fpGenerateBtn').addEventListener('click', async ()=>{
-      const status = wrap.querySelector('#fpGenerateStatus');
-      const notes = wrap.querySelector('#fpKnownDims').value.trim();
-      const keyNow = provider==='openai' ? !!fpGetOpenAiKey() : !!fpGetApiKey();
-      if(!keyNow){ status.textContent = `Add your ${providerName} API key in Settings first.`; return; }
-      if(provider==='openai' && !fpGetOpenAiProxyUrl()){ status.textContent = 'Set your OpenAI proxy Worker URL in Settings first.'; return; }
-      if(picked.length===0 && !notes){ status.textContent = 'Add at least one photo or describe the room\'s dimensions.'; return; }
-      const btn = wrap.querySelector('#fpGenerateBtn');
-      btn.disabled = true; status.textContent = picked.length ? ('Analyzing '+picked.length+' photo'+(picked.length===1?'':'s')+'…') : 'Generating from description…';
-      try{
-        const result = await fpAnalyzePhotos(picked, notes);
-        fpPushHistory();
-        fpApplyGeneratedPlan(result);
-        status.textContent = 'Done.';
-        setTimeout(()=> wrap.remove(), 600);
-      }catch(err){
-        console.error(err);
-        status.textContent = 'Failed: ' + (err && err.message ? err.message : 'unknown error');
-      }finally{
-        btn.disabled = false;
-      }
-    });
-  }
-
-  function fpAnalyzePrompt(notes, hasPhotos){
-    return `You are producing an approximate, to-scale floor plan${hasPhotos ? ' from the photos below' : ' from the measurements/description below (no photos were provided)'}. The plan can hold multiple rooms -- draw every wall you can identify (or infer from the description) as its own line segment; do not assume a single rectangle unless that's genuinely all there is.
-
-Coordinate system: pick an origin (0,0) at whichever corner is clearest from the photos/description. X increases rightward, Y increases going away from that starting point (deeper into the space). All coordinates are in FEET, to the nearest 0.5ft.
-
-Elements (walls, openings, and floor shapes): "type" is "line" or "dashedline" for a wall segment, "door" or "window" for an opening, or "rect"/"square"/"circle"/"oval" for a labeled floor shape like an island or fireplace. "line"/"dashedline"/"door"/"window" all use "x1"/"y1"/"x2"/"y2" (its two endpoints); "rect"/"square"/"circle"/"oval" use "cx"/"cy" = center, "w"/"h" = size in feet for rect/square/oval, "r" = radius in feet for circle, "rot" = rotation in degrees. Most rooms are 4 "line" elements forming a closed shape -- split a wall into multiple segments wherever another wall meets it (a T or L junction), so the segments' endpoints land exactly on the shared corner instead of crossing through it. Place a "door"/"window" element directly on top of (overlapping) the wall segment it belongs to, spanning just the opening's own width, not the whole wall.
-
-Objects (furniture): "cx"/"cy" are the item's CENTER in feet, same coordinate system as elements. "w"/"d" are the item's footprint in INCHES (width x depth). "rot" is rotation in degrees, 0 = default orientation.
-
-Precise placement is the hardest and most error-prone part of this task -- free-floating "somewhere in the middle" coordinate guesses are usually wrong even when the item/room identification itself is correct. To reduce that:
-- Calibrate scale from the most reliable fixed references first -- a standard door is 30-36in wide and ~80in tall, standard ceiling height is 8-9ft. Use whichever of these is visible to establish feet-per-pixel before estimating anything else, rather than guessing overall size first.
-- Anchor every object's position to a specific visible reference -- "flush against the north wall, centered under the window," "left edge touching the west wall, 2ft from the corner" -- not a bare coordinate pulled from general impression. If you cannot identify a specific wall/corner/opening an object is positioned relative to, say so in that item's contribution to "notes" rather than inventing a precise-looking coordinate.
-- Sanity-check before finalizing: no two object footprints should overlap, and every object should sit inside the walls of the room it belongs to. Adjust cx/cy/rot until both hold.
-
-${notes ? 'The user also supplied these known measurements/notes, prefer them over your own visual estimate when they conflict: ' + notes : 'No measurements were supplied -- estimate from standard door/ceiling/furniture sizing and everyday visual proportion.'}
-
-Respond with ONLY a single JSON object, no markdown fences, no commentary, matching exactly this shape (only include the fields relevant to each element's own "type" -- a line doesn't need cx/cy/w/h/r, a rect doesn't need x1/y1/x2/y2/r, etc.):
-{"title": string, "elements": [{"type": "line"|"dashedline"|"door"|"window"|"rect"|"square"|"circle"|"oval", "x1": number, "y1": number, "x2": number, "y2": number, "cx": number, "cy": number, "w": number, "h": number, "r": number, "rot": number}], "objects": [{"label": string, "w": number, "d": number, "cx": number, "cy": number, "rot": number}], "notes": [string, ...]}
-
-Include a "notes" entry stating which figures are firm (anchored to a supplied measurement or a standard size like a door width) versus rough visual estimates, and flag any object whose position wasn't anchored to a specific visible reference.`;
-  }
-
   function fpExtractJson(text){
     if(!text || !text.trim()){
       // A reasoning model (gpt-6-astra) can burn its whole token budget on
@@ -4397,104 +4115,6 @@ Include a "notes" entry stating which figures are firm (anchored to a supplied m
     if(!jsonMatch) throw new Error('Could not find JSON in the response: "' + text.slice(0,200) + '"');
     return JSON.parse(jsonMatch[0]);
   }
-
-  async function fpAnalyzePhotos(files, notes){
-    return fpGetProvider()==='openai' ? fpAnalyzePhotosOpenAI(files, notes) : fpAnalyzePhotosAnthropic(files, notes);
-  }
-
-  async function fpAnalyzePhotosAnthropic(files, notes){
-    const images = await Promise.all(files.map(async f=>({
-      type:'image',
-      source:{ type:'base64', media_type:'image/jpeg', data: await fpFileToDownscaledBase64(f) },
-    })));
-    const prompt = fpAnalyzePrompt(notes, files.length>0);
-
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': fpGetApiKey(),
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 4096,
-        messages: [{ role:'user', content: [ ...images, { type:'text', text: prompt } ] }],
-      }),
-    });
-    if(!resp.ok){
-      const errBody = await resp.text().catch(()=>'');
-      throw new Error('API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,200) : ''));
-    }
-    const data = await resp.json();
-    const text = (data.content||[]).map(b=>b.text||'').join('').trim();
-    return fpExtractJson(text);
-  }
-
-  async function fpAnalyzePhotosOpenAI(files, notes){
-    const proxyUrl = fpGetOpenAiProxyUrl();
-    if(!proxyUrl) throw new Error('Set your proxy Worker URL first (see cloudflare-worker/README.md).');
-    const images = await Promise.all(files.map(async f=>({
-      type:'image_url',
-      image_url:{ url: `data:image/jpeg;base64,${await fpFileToDownscaledBase64(f)}` },
-    })));
-    const prompt = fpAnalyzePrompt(notes, files.length>0);
-
-    const resp = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'authorization': 'Bearer ' + fpGetOpenAiKey(),
-      },
-      body: JSON.stringify({
-        model: 'gpt-6-astra',
-        max_completion_tokens: 16384,
-        response_format: { type: 'json_object' },
-        messages: [{ role:'user', content: [ ...images, { type:'text', text: prompt } ] }],
-      }),
-    });
-    if(!resp.ok){
-      const errBody = await resp.text().catch(()=>'');
-      throw new Error('API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,200) : ''));
-    }
-    const data = await resp.json();
-    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-    return fpExtractJson(text);
-  }
-
-  // Shared by both the photo-generation and text-edit flows -- takes an API
-  // response shaped like the JSON schema in fpAnalyzePrompt() and replaces
-  // the current plan with it, preserving title from the current plan when
-  // the response doesn't specify its own.
-  function fpApplyGeneratedPlan(result){
-    const prev = fpState;
-    const elements = (Array.isArray(result.elements)?result.elements:[]).map(raw=>{
-      const id = fpIdSeq++;
-      const type = ['line','dashedline','door','window','rect','square','circle','oval'].includes(raw.type) ? raw.type : 'line';
-      if(fpIsLineType(type)){
-        return { id, type, x1:fpSnap(Number(raw.x1)||0), y1:fpSnap(Number(raw.y1)||0), x2:fpSnap(Number(raw.x2)||0), y2:fpSnap(Number(raw.y2)||0), color:'#8b8d8e' };
-      }
-      if(type==='circle'){
-        return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), r:Math.max(FP_GRID_STEP, fpSnap(Number(raw.r)||1)), color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
-      }
-      return { id, type, cx:fpSnap(Number(raw.cx)||0), cy:fpSnap(Number(raw.cy)||0), w:Math.max(FP_GRID_STEP, fpSnap(Number(raw.w)||1)), h:Math.max(FP_GRID_STEP, fpSnap(Number(raw.h)||1)), rot:Number(raw.rot)||0, color:'#8b8d8e', fill:'rgba(139,141,142,.06)' };
-    });
-    const objects = (Array.isArray(result.objects)?result.objects:[]).map(o=>({
-      id: fpIdSeq++, label:String(o.label||''), shape:'rect', icon:'plain',
-      w:Math.max(4, Number(o.w)||24), d:Math.max(4, Number(o.d)||24),
-      cx:Number(o.cx)||0, cy:Number(o.cy)||0, rot:Number(o.rot)||0,
-    }));
-    fpState = {
-      title: typeof result.title==='string' && result.title.trim() ? result.title.trim() : (prev && prev.title) || 'Generated Floor Plan',
-      elements, objects,
-      notes: Array.isArray(result.notes) ? result.notes.map(String) : ((prev && prev.notes) || []),
-    };
-    fpDeselect();
-    document.getElementById('fpTitle').textContent = fpState.title;
-    fpSave(); fpRender();
-  }
-
 
   // ---------- PWA: manual backup / restore of the floor plan (Steps 6/6b/7/7a) ----------
   // The floor plan (title/elements/objects/notes, stored
