@@ -22,18 +22,60 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-tap-highlight-color:transparent; overscroll-behavior:none;
   }
+  /* The toolbar (Draw/Select/Copy/Delete/Clear plan/etc, moved in from the
+     floor plan screen -- see the header markup below) now lives inside this
+     sticky header alongside the title, so it stays permanently on-screen
+     while scrolling instead of disappearing with the rest of the page. The
+     house-mark logo sits beside a stretched two-row column (title row, then
+     toolbar row) rather than its own row, so that column's *combined*
+     height -- not just the title's -- matches the mark's, instead of
+     stacking a whole extra row's height on top of it. */
   header{
-    display:flex; flex-direction:column; gap:.25rem; padding:.75rem 1rem;
+    display:flex; flex-direction:column; padding:.4rem 1rem;
     border-bottom:1px solid var(--border); background:var(--panel);
     position:sticky; top:0; z-index:20;
   }
-  header .headerTop{ display:flex; align-items:center; gap:.6rem; }
-  header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; }
+  header .headerTop{ display:flex; align-items:stretch; gap:.6rem; }
+  header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; flex:none; }
   header h1 img{ height:3.4rem; width:auto; display:block; border-radius:6px; }
   header h1 .header-mark{ height:5.98rem; width:5.98rem; border-radius:50%; flex:none; }
   header .spacer{flex:1;}
+  header .headerRight{
+    display:flex; flex-direction:column; justify-content:space-between;
+    flex:1; min-width:0; gap:.2rem;
+  }
+  header .headerTitleRow{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+  /* Below the desktop breakpoint there usually isn't room for title + every
+     view-toggle + every icon on one line -- without this, the zoom/Grid/
+     Labels/Dimensions group gets squeezed into whatever sliver is left
+     between them instead of wrapping, and being a wrapping flex container
+     itself, it then piles its 7 buttons into many stacked internal rows,
+     ballooning the (sticky!) header to cover most of the screen. Giving it
+     the full row's width instead makes it wrap at most once, as its own
+     single line under the title. */
+  @media (max-width:899px){
+    .fp-zoom-row{ flex-basis:100%; justify-content:flex-start; }
+    /* Below the desktop breakpoint, the wordmark logo alone is wide enough
+       to leave almost no room for title+toggles+icons squeezed into the
+       same row beside it -- stack the logo above that block instead of
+       fighting it for space, so headerRight gets the full row width. */
+    header .headerTop{ flex-direction:column; align-items:center; }
+    header h1{ align-self:stretch; justify-content:center; }
+    header .headerRight{ width:100%; }
+  }
+  /* The toolbar's own default card look (background/border/margin, see
+     .toolbar) is redundant a second time nested inside the header panel --
+     trimmed here so it reads as this row of the header, not a boxed-in
+     panel floating inside another panel. */
+  header .fp-toolbar{ margin-bottom:0; padding:.35rem .5rem; }
 
-  main{max-width:1180px; margin:0 auto; padding:1rem;}
+  /* Left-justified (not auto-centered) and much wider than before -- with
+     the Objects/Notes panel fixed at 300px and the Favorites rail thin, the
+     canvas (the .fp-layout grid's only flexible 1fr column) ends up
+     absorbing most of this width, landing around 2/3 of the screen on
+     typical laptop/desktop viewports instead of a cramped, centered 1180px
+     box with wasted margins on either side. */
+  main{max-width:1800px; margin:0; padding:.6rem 1rem 1rem;}
 
   /* ---------- Buttons: one consistent look for every key action/mode control.
      Hierarchy comes from label and position, not from mixing filled/outline/pill
@@ -171,7 +213,53 @@
   .fp-context-submenu.fp-flip-x{ left:auto; right:100%; margin-left:0; margin-right:.3rem; }
   .fp-context-submenu.fp-flip-y{ top:auto; bottom:-.3rem; }
   .fp-layout{ display:grid; grid-template-columns:1fr; gap:.9rem; align-items:start; }
-  @media (min-width:900px){ .fp-layout{ grid-template-columns:1fr 300px; } }
+  @media (min-width:900px){ .fp-layout{ grid-template-columns:auto 1fr 300px; } }
+
+  /* ---------- Favorites: a thin, always-visible rail (left of the canvas on
+     desktop, a row above it on narrow screens) so a handful of go-to graphics
+     don't require reopening the Objects accordion every time. Populated by
+     right-clicking any graphic -- in Objects or here -- to toggle it in/out
+     (see fpToggleFavorite()/fpOpenLibItemMenu()). Thumbnail-sized entries,
+     not full library cards, are what keep this bar thin. */
+  .fp-fav-bar{
+    display:flex; flex-direction:column; align-items:center; gap:.5rem;
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:.6rem .4rem; width:4.4rem;
+  }
+  @media (min-width:900px){
+    .fp-fav-bar{ position:sticky; top:5.5rem; max-height:calc(100vh - 7rem); }
+  }
+  .fp-fav-bar-head{
+    color:var(--danger); display:flex; align-items:center; justify-content:center;
+    padding-bottom:.5rem; margin-bottom:.1rem; border-bottom:1px solid var(--border); width:100%;
+  }
+  .fp-fav-list{
+    display:flex; flex-direction:column; gap:.4rem; width:100%;
+    overflow-y:auto; min-height:0;
+  }
+  .fp-fav-item{
+    position:relative; width:100%; aspect-ratio:1; padding:.2rem; border-radius:8px; border:1px solid var(--border);
+    background:var(--panel2); cursor:grab; display:flex; align-items:center; justify-content:center;
+  }
+  .fp-fav-item:hover{ border-color:var(--accent); }
+  .fp-fav-item:active{ cursor:grabbing; }
+  .fp-fav-item img{ width:100%; height:100%; object-fit:contain; }
+  .fp-fav-empty{ font-size:.62rem; color:var(--dim); text-align:center; padding:.2rem .1rem; }
+
+  /* Favorite-toggle heart badge overlaid in a card's corner -- see
+     fpMakeFavHeartBtn(). Faint by default (still tappable on touch, which
+     has no hover) and full-strength on hover/focus or once favorited, so a
+     favorited item's red heart stays visible as a status indicator even
+     without hovering. */
+  .fp-fav-heart-btn{
+    position:absolute; top:1px; right:1px; z-index:1; width:1.05rem; height:1.05rem;
+    padding:0; border:none; background:transparent; color:var(--dim); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; opacity:.55;
+  }
+  .fp-fav-heart-btn svg{ width:100%; height:100%; }
+  .fp-fav-heart-btn:hover, .fp-fav-heart-btn:focus-visible, .fp-fav-heart-btn.is-fav{ opacity:1; }
+  .fp-fav-heart-btn.is-fav{ color:var(--danger); }
+  .fp-fav-heart-btn:hover:not(.is-fav){ color:var(--text); }
 
   .fp-main{
     background:var(--panel); border:1px solid var(--border); border-radius:12px;
@@ -182,21 +270,31 @@
     other, growing a little on every re-render (i.e. on every edit). */
   }
   .fp-title{
-    margin:.1rem 0 .7rem; font-size:1.15rem; font-weight:700; color:#228B22;
-    outline:none; border-radius:6px; padding:.15rem .3rem; display:inline-block;
+    margin:0; font-size:.88rem; font-weight:700; color:#228B22;
+    outline:none; border-radius:6px; padding:.15rem .3rem;
+    flex:0 1 auto; min-width:0; max-width:16rem;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
     /* Embossed: a light highlight above-left plus a dark shadow below-right
        reads as raised/pressed-into-the-page, rather than a flat drop shadow. */
     text-shadow: -1px -1px 0 rgba(255,255,255,.55), 1px 1px 1.5px rgba(0,0,0,.45);
   }
   .fp-title:hover, .fp-title:focus{ background:var(--panel2); }
+  /* While actually editing, let the full title show/wrap rather than staying
+     ellipsis-clipped to the row's tight max-width. */
+  .fp-title:focus{ overflow:visible; white-space:normal; max-width:24rem; }
+  /* Lives in the header's title row now (see markup below), centered in the
+     space between the left-justified title and the right-side icons -- flex:1
+     so it actually has that space to center within, rather than just
+     clumping next to whichever neighbor comes first. */
   .fp-zoom-row{
-    display:flex; align-items:center; gap:.4rem; margin:0 0 .5rem;
+    display:flex; align-items:center; justify-content:center; flex-wrap:wrap;
+    gap:.4rem; flex:1; min-width:0;
   }
   .fp-zoom-btn{ padding:.15rem .55rem; min-width:2rem; }
   .fp-canvas-wrap{
     overflow:auto; border-radius:10px;
     background:radial-gradient(ellipse at 50% 40%, #f4f5f7 0%, #e6e9ec 100%);
-    padding:40px;
+    padding:10px;
   }
   .fp-canvas{
     position:relative; background:#ffffff;
@@ -253,7 +351,7 @@
   .fp-item-label{
     position:absolute; left:50%; bottom:100%; margin-bottom:.3rem; transform:translateX(-50%);
     font-size:.68rem; font-weight:600; color:var(--text); outline:none;
-    max-width:160%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    min-width:5rem; max-width:160%; white-space:normal; word-break:break-word; text-align:center;
     padding:0; cursor:pointer;
   }
   .fp-item-label.placeholder{ color:var(--dim); font-style:italic; font-weight:500; }
@@ -286,6 +384,15 @@
     background:var(--accent); border:1.5px solid #0a1512; cursor:pointer; display:none; z-index:2;
   }
   .fp-item.selected:not(.fp-multi-selected) .fp-obj-node{ display:block; }
+  /* Label spin handle -- see fpWireDraggableLabel(). Visibility is set
+     directly in JS (selected furniture objects and walls/lines don't share
+     one common ancestor class to key a CSS rule off of), so no display rule
+     here beyond the resting visual style. */
+  .fp-label-spin-handle{
+    position:absolute; left:100%; top:50%; margin-left:.3rem; transform:translateY(-50%);
+    width:8px; height:8px; border-radius:50%; background:var(--warn);
+    cursor:grab; z-index:2;
+  }
   .fp-obj-node.nw{ left:0; top:0; } .fp-obj-node.ne{ left:100%; top:0; }
   .fp-obj-node.sw{ left:0; top:100%; } .fp-obj-node.se{ left:100%; top:100%; }
   .fp-obj-node.n{ left:50%; top:0; } .fp-obj-node.s{ left:50%; top:100%; }
@@ -335,7 +442,7 @@
   .fp-lib-cat[open] summary::before{ transform:rotate(90deg); }
   .fp-lib-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:.4rem; padding:.3rem 0 .5rem; }
   .fp-lib-item{
-    background:var(--panel2); border:1px solid var(--border); border-radius:8px;
+    position:relative; background:var(--panel2); border:1px solid var(--border); border-radius:8px;
     padding:.3rem .2rem .35rem; cursor:grab; display:flex; flex-direction:column;
     align-items:center; gap:.2rem;
   }
@@ -392,6 +499,10 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
   #fpPrintContainer{ display:none; }
+  /* Floor plans are wider than tall by default (see FP_GRID_MIN_W/H) --
+     default the print/PDF page to landscape to match, instead of clipping a
+     wide plan down to a portrait page. */
+  @page{ size: landscape; }
   @media print{
     body.fp-printing > *:not(#fpPrintContainer){ display:none !important; }
     body.fp-printing #fpPrintContainer{ display:block !important; }
@@ -471,94 +582,8 @@
 <header>
   <div class="headerTop">
     <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
-    <div class="spacer"></div>
-    <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
-    <div class="fp-opening-dd" id="fpToolboxDd">
-      <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Projects, Save As, Backup, Restore">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
-      </button>
-      <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxBackup">Backup</button>
-        <button type="button" class="fp-opening-dd-item" id="fpToolboxRestore">Restore&hellip;</button>
-        <input type="file" id="fpToolboxLoadProjectInput" accept="application/json,.json" style="display:none;">
-        <input type="file" id="fpToolboxRestoreInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">
-      </div>
-    </div>
-    <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-    </button>
-    <button class="btn topbar-icon-btn" id="infoBtn" title="Settings">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </button>
-  </div>
-</header>
-
-<main>
-
-  <!-- ============ FLOOR PLAN SCREEN ============ -->
-  <section id="floorplanScreen">
-    <div class="toolbar fp-toolbar">
-      <div class="segGroup" id="fpModeGroup">
-        <button class="btn fp-key-btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
-      </div>
-      <select class="fp-key-btn" id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
-        <option value="line">Solid line</option>
-        <option value="dashedline">Dashed line</option>
-        <option value="rect">Rectangle</option>
-        <option value="square">Square</option>
-        <option value="circle">Circle</option>
-        <option value="oval">Oval</option>
-      </select>
-      <div class="fp-opening-dd" id="fpOpeningDd">
-        <button type="button" class="btn fp-key-btn" id="fpOpeningDdBtn" title="Draw an opening, window, or door -- click two points anywhere, including a blank area">
-          <svg id="fpOpeningDdIcon" viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>
-          <span id="fpOpeningDdLabel">+ Opening</span>
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div class="fp-opening-dd-menu" id="fpOpeningDdMenu" hidden>
-          <button type="button" class="fp-opening-dd-item" data-tool="opening"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>Opening</button>
-          <button type="button" class="fp-opening-dd-item" data-tool="window"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#b8860b" stroke-width="2" stroke-linecap="round" stroke-dasharray="9,6"/></svg>Window</button>
-          <button type="button" class="fp-opening-dd-item" data-tool="door"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="3" x2="27" y2="3" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="27" y2="7" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/></svg>Door</button>
-        </div>
-      </div>
-      <button class="btn fp-key-btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
-      <div class="fp-opening-dd" id="fpCopyDd">
-        <button type="button" class="btn fp-key-btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
-          Copy
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div class="fp-opening-dd-menu" id="fpCopyDdMenu" hidden>
-          <button type="button" class="fp-opening-dd-item" id="fpCopySelectionBtn">Copy</button>
-          <button type="button" class="fp-opening-dd-item" id="fpCopyAllBtn">Copy all</button>
-          <button type="button" class="fp-opening-dd-item" id="fpPasteBtn" disabled title="Paste the last item copied with Copy">Paste</button>
-          <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
-        </div>
-      </div>
-      <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
-      <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
-      <div class="divider"></div>
-      <div class="spacer"></div>
-      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Copy this plan and open Gemini to sign in and try a 3D render yourself -- our own in-app 3D generation is still being wired up">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <defs>
-            <linearGradient id="fpGeminiGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#4285F4"/>
-              <stop offset="0.5" stop-color="#9B72CB"/>
-              <stop offset="1" stop-color="#D96570"/>
-            </linearGradient>
-          </defs>
-          <path fill="url(#fpGeminiGrad)" d="M12 2c0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10 0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10Z"/>
-        </svg>
-      </button>
-      <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
-      <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
-    </div>
-
-    <div class="fp-layout">
-      <div class="fp-main">
+    <div class="headerRight">
+      <div class="headerTitleRow">
         <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Project Title</h2>
         <div class="fp-zoom-row">
           <button class="btn fp-zoom-btn" id="fpZoomOut" title="Zoom out">&minus;</button>
@@ -566,7 +591,105 @@
           <button class="btn fp-zoom-btn" id="fpZoomIn" title="Zoom in">+</button>
           <button class="btn fp-zoom-btn" id="fpZoomFit" title="Reset to fit the screen">Fit</button>
           <button class="btn fp-zoom-btn" id="fpGridToggle" title="Show or hide the grid lines">Grid</button>
+          <button class="btn fp-zoom-btn" id="fpLabelsToggle" title="Show or hide furniture/wall labels">Labels</button>
+          <button class="btn fp-zoom-btn" id="fpDimensionsToggle" title="Show or hide dimensions in labels">Dimensions</button>
         </div>
+        <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
+        <div class="fp-opening-dd" id="fpToolboxDd">
+          <button type="button" class="btn topbar-icon-btn" id="fpToolboxBtn" title="File tools: Projects, Save As, Backup, Restore">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="1"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          </button>
+          <div class="fp-opening-dd-menu fp-toolbox-dd-menu" id="fpToolboxDdMenu" hidden>
+            <button type="button" class="fp-opening-dd-item" id="fpToolboxProjects">Projects</button>
+            <button type="button" class="fp-opening-dd-item" id="fpToolboxLoadProject">Load Project&hellip;</button>
+            <button type="button" class="fp-opening-dd-item" id="fpToolboxSaveAs">Save As&hellip;</button>
+            <button type="button" class="fp-opening-dd-item" id="fpToolboxBackup">Backup</button>
+            <button type="button" class="fp-opening-dd-item" id="fpToolboxRestore">Restore&hellip;</button>
+            <input type="file" id="fpToolboxLoadProjectInput" accept="application/json,.json" style="display:none;">
+            <input type="file" id="fpToolboxRestoreInput" accept="application/json,.json,.js,text/javascript,application/javascript" multiple style="display:none;">
+          </div>
+        </div>
+        <button class="btn topbar-icon-btn" id="printBtn" title="Print this floor plan">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        </button>
+        <button class="btn topbar-icon-btn" id="infoBtn" title="Settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+
+      <div class="toolbar fp-toolbar">
+        <div class="segGroup" id="fpModeGroup">
+          <button class="btn fp-key-btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
+        </div>
+        <select class="fp-key-btn" id="fpDrawToolSelect" title="What Draw mode places on the next click/drag">
+          <option value="line">Solid line</option>
+          <option value="dashedline">Dashed line</option>
+          <option value="rect">Rectangle</option>
+          <option value="square">Square</option>
+          <option value="circle">Circle</option>
+          <option value="oval">Oval</option>
+        </select>
+        <div class="fp-opening-dd" id="fpOpeningDd">
+          <button type="button" class="btn fp-key-btn" id="fpOpeningDdBtn" title="Draw an opening, window, or door -- click two points anywhere, including a blank area">
+            <svg id="fpOpeningDdIcon" viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>
+            <span id="fpOpeningDdLabel">+ Opening</span>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="fp-opening-dd-menu" id="fpOpeningDdMenu" hidden>
+            <button type="button" class="fp-opening-dd-item" data-tool="opening"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#1c2128" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,5"/></svg>Opening</button>
+            <button type="button" class="fp-opening-dd-item" data-tool="window"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="5" x2="27" y2="5" stroke="#b8860b" stroke-width="2" stroke-linecap="round" stroke-dasharray="9,6"/></svg>Window</button>
+            <button type="button" class="fp-opening-dd-item" data-tool="door"><svg viewBox="0 0 28 10" width="28" height="10"><line x1="1" y1="3" x2="27" y2="3" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="7" x2="27" y2="7" stroke="#7a4a24" stroke-width="2" stroke-linecap="round"/></svg>Door</button>
+          </div>
+        </div>
+        <button class="btn fp-key-btn" id="fpModeSelectBtn" data-mode="select" title="Select, move, reshape or rotate what's on the plan">Select</button>
+        <div class="fp-opening-dd" id="fpCopyDd">
+          <button type="button" class="btn fp-key-btn" id="fpCopyDdBtn" title="Copy an image of the plan to the clipboard, to paste into Word, Slack, etc.">
+            Copy
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="fp-opening-dd-menu" id="fpCopyDdMenu" hidden>
+            <button type="button" class="fp-opening-dd-item" id="fpCopySelectionBtn">Copy</button>
+            <button type="button" class="fp-opening-dd-item" id="fpCopyAllBtn">Copy all</button>
+            <button type="button" class="fp-opening-dd-item" id="fpPasteBtn" disabled title="Paste the last item copied with Copy">Paste</button>
+            <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
+          </div>
+        </div>
+        <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
+        <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
+        <div class="divider"></div>
+        <div class="spacer"></div>
+        <button class="btn fp-key-btn" id="fp3dViewBtn" title="Copy this plan and open Gemini to sign in and try a 3D render yourself -- our own in-app 3D generation is still being wired up">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <defs>
+              <linearGradient id="fpGeminiGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#4285F4"/>
+                <stop offset="0.5" stop-color="#9B72CB"/>
+                <stop offset="1" stop-color="#D96570"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#fpGeminiGrad)" d="M12 2c0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10 0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10Z"/>
+          </svg>
+        </button>
+        <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
+        <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ FLOOR PLAN SCREEN ============ -->
+  <section id="floorplanScreen">
+    <div class="fp-layout">
+      <aside class="fp-fav-bar" id="fpFavBar" hidden>
+        <div class="fp-fav-bar-head" title="Favorites — hover the heart on any graphic to add or remove">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 21s-6.72-4.35-9.33-8.2C.86 10.1 1.4 6.6 4.2 5.02c2.04-1.16 4.54-.62 5.8 1.09L12 8.6l2-2.49c1.26-1.71 3.76-2.25 5.8-1.09 2.8 1.58 3.34 5.08 1.53 7.78C18.72 16.65 12 21 12 21Z"/></svg>
+        </div>
+        <div class="fp-fav-list" id="fpFavList"></div>
+      </aside>
+
+      <div class="fp-main">
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
           <div class="fp-canvas" id="fpCanvas"></div>
         </div>
@@ -667,7 +790,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+35d58ce4';
+  const APP_VERSION = '1.0+cf0015b3';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1296,27 +1419,7 @@
       { label:'Cork Flooring', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-cork-flooring.png' },
       { label:'Rubber Flooring (Studded)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-rubber-flooring-studded.png' },
     ]},
-    { name:'Wall Fixtures & Art', items:[
-      { label:'Square Abstract (Wood Frame)', shape:'rect', w:24, d:24, icon:'image', img:'./library/wm-square-abstract.png' },
-      { label:'Vertical Landscape (Dots Art)', shape:'rect', w:20, d:30, icon:'image', img:'./library/wm-vertical-landscape.png' },
-      { label:'Horizontal Seascape (Dots Art)', shape:'rect', w:36, d:24, icon:'image', img:'./library/wm-horizontal-seascape.png' },
-      { label:'Oval Portrait (Gilded Frame)', shape:'oval', w:18, d:24, icon:'image', img:'./library/wm-oval-portrait.png' },
-      { label:'Triptych (Set of 3, Dots Art)', shape:'rect', w:36, d:14, icon:'image', img:'./library/wm-triptych.png' },
-      { label:'Framed Dots Art (Thin Black)', shape:'rect', w:24, d:30, icon:'image', img:'./library/wm-framed-dots-art.png' },
-      { label:'Round Dots Art (Decorative Frame)', shape:'circle', w:24, d:24, icon:'image', img:'./library/wm-round-dots-art.png' },
-      { label:'Gallery Wrap Canvas (Dots Art)', shape:'rect', w:30, d:30, icon:'image', img:'./library/wm-gallery-wrap-canvas.png' },
-      { label:'Oversized Dots Art (Large Art)', shape:'rect', w:48, d:36, icon:'image', img:'./library/wm-oversized-dots-art.png' },
-      { label:'Set of Four Minis (Dots Art)', shape:'rect', w:20, d:20, icon:'image', img:'./library/wm-set-of-four-minis.png' },
-      { label:'Round Mirror (Thin Brass Frame)', shape:'circle', w:30, d:30, icon:'image', img:'./library/wm-round-mirror.png' },
-      { label:'Rectangular Mirror (Teak Wood Frame)', shape:'rect', w:24, d:36, icon:'image', img:'./library/wm-rectangular-mirror.png' },
-      { label:'Ornate Baroque Mirror (Gilded)', shape:'rect', w:26, d:34, icon:'image', img:'./library/wm-ornate-baroque-mirror.png' },
-      { label:'Sunburst Mirror (Decorative)', shape:'circle', w:32, d:32, icon:'image', img:'./library/wm-sunburst-mirror.png' },
-      { label:'Oval Mirror (Polished Nickel Frame)', shape:'oval', w:24, d:36, icon:'image', img:'./library/wm-oval-mirror.png' },
-      { label:'Arch Top Mirror (Black Frame)', shape:'rect', w:24, d:40, icon:'image', img:'./library/wm-arch-top-mirror.png' },
-      { label:'Bevelled Edge Mirror (Frameless)', shape:'rect', w:24, d:30, icon:'image', img:'./library/wm-bevelled-edge-mirror.png' },
-      { label:'Square Mirror (Rattan Frame)', shape:'rect', w:28, d:28, icon:'image', img:'./library/wm-square-mirror.png' },
-      { label:'Full-Length Wall Mirror (Slender Frame)', shape:'rect', w:18, d:60, icon:'image', img:'./library/wm-full-length-mirror.png' },
-      { label:'Geometric Mirror', shape:'rect', w:24, d:28, icon:'image', img:'./library/wm-geometric-mirror.png' },
+    { name:'Wall Fixtures', items:[
       { label:'Traditional Candle Sconce (Brass)', shape:'rect', w:6, d:14, icon:'image', img:'./library/wm-candle-sconce.png' },
       { label:'Modern Cone Sconce', shape:'rect', w:6, d:10, icon:'image', img:'./library/wm-cone-sconce.png' },
       { label:'Art Deco Sconce (Glass & Chrome)', shape:'rect', w:8, d:14, icon:'image', img:'./library/wm-art-deco-sconce.png' },
@@ -1386,6 +1489,7 @@
   const FP_IMAGE_DEFAULT_EDGE_IN = 16.8; // in -- longer side of a freshly-uploaded image (30% smaller than the original 24in default); resizable afterward like any object. The seeded SBI logo below is sized independently, deliberately larger.
   const FP_IMAGE_MAX_EDGE_PX = 900; // downscale uploads so a phone photo doesn't balloon storage for what's ultimately a small icon
   const FP_SBI_LOGO_SEED = { id:'seed-sbi-logo', label:'Simply Beautiful Interiors', img:'./SBI_Logo_transparent.png', w:36, d:7.05 };
+  const FP_BEADS_SEED = { id:'seed-beads', label:'Beads & Buttons', img:'./SBI_Logo_mini.jpg', w:16.8, d:12.6 };
   function fpGetImageLibrary(){
     let list;
     try{
@@ -1393,7 +1497,7 @@
       if(raw) list = JSON.parse(raw);
     }catch(e){}
     if(!list){
-      list = [Object.assign({}, FP_SBI_LOGO_SEED)];
+      list = [Object.assign({}, FP_SBI_LOGO_SEED), Object.assign({}, FP_BEADS_SEED)];
       fpSaveImageLibrary(list);
       return list;
     }
@@ -1406,9 +1510,104 @@
       Object.assign(sbi, FP_SBI_LOGO_SEED);
       fpSaveImageLibrary(list);
     }
+    // One-time seed for the beads-and-buttons sample graphic on a library
+    // that already existed (in localStorage) before this entry was added.
+    if(!list.find(x=>x.id==='seed-beads')){
+      list.push(Object.assign({}, FP_BEADS_SEED));
+      fpSaveImageLibrary(list);
+    }
     return list;
   }
   function fpSaveImageLibrary(list){ try{ localStorage.setItem(FP_IMAGE_LIB_KEY, JSON.stringify(list)); }catch(e){} }
+
+  // ---------- Favorites: any graphic (a furniture/material item from
+  // FP_LIBRARY, or an uploaded image) right-clicked into this list, keyed by
+  // its own img path/data-URL since that's the one field every such graphic
+  // has and it's unique per graphic. Stored as a standalone snapshot (not a
+  // reference back into FP_LIBRARY/the image library) so a favorite still
+  // renders correctly even if the source upload is later removed.
+  const FP_FAVORITES_KEY = 'floorplanner-favorites';
+  function fpGetFavorites(){
+    let list;
+    try{
+      const raw = localStorage.getItem(FP_FAVORITES_KEY);
+      if(raw) list = JSON.parse(raw);
+    }catch(e){}
+    if(!Array.isArray(list)) list = [];
+    // One-time seed: the beads-and-buttons sample graphic (see FP_BEADS_SEED
+    // above) ships pre-favorited so the new Favorites rail isn't empty on
+    // first load, and self-heals back in if a user somehow lost it.
+    if(!list.find(f=>f.img===FP_BEADS_SEED.img)){
+      list.unshift(Object.assign({ shape:'rect', icon:'image' }, FP_BEADS_SEED));
+      fpSaveFavorites(list);
+    }
+    return list;
+  }
+  function fpSaveFavorites(list){ try{ localStorage.setItem(FP_FAVORITES_KEY, JSON.stringify(list)); }catch(e){} }
+  function fpIsFavorite(tpl){ return fpGetFavorites().some(f=>f.img===tpl.img); }
+  function fpToggleFavorite(tpl){
+    const list = fpGetFavorites();
+    const idx = list.findIndex(f=>f.img===tpl.img);
+    if(idx>=0) list.splice(idx,1);
+    else list.push({ label:tpl.label, shape:tpl.shape||'rect', icon:tpl.icon||'image', img:tpl.img, w:tpl.w, d:tpl.d });
+    fpSaveFavorites(list);
+    fpRefreshFavoritesBar();
+  }
+  function fpRefreshFavoritesBar(){
+    const bar = document.getElementById('fpFavBar');
+    const list = document.getElementById('fpFavList');
+    if(!bar || !list) return;
+    const favorites = fpGetFavorites();
+    bar.hidden = favorites.length===0;
+    list.innerHTML = '';
+    favorites.forEach(entry=>{
+      const tpl = { label:entry.label, shape:entry.shape||'rect', icon:entry.icon||'image', img:entry.img, w:entry.w, d:entry.d };
+      // A <div>, not a <button> -- it needs to contain its own nested heart
+      // <button> (see fpMakeFavHeartBtn() below), and a <button> can't
+      // contain another <button> per the HTML spec.
+      const btn = document.createElement('div');
+      btn.className = 'fp-fav-item'; btn.draggable = true; btn.tabIndex = 0; btn.setAttribute('role','button');
+      btn.title = `${entry.label} — drag onto the grid, or tap to add at center`;
+      btn.innerHTML = `<img src="${entry.img}" alt="">`;
+      btn.addEventListener('click', ()=> fpAddObjectFromTemplate(tpl));
+      btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fpAddObjectFromTemplate(tpl); } });
+      btn.addEventListener('dragstart', (e)=>{
+        e.dataTransfer.setData('application/json', JSON.stringify(tpl));
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+      btn.appendChild(fpMakeFavHeartBtn(tpl));
+      list.appendChild(btn);
+    });
+  }
+
+  const FP_HEART_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-6.72-4.35-9.33-8.2C.86 10.1 1.4 6.6 4.2 5.02c2.04-1.16 4.54-.62 5.8 1.09L12 8.6l2-2.49c1.26-1.71 3.76-2.25 5.8-1.09 2.8 1.58 3.34 5.08 1.53 7.78C18.72 16.65 12 21 12 21Z"/></svg>';
+  // A small heart badge overlaid on every graphic card -- in the Objects
+  // accordion, Uploads, or the Favorites rail itself -- that toggles it
+  // in/out of Favorites on click. Clicking anywhere else on the card still
+  // drags or adds it as before (see the click/dragstart handlers around each
+  // call site) -- stopPropagation here, plus draggable=false so a drag can't
+  // accidentally start by pressing on the heart, are what keep the two
+  // clickable regions from interfering with each other. A native title
+  // attribute (not a custom tooltip) shows "Favorite"/"Remove from
+  // Favorites" on hover, matching every other button's hint in this app.
+  function fpMakeFavHeartBtn(tpl){
+    const heart = document.createElement('button');
+    heart.type = 'button'; heart.draggable = false;
+    heart.innerHTML = FP_HEART_SVG;
+    function sync(){
+      const isFav = fpIsFavorite(tpl);
+      heart.className = 'fp-fav-heart-btn' + (isFav ? ' is-fav' : '');
+      heart.title = isFav ? 'Remove from Favorites' : 'Favorite';
+    }
+    sync();
+    heart.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      fpToggleFavorite(tpl);
+      sync(); // updates this specific badge immediately; fpToggleFavorite already rebuilds the Favorites rail itself
+    });
+    heart.addEventListener('dragstart', (e)=> e.stopPropagation());
+    return heart;
+  }
 
   function fpReadImageFile(file){
     return new Promise((resolve, reject)=>{
@@ -1459,15 +1658,20 @@
 
     fpGetImageLibrary().forEach(entry=>{
       const tpl = { label:entry.label, shape:'rect', icon:'image', img:entry.img, w:entry.w, d:entry.d };
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'fp-lib-item'; btn.draggable = true;
+      // A <div>, not a <button> -- it needs to contain its own nested heart
+      // <button> (see fpMakeFavHeartBtn() below), and a <button> can't
+      // contain another <button> per the HTML spec.
+      const btn = document.createElement('div');
+      btn.className = 'fp-lib-item'; btn.draggable = true; btn.tabIndex = 0; btn.setAttribute('role','button');
       btn.title = `${entry.label} — drag onto the grid, or tap to add at center`;
       btn.innerHTML = `<img src="${entry.img}" alt=""><span>${fpEscapeHtml(entry.label)}</span>`;
       btn.addEventListener('click', ()=> fpAddObjectFromTemplate(tpl));
+      btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fpAddObjectFromTemplate(tpl); } });
       btn.addEventListener('dragstart', (e)=>{
         e.dataTransfer.setData('application/json', JSON.stringify(tpl));
         e.dataTransfer.effectAllowed = 'copy';
       });
+      btn.appendChild(fpMakeFavHeartBtn(tpl));
       grid.appendChild(btn);
     });
   }
@@ -1477,13 +1681,28 @@
   // pre-rotation -- frame, so it stays anchored to the entity wherever that
   // entity itself moves or rotates) while a plain tap/click still opens its
   // details modal. Shared by furniture objects and structural lines alike.
-  function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick){
+  function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick, selected){
+    // The label's own on-screen angle is kept independent of the entity's
+    // rotation -- item.labelRot (default 0) is the ABSOLUTE screen angle the
+    // text is drawn at, so by default (labelRot unset) text stays upright
+    // and readable no matter how far the object/wall itself is turned,
+    // instead of inheriting rotDeg and ending up upside down or sideways.
+    // Subtracting rotDeg here is what cancels out the entity's own rotation.
     function reposition(){
       const dx = item.labelDx!=null ? item.labelDx : defaultDx;
       const dy = item.labelDy!=null ? item.labelDy : defaultDy;
+      // Furniture objects always carry their own live item.rot -- read it
+      // fresh here (rather than the rotDeg snapshot from when this label was
+      // created) so a call to this same reposition() from the object's own
+      // rotate-handle drag (see its onMove below) reflects the in-progress
+      // angle, not the angle from the last full render. Lines/walls have no
+      // .rot field at all, so they fall back to the fixed rotDeg (always 0).
+      const liveRotDeg = item.rot!=null ? item.rot : rotDeg;
+      const labelDeg = (item.labelRot||0) - (liveRotDeg||0);
       Object.assign(label.style, {
         left:(centerPx.x + dx*scale)+'px', top:(centerPx.y + dy*scale)+'px',
-        right:'auto', bottom:'auto', marginBottom:'0', transform:'translate(-50%,-100%)',
+        right:'auto', bottom:'auto', marginBottom:'0',
+        transform:`translate(-50%,-100%) rotate(${labelDeg}deg)`,
       });
     }
     reposition();
@@ -1515,6 +1734,40 @@
       label.addEventListener('pointerup', up);
     });
     label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!dragged) onClick(); });
+
+    // Spin handle: drag to set item.labelRot to any custom absolute angle,
+    // overriding the default upright orientation above. Only shown while
+    // selected (like the object's own rotate handle) -- display/overflow
+    // are set directly here rather than via a shared ancestor CSS class,
+    // since furniture objects (.fp-item) and walls/lines (no such wrapper)
+    // don't share one.
+    label.style.overflow = selected ? 'visible' : '';
+    const spinHandle = document.createElement('div');
+    spinHandle.className = 'fp-label-spin-handle';
+    spinHandle.title = "Drag to spin this label's text angle";
+    spinHandle.style.display = selected ? 'block' : 'none';
+    label.appendChild(spinHandle);
+    spinHandle.addEventListener('pointerdown', (e)=>{
+      e.stopPropagation();
+      e.preventDefault();
+      fpPushHistory();
+      try{ spinHandle.setPointerCapture(e.pointerId); }catch(err){}
+      function onMove(ev){
+        const rect = label.getBoundingClientRect();
+        const ccx = rect.left+rect.width/2, ccy = rect.top+rect.height/2;
+        const angle = Math.atan2(ev.clientY-ccy, ev.clientX-ccx) * 180/Math.PI;
+        item.labelRot = Math.round(angle/5)*5;
+        reposition();
+      }
+      function onUp(){
+        spinHandle.removeEventListener('pointermove', onMove);
+        spinHandle.removeEventListener('pointerup', onUp);
+        fpSave();
+      }
+      spinHandle.addEventListener('pointermove', onMove);
+      spinHandle.addEventListener('pointerup', onUp);
+    });
+    return reposition;
   }
 
   // Asks OpenAI (text-only, via a small CORS proxy Worker -- see
@@ -2964,6 +3217,12 @@
   const FP_SHOW_GRID_KEY = 'floorplanner-show-grid';
   function fpGetShowGrid(){ try{ return localStorage.getItem(FP_SHOW_GRID_KEY) !== '0'; }catch(e){ return true; } }
   function fpSetShowGrid(show){ try{ localStorage.setItem(FP_SHOW_GRID_KEY, show ? '1' : '0'); }catch(e){} }
+  const FP_SHOW_LABELS_KEY = 'floorplanner-show-labels';
+  function fpGetShowLabels(){ try{ return localStorage.getItem(FP_SHOW_LABELS_KEY) !== '0'; }catch(e){ return true; } }
+  function fpSetShowLabels(show){ try{ localStorage.setItem(FP_SHOW_LABELS_KEY, show ? '1' : '0'); }catch(e){} }
+  const FP_SHOW_DIMS_KEY = 'floorplanner-show-dimensions';
+  function fpGetShowDimensions(){ try{ return localStorage.getItem(FP_SHOW_DIMS_KEY) !== '0'; }catch(e){ return true; } }
+  function fpSetShowDimensions(show){ try{ localStorage.setItem(FP_SHOW_DIMS_KEY, show ? '1' : '0'); }catch(e){} }
 
   function fpApplyGridBackground(canvas, scale){
     if(!fpGetShowGrid()){ canvas.style.backgroundImage = 'none'; return; }
@@ -3480,14 +3739,14 @@
 
       if(fpIsLineType(el.type)){
         const hasLineLabel = !!(el.label && el.label.trim());
-        if(hasLineLabel || selected){
+        if(fpGetShowLabels() && (hasLineLabel || selected)){
           const midX = (el.x1+el.x2)/2, midY = (el.y1+el.y2)/2;
           const lineLabel = document.createElement('div');
           lineLabel.className = 'fp-item-label' + (hasLineLabel ? '' : ' placeholder');
           lineLabel.spellcheck = false;
           lineLabel.textContent = hasLineLabel ? el.label : 'Add label';
           lineLabel.title = 'Tap to edit name/length, drag to reposition';
-          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el));
+          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected);
           canvas.appendChild(lineLabel);
         }
       }
@@ -3524,6 +3783,7 @@
 
       const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
       const label = document.createElement('div');
+      let repositionLabel = null; // set below for non-room labels; re-called from the rotate handle's drag so the label's counter-rotation stays live and upright while the object itself is being spun
       if(isLabelType){
         // A room-name label IS the object -- shown plain (no dimension
         // suffix, no placeholder styling), always visible. Unlike a
@@ -3583,10 +3843,12 @@
         // the object itself rather than a separate chip that eats canvas space.
         const hasLabel = !!(item.label && item.label.trim());
         label.className = 'fp-item-label' + (hasLabel ? '' : ' placeholder');
-        label.style.display = (hasLabel || isSelected) ? '' : 'none';
-        label.textContent = hasLabel ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : 'Add label';
+        label.style.display = (fpGetShowLabels() && (hasLabel || isSelected)) ? '' : 'none';
+        label.textContent = hasLabel
+          ? (fpGetShowDimensions() ? `${item.label} (${Math.round(item.w)}×${Math.round(item.d)} in)` : item.label)
+          : 'Add label';
         label.title = 'Tap to edit name/dimensions, drag to reposition';
-        fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item));
+        repositionLabel = fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item), isSelected);
       }
       label.spellcheck = false;
       el.appendChild(label);
@@ -3686,6 +3948,7 @@
           const angle = Math.atan2(ev.clientY-ccy, ev.clientX-ccx) * 180/Math.PI + 90;
           item.rot = Math.round(angle/5)*5; // snap to 5-degree steps
           el.style.transform = `rotate(${item.rot}deg)`;
+          if(repositionLabel) repositionLabel(); // keeps the label counter-rotated (upright, or at its custom spin angle) live as the object turns, instead of only catching up on the next full render
         }
         function onUp(){
           rotHandle.removeEventListener('pointermove', onMove);
@@ -3807,20 +4070,27 @@
         const grid = document.createElement('div');
         grid.className = 'fp-lib-grid';
         cat.items.forEach(tpl=>{
-          const btn = document.createElement('button');
-          btn.type = 'button'; btn.className = 'fp-lib-item'; btn.draggable = true;
+          // A <div>, not a <button> -- it needs to contain its own nested
+          // heart <button> (see fpMakeFavHeartBtn() below), and a <button>
+          // can't contain another <button> per the HTML spec.
+          const btn = document.createElement('div');
+          btn.className = 'fp-lib-item'; btn.draggable = true; btn.tabIndex = 0; btn.setAttribute('role','button');
           btn.title = `${tpl.label} (${tpl.w}×${tpl.d}in) — drag onto the grid, or tap to add at center`;
           btn.innerHTML = `<svg viewBox="0 0 ${tpl.w} ${tpl.d}" preserveAspectRatio="xMidYMid meet">${fpIconMarkup(tpl)}</svg><span>${fpEscapeHtml(tpl.label)}</span>`;
           btn.addEventListener('click', ()=> fpAddObjectFromTemplate(tpl));
+          btn.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); fpAddObjectFromTemplate(tpl); } });
           btn.addEventListener('dragstart', (e)=>{
             e.dataTransfer.setData('application/json', JSON.stringify(tpl));
             e.dataTransfer.effectAllowed = 'copy';
           });
+          btn.appendChild(fpMakeFavHeartBtn(tpl));
           grid.appendChild(btn);
         });
         details.appendChild(grid);
         tplWrap.appendChild(details);
       });
+
+      fpRefreshFavoritesBar();
     }
 
     // Notes
@@ -4074,6 +4344,22 @@
       const show = !fpGetShowGrid();
       fpSetShowGrid(show);
       gridToggleBtn.classList.toggle('active', show);
+      fpRender();
+    });
+    const labelsToggleBtn = document.getElementById('fpLabelsToggle');
+    labelsToggleBtn.classList.toggle('active', fpGetShowLabels());
+    labelsToggleBtn.addEventListener('click', ()=>{
+      const show = !fpGetShowLabels();
+      fpSetShowLabels(show);
+      labelsToggleBtn.classList.toggle('active', show);
+      fpRender();
+    });
+    const dimensionsToggleBtn = document.getElementById('fpDimensionsToggle');
+    dimensionsToggleBtn.classList.toggle('active', fpGetShowDimensions());
+    dimensionsToggleBtn.addEventListener('click', ()=>{
+      const show = !fpGetShowDimensions();
+      fpSetShowDimensions(show);
+      dimensionsToggleBtn.classList.toggle('active', show);
       fpRender();
     });
     let fpResizeTimer = null;
