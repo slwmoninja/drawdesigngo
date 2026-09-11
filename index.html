@@ -672,7 +672,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+06e6da31';
+  const APP_VERSION = '1.0+754b6c81';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -831,6 +831,10 @@
       '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
         '<div style="font-weight:600; margin-bottom:.5rem;">AI provider (used for Import Photo)</div>' +
         '<div id="fpSettingsProviderWrap"></div>' +
+      '</div>' +
+      '<div style="margin-top:1rem; padding-top:.8rem; border-top:1px solid var(--border);">' +
+        '<div style="font-weight:600; margin-bottom:.5rem;">Photoreal 3D (Gemini)</div>' +
+        '<div id="fpSettingsGeminiWrap"></div>' +
       '</div>'
     );
     function renderSettingsProvider(){
@@ -840,6 +844,12 @@
       fpWireProviderConfig(container, provider, renderSettingsProvider);
     }
     renderSettingsProvider();
+    function renderSettingsGemini(){
+      const container = wrap.querySelector('#fpSettingsGeminiWrap');
+      container.innerHTML = fpGeminiKeyRowHtml();
+      fpWireGeminiConfig(container, renderSettingsGemini);
+    }
+    renderSettingsGemini();
     wrap.querySelector('#aboutInstallBtn').addEventListener('click', ()=>{ wrap.remove(); onInstallPillClick(); });
     const resetLink = wrap.querySelector('#resetInstallLink');
     if(resetLink){
@@ -2278,6 +2288,73 @@
 
     return svg;
   }
+
+  // Plain-text, coordinate-exact description of the plan -- sent to Gemini
+  // alongside the wireframe reference image so it has the real numbers to
+  // fall back on rather than only visually estimating them off the image
+  // (the same "read structured data, not a picture" principle the free 3D
+  // View is built on, applied to the photoreal request too).
+  function fp3dBuildTextSpec(){
+    const b = fp3dRawBounds();
+    const lines = [];
+    lines.push(`Room bounding box: ${(b.maxX-b.minX).toFixed(1)} ft x ${(b.maxY-b.minY).toFixed(1)} ft. Ceiling height: 8 ft (assumed -- not specified on the original plan). All coordinates below are in feet, in the same (x,y) system, x increasing to the right and y increasing "down"/away, matching the attached reference image exactly.`);
+    const wallEls = fpState.elements.filter(el=>el.type==='line'||el.type==='dashedline');
+    if(wallEls.length){
+      lines.push('Wall segments (straight boundary lines):');
+      wallEls.forEach(w=>lines.push(`- (${w.x1.toFixed(1)}, ${w.y1.toFixed(1)}) to (${w.x2.toFixed(1)}, ${w.y2.toFixed(1)})`));
+    }
+    const features = fpState.elements.filter(el=>!!FP_LINE_TYPE_STYLE[el.type]);
+    if(features.length){
+      lines.push('Windows and doors:');
+      features.forEach(f=>lines.push(`- ${f.type} from (${f.x1.toFixed(1)}, ${f.y1.toFixed(1)}) to (${f.x2.toFixed(1)}, ${f.y2.toFixed(1)})`));
+    }
+    const furniture = fpState.objects.filter(o=>o.type!=='label');
+    if(furniture.length){
+      lines.push('Furniture and fixtures (center point, width x depth in feet, rotation in degrees clockwise):');
+      furniture.forEach(o=>{
+        const label = (o.label && o.label.trim()) || 'unlabeled item';
+        lines.push(`- ${label} at (${o.cx.toFixed(1)}, ${o.cy.toFixed(1)}), ${(o.w/12).toFixed(2)} x ${(o.d/12).toFixed(2)} ft, rotation ${o.rot||0}°`);
+      });
+    }
+    return lines.join('\n');
+  }
+  function fp3dBuildPhotorealPrompt(){
+    return `Attached is a plain schematic isometric "wireframe" reference image of an interior room, generated directly from precise coordinates (listed below -- trust these numbers over anything you might otherwise visually estimate from the image).\n\n${fp3dBuildTextSpec()}\n\nGenerate a photorealistic 3D isometric interior render of this exact room: the same room shape, the same wall/window/door positions and sizes, and the same furniture pieces in the same positions, sizes, and orientations as listed above and shown in the reference image. Add realistic materials, finishes, lighting, and appropriate decor -- but do not change the structure, dimensions, door/window placement, or furniture layout, and keep the same isometric camera angle as the reference image.`;
+  }
+  const FP_GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image';
+  async function fp3dGeneratePhotoreal(svg){
+    const key = fpGetGeminiKey();
+    const proxyUrl = fpGetGeminiProxyUrl();
+    if(!key) throw new Error('Set your Gemini API key first (Settings > Photoreal 3D).');
+    if(!proxyUrl) throw new Error('Set your Gemini proxy Worker URL first (Settings > Photoreal 3D).');
+    const w = Number(svg.getAttribute('width')), h = Number(svg.getAttribute('height'));
+    const canvas = await fpRasterizeSvg(svg.outerHTML, w, h);
+    const base64 = canvas.toDataURL('image/png').split(',')[1];
+    const resp = await fetch(`${proxyUrl}/v1beta/models/${FP_GEMINI_IMAGE_MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'content-type':'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: fp3dBuildPhotorealPrompt() },
+          { inline_data: { mime_type: 'image/png', data: base64 } },
+        ] }],
+        generationConfig: { responseModalities: ['IMAGE'] },
+      }),
+    });
+    if(!resp.ok){
+      const errBody = await resp.text().catch(()=>'');
+      throw new Error('Gemini API error ' + resp.status + (errBody ? ': ' + errBody.slice(0,300) : ''));
+    }
+    const data = await resp.json();
+    const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+    const imgPart = parts.find(p=>p.inlineData && p.inlineData.data);
+    if(!imgPart){
+      const reason = data.candidates && data.candidates[0] && data.candidates[0].finishReason;
+      throw new Error('Gemini did not return an image.' + (reason ? ' (finishReason: '+reason+')' : ''));
+    }
+    return `data:${imgPart.inlineData.mimeType || 'image/png'};base64,${imgPart.inlineData.data}`;
+  }
+
   function fp3dOpenViewModal(){
     if(!fpState || (!fpState.elements.length && !fpState.objects.length)){
       toast('Draw or import a floor plan first.', true);
@@ -2287,7 +2364,12 @@
     const wrap = openModal('3D View',
       '<p class="fp-hint" style="margin:0 0 .7rem;">Free instant massing view, built straight from this plan\'s own numbers -- no API call.</p>' +
       '<div id="fp3dStage" style="background:linear-gradient(180deg,#dce8ef,#eef2ef); border-radius:8px; overflow:auto; max-height:65vh;"></div>' +
-      '<div style="margin-top:.7rem; text-align:right;"><button type="button" class="btn" id="fp3dDownloadBtn">Download PNG</button></div>'
+      '<div style="margin-top:.7rem; display:flex; gap:.6rem; align-items:center; flex-wrap:wrap; justify-content:flex-end;">' +
+        '<span id="fp3dPhotorealStatus" class="fp-hint" style="margin:0; flex:1;"></span>' +
+        '<button type="button" class="btn" id="fp3dPhotorealBtn" style="border-color:var(--accent); color:var(--accent);">Generate Photoreal 3D (Gemini)</button>' +
+        '<button type="button" class="btn" id="fp3dDownloadBtn">Download PNG</button>' +
+      '</div>' +
+      '<div id="fp3dPhotorealResult" style="margin-top:.8rem;"></div>'
     );
     wrap.querySelector('#fp3dStage').appendChild(svg);
     wrap.querySelector('#fp3dDownloadBtn').addEventListener('click', async ()=>{
@@ -2296,6 +2378,35 @@
       const blob = await new Promise(res=>canvas.toBlob(res, 'image/png'));
       if(!blob){ toast('Could not create the image.', true); return; }
       await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-3d.png`, 'PNG image', {'image/png':['.png']});
+    });
+    wrap.querySelector('#fp3dPhotorealBtn').addEventListener('click', async ()=>{
+      const btn = wrap.querySelector('#fp3dPhotorealBtn');
+      const status = wrap.querySelector('#fp3dPhotorealStatus');
+      const resultWrap = wrap.querySelector('#fp3dPhotorealResult');
+      if(!fpGetGeminiKey() || !fpGetGeminiProxyUrl()){
+        status.innerHTML = 'No Gemini key saved yet. <a href="#" id="fp3dOpenSettingsLink">Set it up in Settings</a>.';
+        const link = wrap.querySelector('#fp3dOpenSettingsLink');
+        if(link) link.addEventListener('click', (e)=>{ e.preventDefault(); wrap.remove(); infoBtn.click(); });
+        return;
+      }
+      btn.disabled = true;
+      status.textContent = 'Generating with Gemini -- this can take up to a minute...';
+      resultWrap.innerHTML = '';
+      try{
+        const dataUrl = await fp3dGeneratePhotoreal(svg);
+        status.textContent = 'Done.';
+        resultWrap.innerHTML = '<img id="fp3dPhotorealImg" style="max-width:100%; border-radius:8px; display:block;">' +
+          '<div style="margin-top:.5rem; text-align:right;"><button type="button" class="btn" id="fp3dPhotorealDownloadBtn">Download photoreal PNG</button></div>';
+        resultWrap.querySelector('#fp3dPhotorealImg').src = dataUrl;
+        resultWrap.querySelector('#fp3dPhotorealDownloadBtn').addEventListener('click', async ()=>{
+          const blob = await (await fetch(dataUrl)).blob();
+          await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-photoreal.png`, 'PNG image', {'image/png':['.png']});
+        });
+      }catch(err){
+        status.textContent = (err && err.message) || 'Something went wrong.';
+      }finally{
+        btn.disabled = false;
+      }
     });
   }
 
@@ -3907,6 +4018,19 @@
   function fpGetOpenAiProxyUrl(){ try{ return localStorage.getItem(FP_OPENAI_PROXY_STORAGE) || FP_OPENAI_PROXY_DEFAULT; }catch(e){ return FP_OPENAI_PROXY_DEFAULT; } }
   function fpSetOpenAiProxyUrl(url){ try{ if(url) localStorage.setItem(FP_OPENAI_PROXY_STORAGE, url); else localStorage.removeItem(FP_OPENAI_PROXY_STORAGE); }catch(e){} }
 
+  // Gemini key/proxy, used only by the "Photoreal 3D" button (see the 3D
+  // View section above) -- a separate credential from the Import Photo
+  // provider above since it's a different feature or Google's Generative
+  // Language API also has no CORS support for direct browser calls, so it
+  // needs the same kind of passthrough Worker as OpenAI's.
+  const FP_GEMINI_KEY_STORAGE = 'floorplanner-gemini-key';
+  function fpGetGeminiKey(){ try{ return localStorage.getItem(FP_GEMINI_KEY_STORAGE) || ''; }catch(e){ return ''; } }
+  function fpSetGeminiKey(key){ try{ if(key) localStorage.setItem(FP_GEMINI_KEY_STORAGE, key); else localStorage.removeItem(FP_GEMINI_KEY_STORAGE); }catch(e){} }
+  const FP_GEMINI_PROXY_STORAGE = 'floorplanner-gemini-proxy-url';
+  const FP_GEMINI_PROXY_DEFAULT = 'https://floorplanner-gemini-proxy.rfwrites2.workers.dev'; // deployed 2026-09-11, locked to this app's GitHub Pages origin
+  function fpGetGeminiProxyUrl(){ try{ return localStorage.getItem(FP_GEMINI_PROXY_STORAGE) || FP_GEMINI_PROXY_DEFAULT; }catch(e){ return FP_GEMINI_PROXY_DEFAULT; } }
+  function fpSetGeminiProxyUrl(url){ try{ if(url) localStorage.setItem(FP_GEMINI_PROXY_STORAGE, url); else localStorage.removeItem(FP_GEMINI_PROXY_STORAGE); }catch(e){} }
+
   // Whether OpenAI trains on your prompts/photos is an OpenAI *account*
   // setting (platform.openai.com/settings/organization/data-controls) --
   // there's no API request field for it, so this app can't set it for you.
@@ -4107,6 +4231,41 @@
         if(provider==='openai') fpSetOpenAiKey(''); else fpSetApiKey('');
         onProviderChange(provider);
       });
+    }
+  }
+
+  // Gemini key/proxy setup for the "Photoreal 3D" button -- same shape as
+  // fpKeyRowHtml/fpWireProviderConfig above but for a single fixed provider
+  // (no toggle needed, this feature only ever uses Gemini).
+  function fpGeminiKeyRowHtml(){
+    const key = fpGetGeminiKey();
+    const proxyUrl = fpGetGeminiProxyUrl();
+    return `
+      <label class="mini" style="display:block; color:var(--dim);">Proxy Worker URL
+        <input type="text" id="fpGeminiProxyInput" placeholder="https://your-proxy.workers.dev" value="${fpEscapeHtml(proxyUrl)}" style="width:100%;">
+      </label>
+      <div class="fp-key-row" style="margin-top:.4rem;">
+        ${key
+          ? `<span>Key set: <code>${fpEscapeHtml(fpMaskKey(key))}</code></span><button class="fp-row-remove" id="fpGeminiKeyClear" style="width:auto; border-radius:6px; padding:.2rem .5rem;" title="Remove saved key">Clear key</button>`
+          : `<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a Gemini key</a><input ${FP_KEY_INPUT_ATTRS} id="fpGeminiKeyInput" placeholder="AIza..."><button class="btn" id="fpGeminiKeySave" style="padding:.3rem .6rem; font-size:.74rem;">Save</button>`}
+      </div>
+    `;
+  }
+  function fpWireGeminiConfig(container, onChange){
+    const proxyInput = container.querySelector('#fpGeminiProxyInput');
+    if(proxyInput) proxyInput.addEventListener('change', ()=> fpSetGeminiProxyUrl(proxyInput.value.trim()));
+    const keySave = container.querySelector('#fpGeminiKeySave');
+    if(keySave){
+      keySave.addEventListener('click', ()=>{
+        const v = container.querySelector('#fpGeminiKeyInput').value.trim();
+        if(!v){ toast('Enter a key first.', true); return; }
+        fpSetGeminiKey(v);
+        onChange();
+      });
+    }
+    const keyClear = container.querySelector('#fpGeminiKeyClear');
+    if(keyClear){
+      keyClear.addEventListener('click', ()=>{ fpSetGeminiKey(''); onChange(); });
     }
   }
 
