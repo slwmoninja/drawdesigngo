@@ -366,6 +366,12 @@
   .fp-room-label-text{
     font-size:.74rem; font-weight:800; color:#228B22; /* 30% smaller than the original 1.05rem */
     text-shadow:0 1px 0 rgba(255,255,255,.5), 0 -1px 0 rgba(0,0,0,.15);
+    /* Overrides .fp-item-label's min-width/text-align (tuned for that
+       centered-above-the-shape caption) -- this one is anchored at its own
+       left:0 and meant to grow rightward from there (see fpEnsureRoomLabel's
+       comment), so a min-width would otherwise pad empty space to the left
+       of short text instead of hugging it. */
+    min-width:0; text-align:left;
     max-width:none; overflow:visible; white-space:pre;
   }
   .fp-item-label:hover, .fp-item-label:focus{ white-space:normal; }
@@ -793,7 +799,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+c37358f9';
+  const APP_VERSION = '1.0+61342bb5';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
