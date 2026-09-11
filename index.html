@@ -651,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+9090757e';
+  const APP_VERSION = '1.0+9acaeb6f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3381,6 +3381,20 @@
         canvas.addEventListener('pointermove', onMove);
         canvas.addEventListener('pointerup', onUp);
       });
+      // Double-click a wall opens the same name/length editor as tapping
+      // its dimension label -- that label only shows up once a name's set
+      // or the wall's selected, so this is a more discoverable second way
+      // in (mirrors the object dblclick below). Only line-type elements
+      // (line/dashedline/door/window) have a name/length to edit this way --
+      // rect/square/circle/oval freeform shapes have no fpOpenLineDetailsModal
+      // equivalent, and it assumes x1/y1/x2/y2 those types don't have.
+      if(fpIsLineType(el.type)){
+        g.addEventListener('dblclick', (e)=>{
+          if(e.target.closest('.fp-node, .fp-rotate-node')) return;
+          e.preventDefault(); e.stopPropagation();
+          fpOpenLineDetailsModal(el);
+        });
+      }
 
       svg.appendChild(g);
       // Skip resize/rotate handles during a select-all or marquee multi-
@@ -3573,6 +3587,15 @@
         }
         el.addEventListener('pointermove', onMove);
         el.addEventListener('pointerup', onUp);
+      });
+      // Double-click anywhere on the shape itself opens the same name/
+      // dimensions editor as tapping its caption below -- the caption is
+      // easy to miss (hidden until a label's set or the item's selected),
+      // so this is a more discoverable second way in.
+      el.addEventListener('dblclick', (e)=>{
+        if(e.target.closest('.fp-rotate-handle, .fp-obj-node, .fp-item-label')) return;
+        e.preventDefault(); e.stopPropagation();
+        if(isLabelType) fpOpenRoomLabelModal(item); else fpOpenObjectDetailsModal(item);
       });
 
       if(rotHandle) rotHandle.addEventListener('pointerdown', (e)=>{
