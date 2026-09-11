@@ -555,6 +555,10 @@
           <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
         </div>
       </div>
+      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Instant 3D isometric view of this plan -- free, no API call">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M12 2 L12 22"/><path d="M3 7 L12 12 L21 7"/></svg>
+        3D View
+      </button>
       <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <div class="divider"></div>
@@ -565,7 +569,7 @@
 
     <div class="fp-layout">
       <div class="fp-main">
-        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Untitled Floor Plan</h2>
+        <h2 class="fp-title" id="fpTitle" contenteditable="true" spellcheck="false">Room/Area Name</h2>
         <div class="fp-zoom-row">
           <button class="btn fp-zoom-btn" id="fpZoomOut" title="Zoom out">&minus;</button>
           <span class="mini" id="fpZoomLabel">100%</span>
@@ -613,6 +617,7 @@
   const infoBtn = document.getElementById('infoBtn');
   const printBtn = document.getElementById('printBtn');
   printBtn.addEventListener('click', ()=> fpExportPdf());
+  document.getElementById('fp3dViewBtn').addEventListener('click', ()=> fp3dOpenViewModal());
 
   if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = './vendor/pdfjs/pdf.worker.min.js';
 
@@ -667,7 +672,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+f8f41ac3';
+  const APP_VERSION = '1.0+06e6da31';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1631,7 +1636,7 @@
 
   function fpDefaultState(){
     return {
-      title: 'Untitled Floor Plan',
+      title: 'Room/Area Name',
       elements: [],
       objects: [],
       notes: [],
@@ -2081,6 +2086,219 @@
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
     });
   }
+
+  // ---------- 3D View: free, instant isometric massing render ----------
+  // Deterministic SVG isometric projection of the current plan -- no API
+  // call, no key, no network. Deliberately schematic (flat-shaded boxes,
+  // not photoreal): the point is to check layout/proportions at a glance,
+  // not to produce a finished client visual (see the "Photoreal 3D" flow
+  // for that). Because it's built straight from fpState's own numbers,
+  // it's accurate by construction -- it can't misread a dimension the way
+  // an image-reading model can.
+  const FP_3D_ANGLE = Math.PI/6; // 30 deg, classic 2:1 dimetric
+  function fp3dProject(x,y,z,scale){
+    return [ (x-y)*Math.cos(FP_3D_ANGLE)*scale, ((x+y)*Math.sin(FP_3D_ANGLE) - z)*scale ];
+  }
+  function fp3dShade(hex, amt){
+    const n = parseInt(hex.replace('#',''),16) || 0x999999;
+    let r=(n>>16)&255, g=(n>>8)&255, b=n&255;
+    r=Math.max(0,Math.min(255,Math.round(r+amt)));
+    g=Math.max(0,Math.min(255,Math.round(g+amt)));
+    b=Math.max(0,Math.min(255,Math.round(b+amt)));
+    return `rgb(${r},${g},${b})`;
+  }
+  function fp3dPoly(pts, fill, stroke, opacity){
+    const e = document.createElementNS(SVG_NS,'polygon');
+    e.setAttribute('points', pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' '));
+    e.setAttribute('fill', fill);
+    e.setAttribute('stroke', stroke);
+    e.setAttribute('stroke-width','0.5');
+    if(opacity!=null) e.setAttribute('opacity', opacity);
+    return e;
+  }
+  // A box at (cx,cy) in plan feet, width w (feet, local x before rotation),
+  // depth d (feet, local y), height h (feet), rotated rotDeg around its own
+  // center -- matches how fpState stores objects (rotation about cx/cy).
+  function fp3dAddBox(g, cx,cy,z,w,d,h, rotDeg, color, scale, ox,oy, opacity){
+    const rad = (rotDeg||0) * Math.PI/180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    const corner = (lx,ly) => [ cx + lx*cos - ly*sin, cy + lx*sin + ly*cos ];
+    const c0=corner(-w/2,-d/2), c1=corner(w/2,-d/2), c2=corner(w/2,d/2), c3=corner(-w/2,d/2);
+    const b0=fp3dProject(c0[0],c0[1],z,scale), b1=fp3dProject(c1[0],c1[1],z,scale), b2=fp3dProject(c2[0],c2[1],z,scale), b3=fp3dProject(c3[0],c3[1],z,scale);
+    const t0=fp3dProject(c0[0],c0[1],z+h,scale), t1=fp3dProject(c1[0],c1[1],z+h,scale), t2=fp3dProject(c2[0],c2[1],z+h,scale), t3=fp3dProject(c3[0],c3[1],z+h,scale);
+    const off = p => [p[0]+ox, p[1]+oy];
+    g.appendChild(fp3dPoly([t0,t1,t2,t3].map(off), fp3dShade(color,26), fp3dShade(color,-20), opacity));
+    g.appendChild(fp3dPoly([b0,b1,t1,t0].map(off), fp3dShade(color,0), fp3dShade(color,-30), opacity));
+    g.appendChild(fp3dPoly([b0,b3,t3,t0].map(off), fp3dShade(color,-35), fp3dShade(color,-50), opacity));
+  }
+  function fp3dAddWallPlane(g, x1,y1,x2,y2, h, color, scale, ox,oy, opacity){
+    const b0=fp3dProject(x1,y1,0,scale), b1=fp3dProject(x2,y2,0,scale), t1=fp3dProject(x2,y2,h,scale), t0=fp3dProject(x1,y1,h,scale);
+    const off = p=>[p[0]+ox,p[1]+oy];
+    g.appendChild(fp3dPoly([b0,b1,t1,t0].map(off), color, fp3dShade(color,-40), opacity));
+  }
+  function fp3dRawBounds(){
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    const consider=(x,y)=>{ minX=Math.min(minX,x); minY=Math.min(minY,y); maxX=Math.max(maxX,x); maxY=Math.max(maxY,y); };
+    fpState.elements.forEach(el=>{
+      if(fpIsLineType(el.type)){ consider(el.x1,el.y1); consider(el.x2,el.y2); }
+      else if(el.type==='circle'){ consider(el.cx-el.r,el.cy-el.r); consider(el.cx+el.r,el.cy+el.r); }
+      else { const half=Math.max(el.w,el.h)/2; consider(el.cx-half,el.cy-half); consider(el.cx+half,el.cy+half); }
+    });
+    fpState.objects.forEach(o=>{
+      if(o.type==='label') return;
+      const hw=(o.w/12)/2, hd=(o.d/12)/2;
+      consider(o.cx-hw,o.cy-hd); consider(o.cx+hw,o.cy+hd);
+    });
+    if(minX===Infinity) return { minX:0,minY:0,maxX:16,maxY:16 };
+    return { minX,minY,maxX,maxY };
+  }
+  // Buckets a wall-ish line element by which side of the room's bounding box
+  // it runs along, so we can decide which two (adjacent) walls to render
+  // solid vs. leave open for the camera to see inside -- 'other' covers
+  // diagonal/chamfered segments that aren't clearly on one side.
+  function fp3dClassifySide(el, b){
+    const dx=el.x2-el.x1, dy=el.y2-el.y1;
+    const midX=(el.x1+el.x2)/2, midY=(el.y1+el.y2)/2;
+    const cx=(b.minX+b.maxX)/2, cy=(b.minY+b.maxY)/2;
+    if(Math.abs(dy) <= Math.abs(dx)*0.25) return midY < cy ? 'top' : 'bottom';
+    if(Math.abs(dx) <= Math.abs(dy)*0.25) return midX < cx ? 'left' : 'right';
+    return 'other';
+  }
+  // Picks the pair of adjacent sides with the most windows/doors on them --
+  // those are the walls worth showing solid (you can't see a window in a
+  // wall that isn't drawn). The opposite two sides are left open so the
+  // camera can see the furniture inside, same convention as a dollhouse cutaway.
+  function fp3dChooseSolidSides(walls, features, b){
+    const counts = { top:0, bottom:0, left:0, right:0 };
+    features.forEach(f=>{ const s=fp3dClassifySide(f,b); if(counts[s]!=null) counts[s]++; });
+    const pairs = [['top','left'],['top','right'],['bottom','left'],['bottom','right']];
+    let best = pairs[0], bestScore = -1;
+    pairs.forEach(p=>{ const score = counts[p[0]]+counts[p[1]]; if(score>bestScore){ bestScore=score; best=p; } });
+    return { a:best[0], b:best[1] };
+  }
+  function fp3dHeightFor(label){
+    const s = (label||'').toLowerCase();
+    if(/\b(bed|crib|bunk)\b/.test(s)) return 1.9;
+    if(/\b(pool|pond|spa|hot tub|plunge)\b/.test(s)) return 0.3;
+    if(/\b(wardrobe|armoire|bookshelf|bookcase|cabinet|hutch|filing|credenza)\b/.test(s)) return 5.2;
+    if(/\b(fridge|refrigerator|dishwasher|washer|dryer|island|hob|sink|range|oven)\b/.test(s)) return 3.0;
+    if(/\b(lamp|light|pendant|sconce|chandelier|fixture)\b/.test(s)) return 0.4;
+    if(/\b(sofa|sectional|loveseat|chaise|daybed|bench)\b/.test(s)) return 2.3;
+    if(/\b(chair|stool|recliner|ottoman)\b/.test(s)) return 2.7;
+    if(/\b(rug|planter|hedge|path|paver|decking|deck box)\b/.test(s)) return 0.25;
+    return 2.4;
+  }
+  function fp3dBuildSvg(){
+    const scale = 26;
+    const b = fp3dRawBounds();
+    const pad = 2;
+    const wallElements = fpState.elements.filter(el=>fpIsLineType(el.type));
+    const walls = wallElements.filter(el=>el.type==='line'||el.type==='dashedline');
+    const features = wallElements.filter(el=>!!FP_LINE_TYPE_STYLE[el.type]); // opening/window/door
+    const solid = fp3dChooseSolidSides(walls, features, b);
+    const isSolidSide = side => side===solid.a || side===solid.b;
+    const height = 8; // ft -- not captured on the 2D plan, assumed standard ceiling
+
+    // Find the actual screen-space bounding box by projecting all 8 corners
+    // of the padded footprint (at floor and ceiling height) -- with this
+    // projection formula, the extreme edges are NOT simply the (minX,minY)
+    // and (maxX,maxY) plan corners (e.g. (minX,maxY) projects to the most
+    // negative screen-x), so this has to be measured rather than assumed.
+    const corners3d = [];
+    [b.minX-pad, b.maxX+pad].forEach(x=>[b.minY-pad, b.maxY+pad].forEach(y=>[0,height].forEach(z=>corners3d.push([x,y,z]))));
+    const projCorners = corners3d.map(([x,y,z])=>fp3dProject(x,y,z,scale));
+    const minSx = Math.min(...projCorners.map(p=>p[0])), maxSx = Math.max(...projCorners.map(p=>p[0]));
+    const minSy = Math.min(...projCorners.map(p=>p[1])), maxSy = Math.max(...projCorners.map(p=>p[1]));
+    const margin = 20;
+    const pxW = Math.round(maxSx - minSx) + margin*2;
+    const pxH = Math.round(maxSy - minSy) + margin*2;
+
+    const svg = document.createElementNS(SVG_NS,'svg');
+    svg.setAttribute('viewBox', `0 0 ${pxW} ${pxH}`);
+    svg.setAttribute('width', pxW); svg.setAttribute('height', pxH);
+    svg.setAttribute('style', 'max-width:100%; height:auto; display:block;');
+    const g = document.createElementNS(SVG_NS,'g');
+    svg.appendChild(g);
+    const ox = margin - minSx, oy = margin - minSy;
+
+    // Floor (bounding-box rectangle -- simple and robust for any plan shape;
+    // a chamfered corner will still show correctly in the walls above it,
+    // just with the floor slab extending very slightly past it underneath).
+    const f0=fp3dProject(b.minX-pad,b.minY-pad,0,scale), f1=fp3dProject(b.maxX+pad,b.minY-pad,0,scale),
+          f2=fp3dProject(b.maxX+pad,b.maxY+pad,0,scale), f3=fp3dProject(b.minX-pad,b.maxY+pad,0,scale);
+    g.appendChild(fp3dPoly([f0,f1,f2,f3].map(p=>[p[0]+ox,p[1]+oy]), '#d8c9a8', '#a9976f'));
+
+    // Walls: solid sides get a full-height plane per visible (non-opening)
+    // sub-range, plus a feature pane/panel for any window or door on them.
+    // Non-orthogonal (chamfer) segments always render, at partial height,
+    // since they're a real boundary feature regardless of camera side.
+    walls.forEach(w=>{
+      const side = fp3dClassifySide(w, b);
+      if(side==='other'){
+        fp3dAddWallPlane(g, w.x1,w.y1,w.x2,w.y2, height*0.35, '#e9e2d3', scale, ox,oy, 0.95);
+        return;
+      }
+      if(!isSolidSide(side)) return;
+      const dir = fpLineDir(w);
+      fpVisibleWallRanges(w, fpState.elements).forEach(([lo,hi])=>{
+        const x1=w.x1+(w.x2-w.x1)*lo, y1=w.y1+(w.y2-w.y1)*lo, x2=w.x1+(w.x2-w.x1)*hi, y2=w.y1+(w.y2-w.y1)*hi;
+        fp3dAddWallPlane(g, x1,y1,x2,y2, height, '#efe9dd', scale, ox,oy, 1);
+      });
+    });
+    features.forEach(f=>{
+      const side = fp3dClassifySide(f, b);
+      if(!isSolidSide(side)) return;
+      if(f.type==='window'){
+        fp3dAddWallPlane(g, f.x1,f.y1,f.x2,f.y2, height*0.6, '#bfe1f2', scale, ox,oy, 0.9);
+      } else if(f.type==='door'){
+        fp3dAddWallPlane(g, f.x1,f.y1,f.x2,f.y2, height*0.75, '#8a5a34', scale, ox,oy, 0.85);
+      }
+      // 'opening' (no fixture) intentionally left as a gap -- nothing drawn.
+    });
+
+    // Floor-level items (freeform shapes) + furniture, painter-sorted far-to-near.
+    const items = [];
+    fpState.elements.forEach(el=>{
+      if(fpIsLineType(el.type)) return;
+      const color = el.color || '#8b8d8e';
+      if(el.type==='circle'){
+        items.push({ cx:el.cx, cy:el.cy, w:el.r*2, d:el.r*2, h:0.08, rot:0, color });
+      } else {
+        items.push({ cx:el.cx, cy:el.cy, w:el.w, d:el.h, h:0.08, rot:el.rot||0, color });
+      }
+    });
+    fpState.objects.forEach(o=>{
+      if(o.type==='label') return;
+      items.push({ cx:o.cx, cy:o.cy, w:o.w/12, d:o.d/12, h:fp3dHeightFor(o.label), rot:o.rot||0, color:'#93a3ac' });
+    });
+    items.sort((a,b2)=>(a.cx+a.cy)-(b2.cx+b2.cy));
+    items.forEach(it=>{
+      fp3dAddBox(g, it.cx, it.cy, 0, it.w, it.d, it.h, it.rot, it.color, scale, ox,oy);
+    });
+
+    return svg;
+  }
+  function fp3dOpenViewModal(){
+    if(!fpState || (!fpState.elements.length && !fpState.objects.length)){
+      toast('Draw or import a floor plan first.', true);
+      return;
+    }
+    const svg = fp3dBuildSvg();
+    const wrap = openModal('3D View',
+      '<p class="fp-hint" style="margin:0 0 .7rem;">Free instant massing view, built straight from this plan\'s own numbers -- no API call.</p>' +
+      '<div id="fp3dStage" style="background:linear-gradient(180deg,#dce8ef,#eef2ef); border-radius:8px; overflow:auto; max-height:65vh;"></div>' +
+      '<div style="margin-top:.7rem; text-align:right;"><button type="button" class="btn" id="fp3dDownloadBtn">Download PNG</button></div>'
+    );
+    wrap.querySelector('#fp3dStage').appendChild(svg);
+    wrap.querySelector('#fp3dDownloadBtn').addEventListener('click', async ()=>{
+      const w = Number(svg.getAttribute('width')), h = Number(svg.getAttribute('height'));
+      const canvas = await fpRasterizeSvg(svg.outerHTML, w, h);
+      const blob = await new Promise(res=>canvas.toBlob(res, 'image/png'));
+      if(!blob){ toast('Could not create the image.', true); return; }
+      await fpSaveBlobWithPicker(blob, `${fpSafeFileName(fpState.title)}-3d.png`, 'PNG image', {'image/png':['.png']});
+    });
+  }
+
   function fpSafeFileName(title){
     return (title||'floor-plan').trim().replace(/[\\/:*?"<>|]+/g,'-').slice(0,60) || 'floor-plan';
   }
@@ -3410,7 +3628,7 @@
     if(isFirstEverOpen){
       // Prompt for a project name immediately: focus the title field with
       // its placeholder text selected, so a blinking cursor is ready and the
-      // very first keystroke replaces "Untitled Floor Plan" outright rather
+      // very first keystroke replaces "Room/Area Name" outright rather
       // than requiring the user to clear it themselves first. Deferred a
       // tick -- a focus() call made synchronously during initial page
       // bootstrap is unreliable in some browsers (silently dropped before
@@ -3431,7 +3649,7 @@
     fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
 
     document.getElementById('fpTitle').addEventListener('blur', (e)=>{
-      fpState.title = e.target.textContent.trim() || 'Untitled Floor Plan';
+      fpState.title = e.target.textContent.trim() || 'Room/Area Name';
       fpSave();
     });
 
