@@ -651,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+a6c59fe1';
+  const APP_VERSION = '1.0+9090757e';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2069,19 +2069,22 @@
         ctx.drawImage(img,0,0,w,h);
         resolve(canvas);
       };
-      img.onerror = reject;
+      // A bare <img> error Event has no .message -- wrap it in a real Error
+      // so callers' catch blocks can show something more useful than a
+      // silent, contentless failure (this is exactly what an SVG missing
+      // its xmlns= attribute looks like when loaded as a standalone image).
+      img.onerror = ()=> reject(new Error('Could not rasterize the generated image (invalid SVG markup).'));
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
     });
   }
 
-  // ---------- 3D View: free, instant isometric massing render ----------
-  // Deterministic SVG isometric projection of the current plan -- no API
-  // call, no key, no network. Deliberately schematic (flat-shaded boxes,
-  // not photoreal): the point is to check layout/proportions at a glance,
-  // not to produce a finished client visual (see the "Photoreal 3D" flow
-  // for that). Because it's built straight from fpState's own numbers,
-  // it's accurate by construction -- it can't misread a dimension the way
-  // an image-reading model can.
+  // ---------- 3D View: isometric SVG projection of the current plan ----------
+  // Deterministic, built straight from fpState's own numbers -- no API call
+  // to produce this part. Never shown to the user directly (client feedback
+  // was that flat-shaded massing boxes aren't a usable format); it exists
+  // purely as Gemini's structural reference image for the "Photoreal 3D"
+  // flow below, since it's accurate by construction and can't misread a
+  // dimension the way an image-reading model can.
   const FP_3D_ANGLE = Math.PI/6; // 30 deg, classic 2:1 dimetric
   function fp3dProject(x,y,z,scale){
     return [ (x-y)*Math.cos(FP_3D_ANGLE)*scale, ((x+y)*Math.sin(FP_3D_ANGLE) - z)*scale ];
@@ -2201,6 +2204,15 @@
     const pxH = Math.round(maxSy - minSy) + margin*2;
 
     const svg = document.createElementNS(SVG_NS,'svg');
+    // createElementNS sets the SVG namespace on the live DOM node, but
+    // .outerHTML serialization doesn't reliably re-emit it as an xmlns=
+    // attribute -- fine for an element living in an HTML page, but fatal
+    // once that markup is lifted out as a standalone data:image/svg+xml
+    // string (fpRasterizeSvg, below): without an explicit xmlns, the <img>
+    // has no context to know it's SVG and just fails to load, silently,
+    // with an error Event that has no .message -- which is why this used
+    // to surface as a bare "Something went wrong" with no other detail.
+    svg.setAttribute('xmlns', SVG_NS);
     svg.setAttribute('viewBox', `0 0 ${pxW} ${pxH}`);
     svg.setAttribute('width', pxW); svg.setAttribute('height', pxH);
     svg.setAttribute('style', 'max-width:100%; height:auto; display:block;');
