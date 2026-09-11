@@ -651,7 +651,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+41c40f41';
+  const APP_VERSION = '1.0+8edef030';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1279,6 +1279,58 @@
       { label:'Bamboo Flooring', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-bamboo-flooring.png' },
       { label:'Cork Flooring', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-cork-flooring.png' },
       { label:'Rubber Flooring (Studded)', shape:'rect', w:24, d:24, icon:'image', img:'./library/lf-rubber-flooring-studded.png' },
+    ]},
+    { name:'Wall Fixtures & Art', items:[
+      { label:'Square Abstract (Wood Frame)', shape:'rect', w:24, d:24, icon:'image', img:'./library/wm-square-abstract.png' },
+      { label:'Vertical Landscape (Dots Art)', shape:'rect', w:20, d:30, icon:'image', img:'./library/wm-vertical-landscape.png' },
+      { label:'Horizontal Seascape (Dots Art)', shape:'rect', w:36, d:24, icon:'image', img:'./library/wm-horizontal-seascape.png' },
+      { label:'Oval Portrait (Gilded Frame)', shape:'oval', w:18, d:24, icon:'image', img:'./library/wm-oval-portrait.png' },
+      { label:'Triptych (Set of 3, Dots Art)', shape:'rect', w:36, d:14, icon:'image', img:'./library/wm-triptych.png' },
+      { label:'Framed Dots Art (Thin Black)', shape:'rect', w:24, d:30, icon:'image', img:'./library/wm-framed-dots-art.png' },
+      { label:'Round Dots Art (Decorative Frame)', shape:'circle', w:24, d:24, icon:'image', img:'./library/wm-round-dots-art.png' },
+      { label:'Gallery Wrap Canvas (Dots Art)', shape:'rect', w:30, d:30, icon:'image', img:'./library/wm-gallery-wrap-canvas.png' },
+      { label:'Oversized Dots Art (Large Art)', shape:'rect', w:48, d:36, icon:'image', img:'./library/wm-oversized-dots-art.png' },
+      { label:'Set of Four Minis (Dots Art)', shape:'rect', w:20, d:20, icon:'image', img:'./library/wm-set-of-four-minis.png' },
+      { label:'Round Mirror (Thin Brass Frame)', shape:'circle', w:30, d:30, icon:'image', img:'./library/wm-round-mirror.png' },
+      { label:'Rectangular Mirror (Teak Wood Frame)', shape:'rect', w:24, d:36, icon:'image', img:'./library/wm-rectangular-mirror.png' },
+      { label:'Ornate Baroque Mirror (Gilded)', shape:'rect', w:26, d:34, icon:'image', img:'./library/wm-ornate-baroque-mirror.png' },
+      { label:'Sunburst Mirror (Decorative)', shape:'circle', w:32, d:32, icon:'image', img:'./library/wm-sunburst-mirror.png' },
+      { label:'Oval Mirror (Polished Nickel Frame)', shape:'oval', w:24, d:36, icon:'image', img:'./library/wm-oval-mirror.png' },
+      { label:'Arch Top Mirror (Black Frame)', shape:'rect', w:24, d:40, icon:'image', img:'./library/wm-arch-top-mirror.png' },
+      { label:'Bevelled Edge Mirror (Frameless)', shape:'rect', w:24, d:30, icon:'image', img:'./library/wm-bevelled-edge-mirror.png' },
+      { label:'Square Mirror (Rattan Frame)', shape:'rect', w:28, d:28, icon:'image', img:'./library/wm-square-mirror.png' },
+      { label:'Full-Length Wall Mirror (Slender Frame)', shape:'rect', w:18, d:60, icon:'image', img:'./library/wm-full-length-mirror.png' },
+      { label:'Geometric Mirror', shape:'rect', w:24, d:28, icon:'image', img:'./library/wm-geometric-mirror.png' },
+      { label:'Traditional Candle Sconce (Brass)', shape:'rect', w:6, d:14, icon:'image', img:'./library/wm-candle-sconce.png' },
+      { label:'Modern Cone Sconce', shape:'rect', w:6, d:10, icon:'image', img:'./library/wm-cone-sconce.png' },
+      { label:'Art Deco Sconce (Glass & Chrome)', shape:'rect', w:8, d:14, icon:'image', img:'./library/wm-art-deco-sconce.png' },
+      { label:'Farmhouse Lantern Sconce', shape:'rect', w:8, d:16, icon:'image', img:'./library/wm-lantern-sconce.png' },
+      { label:'Industrial Cage Sconce', shape:'rect', w:7, d:12, icon:'image', img:'./library/wm-cage-sconce.png' },
+      { label:'Swing-Arm Sconce (Half-Moon)', shape:'rect', w:14, d:10, icon:'image', img:'./library/wm-swing-arm-sconce.png' },
+      { label:'LED Picture Light', shape:'rect', w:18, d:4, icon:'image', img:'./library/wm-led-picture-light.png' },
+      { label:'Crystal Wall Sconce', shape:'rect', w:10, d:16, icon:'image', img:'./library/wm-crystal-sconce.png' },
+      { label:'Flush-Mount Wall Sconce', shape:'circle', w:10, d:10, icon:'image', img:'./library/wm-flush-mount-sconce.png' },
+      { label:'Floating Shelf (Dark Wood)', shape:'rect', w:36, d:8, icon:'image', img:'./library/wm-floating-shelf-dark.png' },
+      { label:'Floating Shelf (White Lacquer)', shape:'rect', w:30, d:8, icon:'image', img:'./library/wm-floating-shelf-white.png' },
+      { label:'Wall-Hung Cubby (Square)', shape:'rect', w:16, d:16, icon:'image', img:'./library/wm-wall-cubby.png' },
+      { label:'Hexagonal Wall Shelf', shape:'rect', w:14, d:14, icon:'image', img:'./library/wm-hexagonal-shelf.png' },
+      { label:'Corner Floating Shelf', shape:'rect', w:12, d:12, icon:'image', img:'./library/wm-corner-shelf.png' },
+      { label:'Shadow Box Frame Shelf', shape:'rect', w:18, d:18, icon:'image', img:'./library/wm-shadow-box-shelf.png' },
+      { label:'Ladder Shelf (Wall-Leaning)', shape:'rect', w:24, d:70, icon:'image', img:'./library/wm-ladder-shelf.png' },
+      { label:'Glass Shelf (Metal Brackets)', shape:'rect', w:30, d:10, icon:'image', img:'./library/wm-glass-shelf.png' },
+      { label:'Multi-Tiered Wall Shelf', shape:'rect', w:30, d:30, icon:'image', img:'./library/wm-multitier-shelf.png' },
+      { label:'Wall-Mount Electric Fireplace (Linear)', shape:'rect', w:60, d:16, icon:'image', img:'./library/wm-linear-electric-fireplace.png' },
+      { label:'Recessed Electric Fireplace (Small)', shape:'rect', w:36, d:18, icon:'image', img:'./library/wm-recessed-electric-fireplace.png' },
+      { label:'Bio-Ethanol Wall Fireplace (Sleek)', shape:'rect', w:48, d:16, icon:'image', img:'./library/wm-bioethanol-fireplace.png' },
+      { label:'Traditional Mantelpiece (Shelf Only)', shape:'rect', w:60, d:12, icon:'image', img:'./library/wm-mantelpiece-shelf.png' },
+      { label:'Traditional Mantelpiece (Wall Only)', shape:'rect', w:60, d:48, icon:'image', img:'./library/wm-mantelpiece-wall.png' },
+      { label:'Cast Iron Fireplace Insert (Wall-Mount)', shape:'rect', w:30, d:30, icon:'image', img:'./library/wm-cast-iron-insert.png' },
+      { label:'Decorative Wall Hook (Forged Iron, Double)', shape:'rect', w:4, d:6, icon:'image', img:'./library/wm-wall-hook-a.png' },
+      { label:'Decorative Wall Hook (Forged Iron, Single)', shape:'rect', w:4, d:6, icon:'image', img:'./library/wm-wall-hook-b.png' },
+      { label:'Modern Wall Hook (Geometric Brass)', shape:'rect', w:4, d:6, icon:'image', img:'./library/wm-modern-wall-hook.png' },
+      { label:'Coat Rack (Hook Rail)', shape:'rect', w:30, d:6, icon:'image', img:'./library/wm-coat-rack.png' },
+      { label:'Single Robe Hook (Ceramic)', shape:'rect', w:3, d:3, icon:'image', img:'./library/wm-robe-hook.png' },
+      { label:'Key Holder Hook Shelf', shape:'rect', w:12, d:8, icon:'image', img:'./library/wm-key-holder-shelf.png' },
     ]},
   ];
 
