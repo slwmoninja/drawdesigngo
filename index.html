@@ -537,14 +537,22 @@
           <button type="button" class="fp-opening-dd-item" id="fpPasteAllBtn" disabled title="Paste the last whole plan copied with Copy all">Paste all</button>
         </div>
       </div>
-      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Generate a photorealistic 3D isometric render of this plan (Gemini, needs your API key)">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L21 7 L21 17 L12 22 L3 17 L3 7 Z"/><path d="M12 2 L12 22"/><path d="M3 7 L12 12 L21 7"/></svg>
-        3D View
-      </button>
       <button class="btn fp-key-btn" id="fpDeleteBtn" title="Delete tool -- click, then tap items on the grid to delete them; click again to turn it off">&#128465; Delete</button>
       <button class="btn" id="fpUndoBtn" disabled title="Undo the last change">Undo</button>
       <div class="divider"></div>
       <div class="spacer"></div>
+      <button class="btn fp-key-btn" id="fp3dViewBtn" title="Copy this plan and open Gemini to sign in and try a 3D render yourself -- our own in-app 3D generation is still being wired up">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <defs>
+            <linearGradient id="fpGeminiGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#4285F4"/>
+              <stop offset="0.5" stop-color="#9B72CB"/>
+              <stop offset="1" stop-color="#D96570"/>
+            </linearGradient>
+          </defs>
+          <path fill="url(#fpGeminiGrad)" d="M12 2c0 5.523 4.477 10 10 10-5.523 0-10 4.477-10 10 0-5.523-4.477-10-10-10 5.523 0 10-4.477 10-10Z"/>
+        </svg>
+      </button>
       <button class="btn" id="fpResetBtn" title="Clear everything and start a blank plan">Clear plan</button>
       <button class="btn" id="fpNewProjectQuickBtn" title="Start a new floor plan (saves the current one first)" style="border-color:var(--danger); color:var(--danger); font-weight:700;">+</button>
     </div>
@@ -598,7 +606,15 @@
   const infoBtn = document.getElementById('infoBtn');
   const printBtn = document.getElementById('printBtn');
   printBtn.addEventListener('click', ()=> fpExportPdf());
-  document.getElementById('fp3dViewBtn').addEventListener('click', ()=> fp3dOpenViewModal());
+  // Temporary stand-in for real in-app 3D generation (fp3dOpenViewModal,
+  // left intact below for when that's ready to reconnect): copies a PNG of
+  // the current plan to the clipboard, then sends the user to Gemini's own
+  // web app to sign in with their Google account and paste the image in
+  // themselves -- no API key/proxy/billing setup required on their end.
+  document.getElementById('fp3dViewBtn').addEventListener('click', async ()=>{
+    await fpCopyToClipboard('Plan copied -- paste it into Gemini and ask for a 3D render.');
+    window.open('https://gemini.google.com/app', '_blank', 'noopener');
+  });
 
   // ---------- Utility ----------
   function toast(msg, isErr){
@@ -651,7 +667,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+d44f09b7';
+  const APP_VERSION = '1.0+35d58ce4';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2585,7 +2601,7 @@
 
   // ---- Copy to system clipboard (Ctrl/Cmd+C; Ctrl/Cmd+A marks "whole plan") ----
   let fpSelectAllActive = false;
-  async function fpCopyToClipboard(){
+  async function fpCopyToClipboard(successMsg){
     if(!navigator.clipboard || !window.ClipboardItem){ toast('This browser can\'t copy images to the clipboard.', true); return; }
     let bounds = null;
     if(!fpSelectAllActive){
@@ -2599,7 +2615,7 @@
       const canvas = await fpRasterizeSvg(svg, w, h);
       const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
       await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-      toast('Copied to clipboard.');
+      toast(successMsg || 'Copied to clipboard.');
     }catch(e){
       toast('Could not copy to clipboard in this browser.', true);
     }
