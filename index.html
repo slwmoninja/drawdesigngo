@@ -400,9 +400,11 @@
      here beyond the resting visual style. */
   .fp-label-spin-handle{
     position:absolute; left:100%; top:50%; margin-left:.3rem; transform:translateY(-50%);
-    width:8px; height:8px; border-radius:50%; background:var(--warn);
-    cursor:grab; z-index:2;
+    width:14px; height:14px; line-height:14px; text-align:center; border-radius:50%;
+    background:var(--panel2); border:1px solid var(--warn); color:var(--warn);
+    font-size:10px; cursor:grab; z-index:2;
   }
+  .fp-label-spin-handle::before{ content:"\21bb"; }
   .fp-obj-node.nw{ left:0; top:0; } .fp-obj-node.ne{ left:100%; top:0; }
   .fp-obj-node.sw{ left:0; top:100%; } .fp-obj-node.se{ left:100%; top:100%; }
   .fp-obj-node.n{ left:50%; top:0; } .fp-obj-node.s{ left:50%; top:100%; }
@@ -799,7 +801,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+61342bb5';
+  const APP_VERSION = '1.0+ff849300';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1696,7 +1698,7 @@
   // pre-rotation -- frame, so it stays anchored to the entity wherever that
   // entity itself moves or rotates) while a plain tap/click still opens its
   // details modal. Shared by furniture objects and structural lines alike.
-  function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick, selected){
+  function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick, selected, defaultLabelRot){
     // The label's own on-screen angle is kept independent of the entity's
     // rotation -- item.labelRot (default 0) is the ABSOLUTE screen angle the
     // text is drawn at, so by default (labelRot unset) text stays upright
@@ -1713,7 +1715,7 @@
       // angle, not the angle from the last full render. Lines/walls have no
       // .rot field at all, so they fall back to the fixed rotDeg (always 0).
       const liveRotDeg = item.rot!=null ? item.rot : rotDeg;
-      const labelDeg = (item.labelRot||0) - (liveRotDeg||0);
+      const labelDeg = (item.labelRot!=null ? item.labelRot : (defaultLabelRot||0)) - (liveRotDeg||0);
       Object.assign(label.style, {
         left:(centerPx.x + dx*scale)+'px', top:(centerPx.y + dy*scale)+'px',
         right:'auto', bottom:'auto', marginBottom:'0',
@@ -3815,7 +3817,11 @@
           lineLabel.spellcheck = false;
           lineLabel.textContent = combined || 'Add label';
           lineLabel.title = 'Tap to edit name/length/height, drag to reposition';
-          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected);
+          // Runs more vertical than horizontal (a wall/window/door standing
+          // up-and-down on the plan) default to vertical text so it reads
+          // along the run instead of overlapping a narrow wall sideways.
+          const lineIsVertical = Math.abs(el.y2-el.y1) > Math.abs(el.x2-el.x1);
+          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected, lineIsVertical ? 90 : 0);
           canvas.appendChild(lineLabel);
         }
       }
