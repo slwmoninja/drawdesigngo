@@ -699,6 +699,7 @@
             <button class="btn fp-zoom-btn" id="fpGridToggle" title="Show or hide the grid lines">Grid</button>
             <button class="btn fp-zoom-btn" id="fpLabelsToggle" title="Show or hide furniture/wall labels">Labels</button>
             <button class="btn fp-zoom-btn" id="fpDimensionsToggle" title="Show or hide dimensions in labels">Dimensions</button>
+            <button class="btn fp-zoom-btn" id="fpSaveAsBtn" title="Save the current plan as an image, PDF, CAD file, or project file">Save as&hellip;</button>
           </div>
         </div>
         <div class="fp-canvas-wrap" id="fpCanvasWrap">
@@ -801,7 +802,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+7190fee6';
+  const APP_VERSION = '1.0+ce8ae5e7';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1274,7 +1275,7 @@
       { label:'Console Table', shape:'rect', w:48, d:16, icon:'image', img:'./library/console-table.png' },
       { label:'Dining Hutch', shape:'rect', w:42, d:18, icon:'image', img:'./library/dining-hutch.png' },
     ]},
-    { name:'Seating', items:[
+    { name:'Chair & Ent.', items:[
       { label:'3-Seater Sofa', shape:'rect', w:84, d:38, icon:'image', img:'./library/3-seater-sofa.png' },
       { label:'Sectional', shape:'lshape', w:100, d:100, icon:'image', img:'./library/sectional.png' },
       { label:'TV Stand', shape:'rect', w:60, d:18, icon:'image', img:'./library/tv-stand.png' },
@@ -1877,6 +1878,14 @@
       </label>
       <button class="btn" id="fpObjAutoDetectBtn" type="button" style="width:100%; margin-bottom:.6rem; border-color:var(--accent); color:var(--accent);">&#10024; Auto-detect dimensions</button>
       <p class="fp-hint" id="fpObjDetectStatus" style="margin:0 0 .6rem;"></p>
+      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.4rem;">
+        <input type="checkbox" id="fpObjHideName" ${item.hideName ? 'checked' : ''}>
+        <span>Hide name on this item, even when Labels is on</span>
+      </label>
+      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;">
+        <input type="checkbox" id="fpObjHideDims" ${item.hideDims ? 'checked' : ''}>
+        <span>Hide dimensions on this item, even when Dimensions is on</span>
+      </label>
       <button class="btn-primary" id="fpObjSaveBtn" type="button">Save</button>
     `);
     const nameInput = wrap.querySelector('#fpObjNameInput');
@@ -1902,6 +1911,8 @@
       item.w = Math.max(1, fpReadFtInFields(wrap, 'fpObjWidth', item.w));
       item.d = Math.max(1, fpReadFtInFields(wrap, 'fpObjDepth', item.d));
       item.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpObjHeight', item.heightIn||FP_DEFAULT_OBJ_HEIGHT_IN));
+      item.hideName = wrap.querySelector('#fpObjHideName').checked;
+      item.hideDims = wrap.querySelector('#fpObjHideDims').checked;
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -1958,6 +1969,14 @@
       <label class="mini" style="display:block; margin-bottom:.6rem;">H
         ${fpFtInFieldsHtml('fpLineHeight', el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96))}
       </label>
+      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.4rem;">
+        <input type="checkbox" id="fpLineHideName" ${el.hideName ? 'checked' : ''}>
+        <span>Hide name on this item, even when Labels is on</span>
+      </label>
+      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;">
+        <input type="checkbox" id="fpLineHideDims" ${el.hideDims ? 'checked' : ''}>
+        <span>Hide dimensions on this item, even when Dimensions is on</span>
+      </label>
       <div style="display:flex; gap:.5rem;">
         <button class="btn" id="fpLineDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
         <button class="btn-primary" id="fpLineSaveBtn" type="button" style="flex:1;">Save</button>
@@ -1980,6 +1999,8 @@
       const ux = (el.x2-el.x1)/curLen, uy = (el.y2-el.y1)/curLen;
       el.x2 = el.x1 + ux*newLenFt; el.y2 = el.y1 + uy*newLenFt;
       el.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpLineHeight', el.heightIn||FP_DEFAULT_HEIGHT_IN[el.type]||96));
+      el.hideName = wrap.querySelector('#fpLineHideName').checked;
+      el.hideDims = wrap.querySelector('#fpLineHideDims').checked;
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -2370,6 +2391,26 @@
     const h = Math.max(1, Math.round((bounds.maxY-bounds.minY)*scale));
     const px = (x,y) => [ (x-bounds.minX)*scale, (y-bounds.minY)*scale ];
     let body = '';
+    if(fpGetShowGrid()){
+      // Mirrors fpApplyGridBackground()'s CSS pattern as real SVG lines --
+      // that background is screen-only (not part of this serialized SVG),
+      // so without this the Grid toggle had no effect on Save As output.
+      const minorStep = FP_GRID_STEP, majorEvery = Math.round(5/FP_GRID_STEP);
+      const firstCol = Math.ceil(bounds.minX/minorStep), lastCol = Math.floor(bounds.maxX/minorStep);
+      const firstRow = Math.ceil(bounds.minY/minorStep), lastRow = Math.floor(bounds.maxY/minorStep);
+      for(let i=firstCol; i<=lastCol; i++){
+        const x = i*minorStep;
+        const [x1,y1] = px(x, bounds.minY), [x2,y2] = px(x, bounds.maxY);
+        const color = (i%majorEvery===0) ? 'rgba(74,144,217,.4)' : 'rgba(74,144,217,.16)';
+        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1"/>`;
+      }
+      for(let j=firstRow; j<=lastRow; j++){
+        const y = j*minorStep;
+        const [x1,y1] = px(bounds.minX, y), [x2,y2] = px(bounds.maxX, y);
+        const color = (j%majorEvery===0) ? 'rgba(74,144,217,.4)' : 'rgba(74,144,217,.16)';
+        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1"/>`;
+      }
+    }
     fpState.elements.forEach(el=>{
       if(fpIsLineType(el.type)){
         const lineStyle = FP_LINE_TYPE_STYLE[el.type];
@@ -2391,6 +2432,19 @@
           const [ox1,oy1] = px(el.x1-dyr/len*off, el.y1+dxr/len*off);
           const [ox2,oy2] = px(el.x2-dyr/len*off, el.y2+dxr/len*off);
           body += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
+        }
+        // Same name/dimension text as the live canvas's draggable label (see
+        // the Labels/Dimensions toggle handling below fpRender()) so Save As
+        // reflects whichever of those two are currently switched on.
+        const hasLineLabel = !!(el.label && el.label.trim());
+        const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
+        const heightIn = el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96);
+        const lineDims = (fpGetShowDimensions() && !el.hideDims) ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
+        const lineNameText = (fpGetShowLabels() && !el.hideName && hasLineLabel) ? el.label : '';
+        const lineCombined = [lineNameText, lineDims && `(${lineDims})`].filter(Boolean).join(' ');
+        if(lineCombined){
+          const [midX,midY] = px((el.x1+el.x2)/2, (el.y1+el.y2)/2);
+          body += `<text x="${midX}" y="${midY-6}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(lineCombined)}</text>`;
         }
       } else if(el.type==='circle'){
         const [cx,cy] = px(el.cx,el.cy);
@@ -2418,8 +2472,13 @@
         return;
       }
       body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="0 0 ${item.w} ${item.d}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
-      if(item.label && item.label.trim()){
-        body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(item.label)}</text>`;
+      const hasObjLabel = !!(item.label && item.label.trim());
+      const objHeightIn = item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN;
+      const objDims = (fpGetShowDimensions() && !item.hideDims) ? `${Math.round(item.w)}×${Math.round(item.d)}×${Math.round(objHeightIn)} in` : '';
+      const objNameText = (fpGetShowLabels() && !item.hideName && hasObjLabel) ? item.label : '';
+      const objCombined = [objNameText, objDims && `(${objDims})`].filter(Boolean).join(' ');
+      if(objCombined){
+        body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(objCombined)}</text>`;
       }
     });
     return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
@@ -2864,13 +2923,39 @@
         const corners = [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([dx,dy])=>fpRotatePoint(el.cx+dx, el.cy+dy, el.cx, el.cy, el.rot||0));
         for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
       }
+      // Same name/dimension text as the raster/PDF export (fpBuildExportSvg)
+      // so the Labels/Dimensions toggles apply here too, not just PNG/JPG/PDF.
+      if(fpIsLineType(el.type)){
+        const hasLineLabel = !!(el.label && el.label.trim());
+        const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
+        const heightIn = el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96);
+        const lineDims = (fpGetShowDimensions() && !el.hideDims) ? `${fpFormatFeetIn(lenFt)} x ${fpFormatFeetIn(heightIn/12)}` : '';
+        const lineNameText = (fpGetShowLabels() && !el.hideName && hasLineLabel) ? el.label : '';
+        const lineCombined = [lineNameText, lineDims && `(${lineDims})`].filter(Boolean).join(' ');
+        if(lineCombined){
+          const midX=(el.x1+el.x2)/2, midY=(el.y1+el.y2)/2;
+          body += fpDxfText(midX, flipY(midY+0.3), lineCombined, 0.2);
+        }
+      }
     });
     fpState.objects.forEach(item=>{
       const hw=(item.w/12)/2, hd=(item.d/12)/2;
       const corners = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([dx,dy])=>fpRotatePoint(item.cx+dx, item.cy+dy, item.cx, item.cy, item.rot||0));
       for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
-      if(item.label && item.label.trim()){
-        body += fpDxfText(item.cx-hw, flipY(item.cy-hd-0.3), item.label, 0.25);
+      if(item.type==='label'){
+        // Room-name label -- always shown, same as fpBuildExportSvg's
+        // treatment of this object type.
+        const text = (item.label && item.label.trim()) || 'Untitled Room';
+        body += fpDxfText(item.cx-hw, flipY(item.cy-hd-0.3), text, 0.3);
+        return;
+      }
+      const hasObjLabel = !!(item.label && item.label.trim());
+      const objHeightIn = item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN;
+      const objDims = (fpGetShowDimensions() && !item.hideDims) ? `${Math.round(item.w)}x${Math.round(item.d)}x${Math.round(objHeightIn)} in` : '';
+      const objNameText = (fpGetShowLabels() && !item.hideName && hasObjLabel) ? item.label : '';
+      const objCombined = [objNameText, objDims && `(${objDims})`].filter(Boolean).join(' ');
+      if(objCombined){
+        body += fpDxfText(item.cx-hw, flipY(item.cy-hd-0.3), objCombined, 0.25);
       }
     });
     return `0\nSECTION\n2\nENTITIES\n${body}0\nENDSEC\n0\nEOF\n`;
@@ -3806,10 +3891,10 @@
         const hasLineLabel = !!(el.label && el.label.trim());
         const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
         const heightIn = el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96);
-        const dims = fpGetShowDimensions() ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
-        const nameText = (fpGetShowLabels() && hasLineLabel) ? el.label : '';
+        const dims = (fpGetShowDimensions() && !el.hideDims) ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
+        const nameText = (fpGetShowLabels() && !el.hideName && hasLineLabel) ? el.label : '';
         const combined = [nameText, dims && `(${dims})`].filter(Boolean).join(' ');
-        const showPlaceholder = fpGetShowLabels() && selected && !combined;
+        const showPlaceholder = fpGetShowLabels() && !el.hideName && selected && !combined;
         if(combined || showPlaceholder){
           const midX = (el.x1+el.x2)/2, midY = (el.y1+el.y2)/2;
           const lineLabel = document.createElement('div');
@@ -3923,14 +4008,14 @@
         // there's currently no separate structured-data channel to it.
         const hasLabel = !!(item.label && item.label.trim());
         const heightIn = item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN;
-        const dims = fpGetShowDimensions() ? `${Math.round(item.w)}×${Math.round(item.d)}×${Math.round(heightIn)} in` : '';
-        const nameText = (fpGetShowLabels() && hasLabel) ? item.label : '';
+        const dims = (fpGetShowDimensions() && !item.hideDims) ? `${Math.round(item.w)}×${Math.round(item.d)}×${Math.round(heightIn)} in` : '';
+        const nameText = (fpGetShowLabels() && !item.hideName && hasLabel) ? item.label : '';
         const combined = [nameText, dims && `(${dims})`].filter(Boolean).join(' ');
         if(combined){
           label.className = 'fp-item-label';
           label.style.display = '';
           label.textContent = combined;
-        } else if(fpGetShowLabels() && isSelected){
+        } else if(fpGetShowLabels() && !item.hideName && isSelected){
           label.className = 'fp-item-label placeholder';
           label.style.display = '';
           label.textContent = 'Add label';
@@ -4454,6 +4539,7 @@
       dimensionsToggleBtn.classList.toggle('active', show);
       fpRender();
     });
+    document.getElementById('fpSaveAsBtn').addEventListener('click', ()=> fpOpenExportModal());
     let fpResizeTimer = null;
     window.addEventListener('resize', ()=>{
       clearTimeout(fpResizeTimer);
