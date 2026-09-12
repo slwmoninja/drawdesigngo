@@ -249,6 +249,19 @@
   .fp-fav-heart-btn.is-fav{ color:var(--danger); }
   .fp-fav-heart-btn:hover:not(.is-fav){ color:var(--text); }
 
+  /* Delete badge on an uploaded-image library card (see
+     fpRefreshImageLibraryGrid()) -- opposite corner from the favorite heart
+     above so the two never overlap. Faint by default, same as the heart,
+     but goes straight to the danger color on hover since there's no
+     "toggled" state to distinguish -- clicking it always deletes. */
+  .fp-lib-delete-btn{
+    position:absolute; top:1px; left:1px; z-index:1; width:1.05rem; height:1.05rem;
+    padding:0; border:none; background:transparent; color:var(--dim); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; opacity:.55;
+    font-size:.9rem; line-height:1; font-weight:700;
+  }
+  .fp-lib-delete-btn:hover, .fp-lib-delete-btn:focus-visible{ opacity:1; color:var(--danger); }
+
   /* Live length readout shown near the midpoint of the in-progress preview
      line while drawing a wall/opening/window/door (see fpWireCanvasInteraction) --
      positioned by JS (left/top, feet*scale px), not by this rule. */
@@ -518,7 +531,7 @@
   @media print{
     body.fp-printing > *:not(#fpPrintContainer){ display:none !important; }
     body.fp-printing #fpPrintContainer{ display:block !important; }
-    #fpPrintContainer svg{ width:100%; height:auto; }
+    #fpPrintContainer svg, #fpPrintContainer img{ width:100%; height:auto; }
   }
 
   /* ---------- Install pill: pill-shaped, top-right of the topbar. The About
@@ -802,7 +815,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+ce8ae5e7';
+  const APP_VERSION = '1.0+1dc73fac';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1176,6 +1189,7 @@
   let fpSelectedId = null;
   let fpSelectedKind = null; // 'element' | 'object'
   let fpZoomMultiplier = 1; // manual zoom on top of auto-fit, reset by the Fit button
+  let fpLiveScale = 1; // px-per-foot fpRender() actually used last -- read by the raster-export path (see fpCaptureFullCanvasRaster) to map feet bounds onto the captured canvas's pixels
   let fpHistory = [];
   let fpIdSeq = 1;
   let fpMode = 'draw'; // 'select' | 'draw'
@@ -1217,7 +1231,8 @@
   // Sub-ranges of `wall` (t in [0,1], t=0 at (x1,y1), t=1 at (x2,y2)) that
   // are NOT covered by any opening/window/door element sitting on top of
   // it -- lets a plain wall visually "disappear" wherever the user has laid
-  // an opening over it (see the render loop and fpBuildExportSvg below).
+  // an opening over it (see the render loop below -- raster exports clone
+  // that same rendered DOM, so this applies there too).
   // Purely a render-time computation, never touches the wall's own
   // x1/y1/x2/y2, so moving or deleting the covering opening (which just
   // triggers the next render) makes the wall whole again automatically --
@@ -1662,6 +1677,11 @@
     fpRefreshImageLibraryGrid();
   }
 
+  function fpDeleteImageFromLibrary(id){
+    fpSaveImageLibrary(fpGetImageLibrary().filter(e=>e.id!==id));
+    fpRefreshImageLibraryGrid();
+  }
+
   function fpRefreshImageLibraryGrid(){
     const grid = document.getElementById('fpImageUploadGrid');
     if(!grid) return;
@@ -1677,8 +1697,8 @@
     fpGetImageLibrary().forEach(entry=>{
       const tpl = { label:entry.label, shape:'rect', icon:'image', img:entry.img, w:entry.w, d:entry.d };
       // A <div>, not a <button> -- it needs to contain its own nested heart
-      // <button> (see fpMakeFavHeartBtn() below), and a <button> can't
-      // contain another <button> per the HTML spec.
+      // and delete <button>s (see fpMakeFavHeartBtn() and the delete button
+      // below), and a <button> can't contain another <button> per the HTML spec.
       const btn = document.createElement('div');
       btn.className = 'fp-lib-item'; btn.draggable = true; btn.tabIndex = 0; btn.setAttribute('role','button');
       btn.title = `${entry.label} — drag onto the grid, or tap to add at center`;
@@ -1690,6 +1710,12 @@
         e.dataTransfer.effectAllowed = 'copy';
       });
       btn.appendChild(fpMakeFavHeartBtn(tpl));
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button'; delBtn.className = 'fp-lib-delete-btn'; delBtn.draggable = false;
+      delBtn.title = 'Delete this image from your library'; delBtn.innerHTML = '&times;';
+      delBtn.addEventListener('click', (e)=>{ e.stopPropagation(); fpDeleteImageFromLibrary(entry.id); });
+      delBtn.addEventListener('dragstart', (e)=> e.stopPropagation());
+      btn.appendChild(delBtn);
       grid.appendChild(btn);
     });
   }
@@ -1878,19 +1904,17 @@
       </label>
       <button class="btn" id="fpObjAutoDetectBtn" type="button" style="width:100%; margin-bottom:.6rem; border-color:var(--accent); color:var(--accent);">&#10024; Auto-detect dimensions</button>
       <p class="fp-hint" id="fpObjDetectStatus" style="margin:0 0 .6rem;"></p>
-      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.4rem;">
-        <input type="checkbox" id="fpObjHideName" ${item.hideName ? 'checked' : ''}>
-        <span>Hide name on this item, even when Labels is on</span>
-      </label>
-      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;">
-        <input type="checkbox" id="fpObjHideDims" ${item.hideDims ? 'checked' : ''}>
-        <span>Hide dimensions on this item, even when Dimensions is on</span>
-      </label>
+      <div style="display:flex; gap:.5rem; margin-bottom:.6rem;">
+        <button class="btn${item.hideName ? ' active' : ''}" id="fpObjHideNameBtn" type="button" style="flex:1;">Hide name</button>
+        <button class="btn${item.hideDims ? ' active' : ''}" id="fpObjHideDimsBtn" type="button" style="flex:1;">Hide dimensions</button>
+      </div>
       <button class="btn-primary" id="fpObjSaveBtn" type="button">Save</button>
     `);
     const nameInput = wrap.querySelector('#fpObjNameInput');
     const status = wrap.querySelector('#fpObjDetectStatus');
     nameInput.focus();
+    wrap.querySelector('#fpObjHideNameBtn').addEventListener('click', (e)=> e.currentTarget.classList.toggle('active'));
+    wrap.querySelector('#fpObjHideDimsBtn').addEventListener('click', (e)=> e.currentTarget.classList.toggle('active'));
     wrap.querySelector('#fpObjAutoDetectBtn').addEventListener('click', async ()=>{
       const name = nameInput.value.trim();
       if(!name){ status.textContent = 'Enter a name first.'; return; }
@@ -1911,8 +1935,8 @@
       item.w = Math.max(1, fpReadFtInFields(wrap, 'fpObjWidth', item.w));
       item.d = Math.max(1, fpReadFtInFields(wrap, 'fpObjDepth', item.d));
       item.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpObjHeight', item.heightIn||FP_DEFAULT_OBJ_HEIGHT_IN));
-      item.hideName = wrap.querySelector('#fpObjHideName').checked;
-      item.hideDims = wrap.querySelector('#fpObjHideDims').checked;
+      item.hideName = wrap.querySelector('#fpObjHideNameBtn').classList.contains('active');
+      item.hideDims = wrap.querySelector('#fpObjHideDimsBtn').classList.contains('active');
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -1969,14 +1993,10 @@
       <label class="mini" style="display:block; margin-bottom:.6rem;">H
         ${fpFtInFieldsHtml('fpLineHeight', el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96))}
       </label>
-      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.4rem;">
-        <input type="checkbox" id="fpLineHideName" ${el.hideName ? 'checked' : ''}>
-        <span>Hide name on this item, even when Labels is on</span>
-      </label>
-      <label class="mini" style="display:flex; align-items:center; gap:.4rem; margin-bottom:.6rem;">
-        <input type="checkbox" id="fpLineHideDims" ${el.hideDims ? 'checked' : ''}>
-        <span>Hide dimensions on this item, even when Dimensions is on</span>
-      </label>
+      <div style="display:flex; gap:.5rem; margin-bottom:.6rem;">
+        <button class="btn${el.hideName ? ' active' : ''}" id="fpLineHideNameBtn" type="button" style="flex:1;">Hide name</button>
+        <button class="btn${el.hideDims ? ' active' : ''}" id="fpLineHideDimsBtn" type="button" style="flex:1;">Hide dimensions</button>
+      </div>
       <div style="display:flex; gap:.5rem;">
         <button class="btn" id="fpLineDeleteBtn" type="button" style="flex:1; border-color:var(--danger); color:var(--danger);">Delete</button>
         <button class="btn-primary" id="fpLineSaveBtn" type="button" style="flex:1;">Save</button>
@@ -1984,6 +2004,8 @@
     `);
     const nameInput = wrap.querySelector('#fpLineNameInput');
     nameInput.focus();
+    wrap.querySelector('#fpLineHideNameBtn').addEventListener('click', (e)=> e.currentTarget.classList.toggle('active'));
+    wrap.querySelector('#fpLineHideDimsBtn').addEventListener('click', (e)=> e.currentTarget.classList.toggle('active'));
     wrap.querySelector('#fpLineDeleteBtn').addEventListener('click', ()=>{
       fpPushHistory();
       fpState.elements = fpState.elements.filter(e=>e.id!==el.id);
@@ -1999,8 +2021,8 @@
       const ux = (el.x2-el.x1)/curLen, uy = (el.y2-el.y1)/curLen;
       el.x2 = el.x1 + ux*newLenFt; el.y2 = el.y1 + uy*newLenFt;
       el.heightIn = Math.max(1, fpReadFtInFields(wrap, 'fpLineHeight', el.heightIn||FP_DEFAULT_HEIGHT_IN[el.type]||96));
-      el.hideName = wrap.querySelector('#fpLineHideName').checked;
-      el.hideDims = wrap.querySelector('#fpLineHideDims').checked;
+      el.hideName = wrap.querySelector('#fpLineHideNameBtn').classList.contains('active');
+      el.hideDims = wrap.querySelector('#fpLineHideDimsBtn').classList.contains('active');
       fpSave(); fpRender();
       wrap.remove();
     }
@@ -2381,107 +2403,105 @@
     return fpBoundsFor(fpSelectedKind, fpSelectedId);
   }
 
-  // Builds a standalone, self-contained SVG string of the plan (or a region
-  // of it) at a fixed export scale -- independent of the on-screen zoom --
-  // for rasterizing to PNG/JPG, printing to PDF, or copying to the clipboard.
-  const FP_EXPORT_SCALE = 40; // px per foot
-  function fpBuildExportSvg(bounds){
-    const scale = FP_EXPORT_SCALE;
-    const w = Math.max(1, Math.round((bounds.maxX-bounds.minX)*scale));
-    const h = Math.max(1, Math.round((bounds.maxY-bounds.minY)*scale));
-    const px = (x,y) => [ (x-bounds.minX)*scale, (y-bounds.minY)*scale ];
-    let body = '';
-    if(fpGetShowGrid()){
-      // Mirrors fpApplyGridBackground()'s CSS pattern as real SVG lines --
-      // that background is screen-only (not part of this serialized SVG),
-      // so without this the Grid toggle had no effect on Save As output.
-      const minorStep = FP_GRID_STEP, majorEvery = Math.round(5/FP_GRID_STEP);
-      const firstCol = Math.ceil(bounds.minX/minorStep), lastCol = Math.floor(bounds.maxX/minorStep);
-      const firstRow = Math.ceil(bounds.minY/minorStep), lastRow = Math.floor(bounds.maxY/minorStep);
-      for(let i=firstCol; i<=lastCol; i++){
-        const x = i*minorStep;
-        const [x1,y1] = px(x, bounds.minY), [x2,y2] = px(x, bounds.maxY);
-        const color = (i%majorEvery===0) ? 'rgba(74,144,217,.4)' : 'rgba(74,144,217,.16)';
-        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1"/>`;
-      }
-      for(let j=firstRow; j<=lastRow; j++){
-        const y = j*minorStep;
-        const [x1,y1] = px(bounds.minX, y), [x2,y2] = px(bounds.maxX, y);
-        const color = (j%majorEvery===0) ? 'rgba(74,144,217,.4)' : 'rgba(74,144,217,.16)';
-        body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="1"/>`;
-      }
-    }
-    fpState.elements.forEach(el=>{
-      if(fpIsLineType(el.type)){
-        const lineStyle = FP_LINE_TYPE_STYLE[el.type];
-        const stroke = lineStyle ? lineStyle.stroke : '#2a2f36';
-        const dash = lineStyle ? lineStyle.dash : (el.type==='dashedline' ? '10,7' : null);
-        const strokeWidth = lineStyle ? FP_OPENING_STROKE_WIDTH : FP_WALL_STROKE_WIDTH;
-        // Plain walls skip whatever range an opening/window/door on top of
-        // them covers, same as the live canvas (see fpVisibleWallRanges()) --
-        // exported art shouldn't show a solid wall poking through a door.
-        const ranges = lineStyle ? [[0,1]] : fpVisibleWallRanges(el, fpState.elements);
-        ranges.forEach(([lo,hi])=>{
-          const [x1,y1] = px(el.x1+(el.x2-el.x1)*lo, el.y1+(el.y2-el.y1)*lo);
-          const [x2,y2] = px(el.x1+(el.x2-el.x1)*hi, el.y1+(el.y2-el.y1)*hi);
-          body += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;
+  // ---- Raster exports (PNG/JPG/PDF/clipboard): captured straight from the
+  // live #fpCanvas DOM, not rebuilt from fpState -- a hand-rolled redraw
+  // (the old approach) inevitably drifts from what's actually on screen
+  // (missed a furniture icon whose artwork is an <image> reference, drew
+  // wall labels horizontally even when the live one is rotated 90deg to run
+  // along a vertical wall, ignored any dragged label offset). Cloning the
+  // real DOM and rasterizing that instead makes "looks like the screen" true
+  // by construction: whatever's actually rendered -- icons, label position/
+  // rotation, Grid/Labels/Dimensions toggles, per-item hideName/hideDims --
+  // comes along for free because it's the same nodes, not a second
+  // implementation of the same rules. DXF is the one exception: it's real
+  // CAD vector geometry in feet, which has no "screen pixels" to clone, so
+  // fpBuildDxf() below still walks fpState directly.
+  const FP_EXPORT_SCALE = 40; // px per foot, used to size the final crop -- independent of the live on-screen zoom
+  // Resource refs baked into the app (furniture icons, seeded logos) are
+  // relative ("./library/x.png"). Beyond just failing to resolve once this
+  // DOM is serialized into a standalone SVG string loaded via a data: URI
+  // (see fpRasterizeSvg) -- which absolute-URL-ing alone would fix -- an
+  // <image> that's still a separate HTTP fetch, nested inside a
+  // <foreignObject>, isn't reliably awaited by the outer <img>'s own load
+  // event; the outer SVG can finish "loading" and get rasterized before that
+  // inner fetch completes, silently rasterizing a blank spot. Inlining every
+  // reference as a data: URL up front removes the pending fetch entirely, so
+  // there's nothing left for that race to lose. Already-inline data URLs
+  // (user uploads) are left alone.
+  async function fpInlineImages(root){
+    const targets = [
+      ...[...root.querySelectorAll('image[href]')].map(n=>({n, attr:'href'})),
+      ...[...root.querySelectorAll('img[src]')].map(n=>({n, attr:'src'})),
+    ];
+    await Promise.all(targets.map(async ({n, attr})=>{
+      const val = n.getAttribute(attr);
+      if(!val || val.startsWith('data:')) return;
+      const abs = new URL(val, document.baseURI).href;
+      try{
+        const blob = await fetch(abs).then(r=>r.blob());
+        const dataUrl = await new Promise((resolve,reject)=>{
+          const reader = new FileReader();
+          reader.onload = ()=> resolve(reader.result);
+          reader.onerror = ()=> reject(reader.error);
+          reader.readAsDataURL(blob);
         });
-        if(lineStyle && lineStyle.double){
-          const dxr = el.x2-el.x1, dyr = el.y2-el.y1, len = Math.hypot(dxr,dyr)||1;
-          const off = 2.5/scale;
-          const [ox1,oy1] = px(el.x1-dyr/len*off, el.y1+dxr/len*off);
-          const [ox2,oy2] = px(el.x2-dyr/len*off, el.y2+dxr/len*off);
-          body += `<line x1="${ox1}" y1="${oy1}" x2="${ox2}" y2="${oy2}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round"/>`;
-        }
-        // Same name/dimension text as the live canvas's draggable label (see
-        // the Labels/Dimensions toggle handling below fpRender()) so Save As
-        // reflects whichever of those two are currently switched on.
-        const hasLineLabel = !!(el.label && el.label.trim());
-        const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
-        const heightIn = el.heightIn!=null ? el.heightIn : (FP_DEFAULT_HEIGHT_IN[el.type]||96);
-        const lineDims = (fpGetShowDimensions() && !el.hideDims) ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
-        const lineNameText = (fpGetShowLabels() && !el.hideName && hasLineLabel) ? el.label : '';
-        const lineCombined = [lineNameText, lineDims && `(${lineDims})`].filter(Boolean).join(' ');
-        if(lineCombined){
-          const [midX,midY] = px((el.x1+el.x2)/2, (el.y1+el.y2)/2);
-          body += `<text x="${midX}" y="${midY-6}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(lineCombined)}</text>`;
-        }
-      } else if(el.type==='circle'){
-        const [cx,cy] = px(el.cx,el.cy);
-        body += `<circle cx="${cx}" cy="${cy}" r="${el.r*scale}" stroke="#2a2f36" stroke-width="2" fill="none"/>`;
-      } else if(el.type==='oval'){
-        const [cx,cy] = px(el.cx,el.cy);
-        body += `<ellipse cx="${cx}" cy="${cy}" rx="${el.w/2*scale}" ry="${el.h/2*scale}" stroke="#2a2f36" stroke-width="2" fill="none" transform="rotate(${el.rot||0} ${cx} ${cy})"/>`;
-      } else {
-        const [x,y] = px(el.cx-el.w/2, el.cy-el.h/2);
-        const [cx,cy] = px(el.cx,el.cy);
-        body += `<rect x="${x}" y="${y}" width="${el.w*scale}" height="${el.h*scale}" stroke="#2a2f36" stroke-width="2" fill="none" transform="rotate(${el.rot||0} ${cx} ${cy})"/>`;
-      }
-    });
-    fpState.objects.forEach(item=>{
-      const pw = (item.w/12)*scale, pd = (item.d/12)*scale;
-      const [x,y] = px(item.cx-item.w/24, item.cy-item.d/24);
-      const [cx,cy] = px(item.cx,item.cy);
-      if(item.type==='label'){
-        // Room-name labels bake straight into Print/PDF/PNG/JPG/Copy-all as a
-        // real heading -- no icon artwork, and left-anchored (not centered)
-        // so it reads like a title sitting at its placed point rather than a
-        // furniture caption floating below a shape.
-        const text = (item.label && item.label.trim()) || 'Untitled Room';
-        body += `<text x="${x}" y="${cy}" text-anchor="start" dominant-baseline="middle" font-size="18" font-weight="700" fill="#1f6b2c" font-family="sans-serif">${fpEscapeHtml(text)}</text>`;
-        return;
-      }
-      body += `<g transform="rotate(${item.rot||0} ${cx} ${cy})"><svg x="${x}" y="${y}" width="${pw}" height="${pd}" viewBox="0 0 ${item.w} ${item.d}" preserveAspectRatio="none">${fpIconMarkup(item)}</svg></g>`;
-      const hasObjLabel = !!(item.label && item.label.trim());
-      const objHeightIn = item.heightIn!=null ? item.heightIn : FP_DEFAULT_OBJ_HEIGHT_IN;
-      const objDims = (fpGetShowDimensions() && !item.hideDims) ? `${Math.round(item.w)}×${Math.round(item.d)}×${Math.round(objHeightIn)} in` : '';
-      const objNameText = (fpGetShowLabels() && !item.hideName && hasObjLabel) ? item.label : '';
-      const objCombined = [objNameText, objDims && `(${objDims})`].filter(Boolean).join(' ');
-      if(objCombined){
-        body += `<text x="${cx}" y="${y+pd+13}" text-anchor="middle" font-size="11" fill="#2a2f36" font-family="sans-serif">${fpEscapeHtml(objCombined)}</text>`;
-      }
-    });
-    return `<svg xmlns="${SVG_NS}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect x="0" y="0" width="${w}" height="${h}" fill="#ffffff"/>${body}</svg>`;
+        n.setAttribute(attr, dataUrl);
+      }catch(e){ n.setAttribute(attr, abs); } // couldn't inline -- absolute URL is still better than the original relative one
+    }));
+  }
+  // Clones the live plan canvas -- exactly as currently rendered, at
+  // whatever zoom the user is at -- strips the bits that only make sense
+  // interactively (selection outlines/handles, "Add label" placeholders),
+  // and rasterizes it 1:1 (no scaling) into an offscreen canvas. Callers
+  // then crop+rescale from this to the region/resolution they actually want
+  // (see fpCaptureRasterForBounds), since the full canvas is a fixed grid
+  // that's typically much bigger than just the drawn content.
+  async function fpCaptureFullCanvasRaster(){
+    const liveCanvas = document.getElementById('fpCanvas');
+    const w = liveCanvas.offsetWidth, h = liveCanvas.offsetHeight;
+    const clone = liveCanvas.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.style.border = 'none';
+    clone.style.boxShadow = 'none';
+    clone.querySelectorAll('.fp-node, .fp-rotate-node, .fp-marquee').forEach(n=>n.remove());
+    clone.querySelectorAll('.fp-item-label.placeholder').forEach(n=>n.remove());
+    clone.querySelectorAll('.selected').forEach(n=>n.classList.remove('selected'));
+    clone.querySelectorAll('.fp-multi-selected').forEach(n=>n.classList.remove('fp-multi-selected'));
+    // Nested <svg> (the walls layer, each furniture icon) silently vanish
+    // without this: .outerHTML on a subtree that's about to be dropped into
+    // a hand-built XML wrapper doesn't carry the SVG namespace along with
+    // it, so once parsed as strict XML they're unqualified elements the
+    // renderer doesn't recognize as SVG at all -- not an error, just nothing
+    // drawn.
+    clone.querySelectorAll('svg').forEach(s=> s.setAttribute('xmlns', SVG_NS));
+    await fpInlineImages(clone);
+    // CDATA, not a raw template-literal drop-in -- this file's CSS comments
+    // reference tags like "<button>" and "<select>" in plain English, which
+    // a strict XML parser (this whole thing is parsed as XML once it's a
+    // data:image/svg+xml source) reads as real markup and chokes on.
+    const styleText = document.querySelector('style').textContent.replace(/]]>/g, ']] >');
+    const svgString = `<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<foreignObject width="${w}" height="${h}"><div xmlns="http://www.w3.org/1999/xhtml"><style><![CDATA[${styleText}]]></style>${clone.outerHTML}</div></foreignObject></svg>`;
+    const canvas = await fpRasterizeSvg(svgString, w, h);
+    return { canvas, scale: fpLiveScale };
+  }
+  // Crops the full-canvas capture down to a feet-space region (plan bounds
+  // or just the current selection) and rescales it to FP_EXPORT_SCALE, so
+  // exports stay tightly framed around actual content and print at a
+  // consistent resolution no matter what zoom level the plan happened to be
+  // viewed at when "Save As" was clicked.
+  async function fpCaptureRasterForBounds(bounds){
+    const { canvas: full, scale } = await fpCaptureFullCanvasRaster();
+    const sx = bounds.minX*scale, sy = bounds.minY*scale;
+    const sw = (bounds.maxX-bounds.minX)*scale, sh = (bounds.maxY-bounds.minY)*scale;
+    const dw = Math.max(1, Math.round((bounds.maxX-bounds.minX)*FP_EXPORT_SCALE));
+    const dh = Math.max(1, Math.round((bounds.maxY-bounds.minY)*FP_EXPORT_SCALE));
+    const out = document.createElement('canvas');
+    out.width = dw; out.height = dh;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,dw,dh);
+    ctx.drawImage(full, sx, sy, sw, sh, 0, 0, dw, dh);
+    return out;
   }
   function fpRasterizeSvg(svgString, w, h){
     return new Promise((resolve,reject)=>{
@@ -2852,9 +2872,7 @@
 
   async function fpExportRaster(format){ // 'png' | 'jpeg'
     const bounds = fpComputePlanBounds();
-    const svg = fpBuildExportSvg(bounds);
-    const w = Math.round((bounds.maxX-bounds.minX)*FP_EXPORT_SCALE), h = Math.round((bounds.maxY-bounds.minY)*FP_EXPORT_SCALE);
-    const canvas = await fpRasterizeSvg(svg, w, h);
+    const canvas = await fpCaptureRasterForBounds(bounds);
     const mime = format==='jpeg' ? 'image/jpeg' : 'image/png';
     const blob = await new Promise(res=>canvas.toBlob(res, mime, 0.95));
     if(!blob){ toast('Could not create the image.', true); return; }
@@ -2864,9 +2882,9 @@
 
   async function fpExportPdf(){
     const bounds = fpComputePlanBounds();
-    const svg = fpBuildExportSvg(bounds);
+    const canvas = await fpCaptureRasterForBounds(bounds);
     const container = document.getElementById('fpPrintContainer');
-    container.innerHTML = svg;
+    container.innerHTML = `<img src="${canvas.toDataURL('image/png')}" alt="">`;
     document.body.classList.add('fp-printing');
     window.print();
     // No reliable "print dialog closed" event across browsers -- clear the
@@ -2923,8 +2941,9 @@
         const corners = [[-hw,-hh],[hw,-hh],[hw,hh],[-hw,hh]].map(([dx,dy])=>fpRotatePoint(el.cx+dx, el.cy+dy, el.cx, el.cy, el.rot||0));
         for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
       }
-      // Same name/dimension text as the raster/PDF export (fpBuildExportSvg)
-      // so the Labels/Dimensions toggles apply here too, not just PNG/JPG/PDF.
+      // Same name/dimension text the live canvas shows (see fpRender below)
+      // so the Labels/Dimensions toggles apply to DXF too, not just what the
+      // raster/PDF export sees by cloning that canvas directly.
       if(fpIsLineType(el.type)){
         const hasLineLabel = !!(el.label && el.label.trim());
         const lenFt = Math.hypot(el.x2-el.x1, el.y2-el.y1);
@@ -2943,8 +2962,8 @@
       const corners = [[-hw,-hd],[hw,-hd],[hw,hd],[-hw,hd]].map(([dx,dy])=>fpRotatePoint(item.cx+dx, item.cy+dy, item.cx, item.cy, item.rot||0));
       for(let i=0;i<4;i++){ const a=corners[i], b=corners[(i+1)%4]; body += fpDxfLine(a[0], flipY(a[1]), b[0], flipY(b[1])); }
       if(item.type==='label'){
-        // Room-name label -- always shown, same as fpBuildExportSvg's
-        // treatment of this object type.
+        // Room-name label -- always shown, same as the live canvas's
+        // treatment of this object type (see fpRender below).
         const text = (item.label && item.label.trim()) || 'Untitled Room';
         body += fpDxfText(item.cx-hw, flipY(item.cy-hd-0.3), text, 0.3);
         return;
@@ -2992,10 +3011,8 @@
       if(sel) bounds = { minX:sel.minX-1, minY:sel.minY-1, maxX:sel.maxX+1, maxY:sel.maxY+1 };
     }
     if(!bounds) bounds = fpComputePlanBounds();
-    const svg = fpBuildExportSvg(bounds);
-    const w = Math.round((bounds.maxX-bounds.minX)*FP_EXPORT_SCALE), h = Math.round((bounds.maxY-bounds.minY)*FP_EXPORT_SCALE);
     try{
-      const canvas = await fpRasterizeSvg(svg, w, h);
+      const canvas = await fpCaptureRasterForBounds(bounds);
       const blob = await new Promise(res=>canvas.toBlob(res,'image/png'));
       await navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
       toast(successMsg || 'Copied to clipboard.');
@@ -3179,8 +3196,10 @@
   // Seeds a single editable "room name" text object at the top-left of a
   // fresh plan, defaulted to a generic placeholder (NOT the project title --
   // the two are deliberately independent, see below) -- exists so Print/PDF/
-  // PNG/JPG/Copy all bake a real room label into the exported plan (see
-  // fpBuildExportSvg()'s type==='label' branch). Editing it never touches
+  // PNG/JPG/Copy all bake a real room label into the exported plan (those
+  // exports clone the live canvas -- see fpCaptureFullCanvasRaster -- so
+  // whatever's rendered here, per fpRender's own type==='label' handling
+  // below, comes along automatically). Editing it never touches
   // fpState.title, and vice versa (see fpOpenRoomLabelModal()). Guarded by
   // roomLabelSeeded, persisted on fpState itself, so this only ever runs
   // once per project: it backfills existing plans saved before this feature
@@ -3736,6 +3755,7 @@
     const availW = wrap ? wrap.clientWidth - 80 : 0; // minus 40px padding each side
     const autoFit = (availW > 0) ? Math.min(1, availW/naturalW) : 1;
     const scale = FP_SCALE * autoFit * fpZoomMultiplier;
+    fpLiveScale = scale;
     const zoomLabel = document.getElementById('fpZoomLabel');
     if(zoomLabel) zoomLabel.textContent = Math.round(autoFit*fpZoomMultiplier*100)+'%';
     const w = gridSize.w * scale, d = gridSize.h * scale;
@@ -3950,9 +3970,9 @@
         // furniture caption (fpWireDraggableLabel below, which drags a
         // separate labelDx/labelDy offset from its shape), there's no
         // separate shape here for the text to float next to -- so dragging
-        // the text moves item.cx/cy directly, the same coordinate export
-        // (fpBuildExportSvg) reads, rather than an offset export wouldn't
-        // know about. Editing it (fpOpenRoomLabelModal) only ever touches
+        // the text moves item.cx/cy directly (raster exports clone this DOM
+        // node as-is, so there's no separate offset an export could miss).
+        // Editing it (fpOpenRoomLabelModal) only ever touches
         // this object's own item.label, never fpState.title -- see
         // fpEnsureRoomLabel().
         label.className = 'fp-item-label fp-room-label-text';
@@ -3964,11 +3984,10 @@
         // them instead of sizing to the text's actual content height, which
         // was collapsing every measurement below to ~0.
         // Anchored at the object's own left edge (local x=0) and only
-        // vertically centered -- matches fpBuildExportSvg's text-anchor
-        // "start" at this same point (item.cx - halfWidth), so the text
-        // only ever grows rightward, into the room, instead of centering on
-        // cx and bleeding an unbounded (max-width:none) string half off the
-        // left edge of the grid when cx is close to x=0.
+        // vertically centered, so the text only ever grows rightward, into
+        // the room, instead of centering on cx and bleeding an unbounded
+        // (max-width:none) string half off the left edge of the grid when
+        // cx is close to x=0.
         Object.assign(label.style, { left:'0px', top:(pd/2)+'px', right:'auto', bottom:'auto', transform:'translate(0,-50%)' });
         let labelDragged = false;
         label.addEventListener('pointerdown', (e)=>{
