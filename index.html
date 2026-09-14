@@ -815,7 +815,7 @@
           <button class="btn shop-chip" type="button" data-cat="Other">Other</button>
         </div>
         <input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="Add specifics -- e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">
-        <button class="btn" id="shopSearchAllBtn" type="button" title="If your browser blocks extra tabs, allow pop-ups for this site or click the links below one at a time." style="width:100%; margin-bottom:.5rem; font-weight:700; border-color:var(--accent); color:var(--accent);">Search All 4 at Once</button>
+        <button class="btn" id="shopSearchAllBtn" type="button" style="width:100%; margin-bottom:.5rem; font-weight:700; border-color:var(--accent); color:var(--accent);">Search All 4 at Once</button>
         <div class="shop-brand-links" id="shopBrandLinks"></div>
 
         <div class="shop-bookmarklet-setup">
@@ -828,7 +828,7 @@
         </div>
         <div class="shop-bookmarklet-setup">
           <h4>Step 2: Use while browsing</h4>
-          <p class="fp-hint">One item: <strong>Save This Item</strong>. Many items: <strong>Save All Results</strong>.</p>
+          <p class="fp-hint">Click over to the store's tab first. One item: <strong>Save This Item</strong>. Many items: <strong>Save All Results</strong>.</p>
         </div>
       </div>
 
@@ -933,7 +933,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+87f25cf9';
+  const APP_VERSION = '1.0+9a1c2521';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5396,6 +5396,17 @@
     const appUrl = location.origin + location.pathname;
     const fn = function(){
      try{
+      /* Bookmarklets run on whatever tab is currently active when you
+         click them in the bookmarks bar -- if a store's page opened in a
+         background tab (e.g. via "Search All 4 at Once", which doesn't
+         switch you to the new tab), clicking the bookmarklet while still
+         looking at the DrawDesignGo tab silently runs it against our own
+         page instead. Catch that specific case with a clear message
+         rather than a confusing "no product found" a moment later. */
+      if(location.href.indexOf('APP_URL_PLACEHOLDER')===0){
+        alert('Switch to the store\'s tab first, then click this again.');
+        throw new Error('__handled__');
+      }
       function metaContent(sel){ var el = document.querySelector(sel); return el ? (el.getAttribute('content') || el.textContent || '').trim() : ''; }
       function productLD(){
         var scripts = [].slice.call(document.querySelectorAll('script[type="application/ld+json"]'));
@@ -5409,11 +5420,11 @@
         return null;
       }
       var name='', price='', image='';
-      // Real, large, on-page <img> as a photo candidate -- excludes obvious
-      // logo/icon/sprite/QR/promo images and requires a decent decoded
-      // size so small nav/swatch/badge icons don't win. Used as the
-      // final catch-all fallback below, and (for S&L specifically) tried
-      // before the meta tag -- see the serenaandlily.com branch.
+      /* Real, large, on-page <img> as a photo candidate -- excludes obvious
+         logo/icon/sprite/QR/promo images and requires a decent decoded
+         size so small nav/swatch/badge icons don't win. Used as the
+         final catch-all fallback below, and (for S&L specifically) tried
+         before the meta tag -- see the serenaandlily.com branch. */
       function domGalleryImage(){
         var imgs = [].slice.call(document.querySelectorAll('img')).filter(function(i){
           return i.naturalWidth>=200 && i.naturalHeight>=200 && !/logo|sprite|icon|qr[-_]|badge|promo/i.test(i.src);
@@ -5421,17 +5432,17 @@
         imgs.sort(function(a,b){ return (b.naturalWidth*b.naturalHeight)-(a.naturalWidth*a.naturalHeight); });
         return imgs[0] ? imgs[0].src : '';
       }
-      // Found live on Serena & Lily (2026-09-14): og:image and
-      // itemprop="image" both point at an Amplience "swatch set" asset ID
-      // that itself resolves to S&L's own "IMAGE UNAVAILABLE" placeholder
-      // graphic -- a valid, loadable image file, just not a photo of the
-      // product. The real photo lives in a plain rendered <img> (a Scene7
-      // render URL) elsewhere on the page. This is host-scoped rather than
-      // applied to every brand because the opposite trade-off is also
-      // real: on Pottery Barn, "largest on-page image" caught a 3000x3000
-      // QR-code promo graphic instead of the actual (smaller) product
-      // photo, while PB's own og:image was correct. So each brand gets
-      // whichever source is verified-correct for it, not one blanket rule.
+      /* Found live on Serena & Lily (2026-09-14): og:image and
+         itemprop="image" both point at an Amplience "swatch set" asset ID
+         that itself resolves to S&L's own "IMAGE UNAVAILABLE" placeholder
+         graphic -- a valid, loadable image file, just not a photo of the
+         product. The real photo lives in a plain rendered <img> (a Scene7
+         render URL) elsewhere on the page. This is host-scoped rather than
+         applied to every brand because the opposite trade-off is also
+         real: on Pottery Barn, "largest on-page image" caught a 3000x3000
+         QR-code promo graphic instead of the actual (smaller) product
+         photo, while PB's own og:image was correct. So each brand gets
+         whichever source is verified-correct for it, not one blanket rule. */
       if(/(^|\.)serenaandlily\.com$/.test(location.hostname)) image = domGalleryImage();
       var scope = document.querySelector('[itemtype*="schema.org/Product"]');
       if(scope){
@@ -5483,10 +5494,19 @@
       var w = window.open(target, '_blank');
       if(!w) location.href = target;
      }catch(e){
+      if(e && e.message === '__handled__') return;
       alert('DrawDesignGo: could not save this item (' + (e && e.message || e) + '). Make sure you\'re on one item\'s own page, not a search results list -- use "Save All Results" for those.');
      }
     };
-    const body = fn.toString().replace('APP_URL_PLACEHOLDER', appUrl);
+    // Collapse to one line ourselves rather than relying on however the
+    // browser happens to serialize a multi-line string into the <a>'s
+    // href -- setting .href on a real DOM element was found (2026-09-15)
+    // to silently turn embedded newlines into spaces, which merges a `//`
+    // comment with everything that follows it into one unterminated
+    // comment, deleting the rest of the function. Block comments (/* */)
+    // fixed the immediate case, but doing this ourselves means it can't
+    // recur no matter what comment style ends up in here later.
+    const body = fn.toString().replace(/\s+/g, ' ').replace(/APP_URL_PLACEHOLDER/g, appUrl);
     return 'javascript:(' + body + ')();';
   }
 
@@ -5519,6 +5539,12 @@
     const appUrl = location.origin + location.pathname;
     const fn = function(){
      try{
+      /* See the same check in fpShopBookmarkletSrc -- catches clicking
+         this while still on the DrawDesignGo tab instead of the store's. */
+      if(location.href.indexOf('APP_URL_PLACEHOLDER')===0){
+        alert('Switch to the store\'s tab first, then click this again.');
+        throw new Error('__handled__');
+      }
       function abs(u){ if(!u) return ''; if(u.slice(0,2)==='//') return location.protocol + u; try{ return new URL(u, location.href).href; }catch(e){ return u; } }
       function firstPrice(text){ var m = (text||'').match(/\$[\d,]+(?:\.\d{2})?/); return m ? m[0].replace('$','').replace(/,/g,'') : ''; }
       var items = [];
@@ -5578,10 +5604,11 @@
       var w = window.open(target, '_blank');
       if(!w) location.href = target;
      }catch(e){
+      if(e && e.message === '__handled__') return;
       alert('DrawDesignGo: ' + (e && e.message || e));
      }
     };
-    const body = fn.toString().replace('APP_URL_PLACEHOLDER', appUrl);
+    const body = fn.toString().replace(/\s+/g, ' ').replace(/APP_URL_PLACEHOLDER/g, appUrl);
     return 'javascript:(' + body + ')();';
   }
 
@@ -5693,8 +5720,15 @@
     // than calling window.open() in a loop -- browsers are far more
     // willing to let a genuine anchor click through their popup blocker
     // than a script-driven window.open(), especially several in a row.
+    // Even so, a browser's per-click "how many new tabs am I willing to
+    // open" budget is inherently inconsistent (Russ saw 2 tabs once, 1
+    // the next time, same button, same page) -- there's no reliable way
+    // to detect from here how many actually made it through, so rather
+    // than a hover-only tooltip nobody saw, always surface a toast right
+    // when the button is clicked telling them what to do about the rest.
     document.getElementById('shopSearchAllBtn').addEventListener('click', ()=>{
       document.querySelectorAll('#shopBrandLinks .shop-brand-link').forEach(a => a.click());
+      toast('Opened what your browser allowed. Click any store below for the rest.');
     });
 
     document.getElementById('shopFilterCat').addEventListener('change', fpRenderShopItems);
