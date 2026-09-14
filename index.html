@@ -216,14 +216,12 @@
   .shop-panel h4{ margin:.9rem 0 .2rem; font-size:.82rem; color:var(--dim); }
   .shop-cat-chips{ display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; }
   .shop-chip{ padding:.3rem .7rem; font-size:.78rem; }
-  .shop-brand-links{ display:flex; flex-direction:column; gap:.4rem; margin-top:.5rem; }
-  .shop-brand-link{
-    display:flex; align-items:center; justify-content:space-between; padding:.5rem .7rem;
-    border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text);
-    text-decoration:none; font-size:.84rem; font-weight:600;
-  }
-  .shop-brand-link:hover{ border-color:var(--accent); }
-  .shop-brand-link .fp-hint{ margin:0; font-weight:400; }
+  .shop-brand-checks{ display:flex; flex-direction:column; gap:.35rem; margin:.6rem 0; }
+  .shop-check{ display:flex; align-items:center; gap:.45rem; font-size:.84rem; font-weight:600; cursor:pointer; }
+  .shop-check input{ width:1rem; height:1rem; accent-color:var(--accent); }
+  .shop-price-row{ display:flex; align-items:center; gap:.5rem; margin:.6rem 0; }
+  .shop-price-row label{ font-size:.84rem; font-weight:600; white-space:nowrap; }
+  .shop-price-row input{ width:7rem; }
   .shop-bookmarklet-setup{ border-top:1px solid var(--border); margin-top:.9rem; padding-top:.7rem; }
 
   .shop-results-head{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-bottom:.7rem; }
@@ -815,8 +813,18 @@
           <button class="btn shop-chip" type="button" data-cat="Other">Other</button>
         </div>
         <input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="Add specifics -- e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">
-        <button class="btn" id="shopSearchAllBtn" type="button" style="width:100%; margin-bottom:.5rem; font-weight:700; border-color:var(--accent); color:var(--accent);">Search All 4 at Once</button>
-        <div class="shop-brand-links" id="shopBrandLinks"></div>
+        <div class="shop-brand-checks" id="shopBrandChecks">
+          <label class="shop-check"><input type="checkbox" value="Ethan Allen" checked>Ethan Allen</label>
+          <label class="shop-check"><input type="checkbox" value="Pottery Barn" checked>Pottery Barn</label>
+          <label class="shop-check"><input type="checkbox" value="Restoration Hardware" checked>Restoration Hardware</label>
+          <label class="shop-check"><input type="checkbox" value="Serena & Lily" checked>Serena & Lily</label>
+          <label class="shop-check"><input type="checkbox" id="shopOtherStoresCheck">Other stores</label>
+        </div>
+        <div class="shop-price-row">
+          <label for="shopMaxPrice">Up to $</label>
+          <input type="number" id="shopMaxPrice" class="fp-detail-input" placeholder="No limit" min="0" step="50">
+        </div>
+        <button class="btn" id="shopSearchAllBtn" type="button" style="width:100%; margin:.5rem 0; font-weight:700; border-color:var(--accent); color:var(--accent);">Search</button>
 
         <div class="shop-bookmarklet-setup">
           <h4>Step 1: Set up once</h4>
@@ -844,6 +852,7 @@
               <option value="Display">Display</option>
               <option value="Other">Other</option>
             </select>
+            <input type="number" id="shopFilterMaxPrice" class="fp-key-btn" placeholder="Up to $" min="0" step="50" style="width:6.5rem;">
             <select id="shopSortBy" class="fp-key-btn">
               <option value="addedAt">Newest first</option>
               <option value="priceAsc">Price: low to high</option>
@@ -933,7 +942,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+9a1c2521';
+  const APP_VERSION = '1.0+4d14bbc0';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5350,13 +5359,19 @@
   }
   function fpSaveShopItems(items){ try{ localStorage.setItem(FP_SHOP_ITEMS_KEY, JSON.stringify(items)); }catch(e){} }
 
-  // One search-URL builder per brand -- each confirmed live (not guessed)
-  // by actually running the search in a real browser session.
+  // Brand list -- host used to attribute a captured item's brand when it
+  // was saved directly from that brand's own site (single-item/bulk
+  // bookmarklet on a retailer's own page); queryName used to build the
+  // combined Bing Shopping search below (matches how a person would
+  // naturally type the brand into a query, not the display name -- e.g.
+  // "serena and lily" not "Serena & Lily", confirmed live against
+  // bing.com/shop, which parses a "<item>: brand1, brand2, ..." query
+  // into its own native brand/price filters).
   const FP_SHOP_BRANDS = [
-    { name:'Ethan Allen', host:'ethanallen.com', searchUrl: q => `https://www.ethanallen.com/en_US/search?q=${encodeURIComponent(q)}` },
-    { name:'Pottery Barn', host:'potterybarn.com', searchUrl: q => `https://www.potterybarn.com/search/results.html?words=${encodeURIComponent(q)}` },
-    { name:'Restoration Hardware', host:'rh.com', searchUrl: q => `https://rh.com/us/en/search/results.jsp?Ntt=${encodeURIComponent(q)}` },
-    { name:'Serena & Lily', host:'serenaandlily.com', searchUrl: q => `https://www.serenaandlily.com/search?q=${encodeURIComponent(q)}` },
+    { name:'Ethan Allen', host:'ethanallen.com', queryName:'ethan allen' },
+    { name:'Pottery Barn', host:'potterybarn.com', queryName:'pottery barn' },
+    { name:'Restoration Hardware', host:'rh.com', queryName:'restoration hardware' },
+    { name:'Serena & Lily', host:'serenaandlily.com', queryName:'serena and lily' },
   ];
   function fpShopBrandForHost(host){
     host = (host||'').replace(/^www\./,'');
@@ -5365,19 +5380,32 @@
 
   let fpShopSelectedCat = 'Sofas';
 
-  function fpRenderShopBrandLinks(){
-    const wrap = document.getElementById('shopBrandLinks');
-    if(!wrap) return;
-    const query = document.getElementById('shopQueryInput').value.trim() || fpShopSelectedCat;
-    wrap.innerHTML = '';
-    FP_SHOP_BRANDS.forEach(b=>{
-      const a = document.createElement('a');
-      a.className = 'shop-brand-link';
-      a.href = b.searchUrl(query);
-      a.target = '_blank'; a.rel = 'noopener';
-      a.innerHTML = `<span>Search &quot;${fpEscapeHtml(query)}&quot; at ${fpEscapeHtml(b.name)}</span><span aria-hidden="true">&#8599;</span>`;
-      wrap.appendChild(a);
-    });
+  // Builds one combined Bing Shopping search covering every checked
+  // brand plus an optional price cap, e.g. "swivel chair under $1200:
+  // ethan allen, pottery barn" -- verified live that Bing both restricts
+  // results to the listed stores AND respects "under $X" as a real price
+  // ceiling (checked the actual returned prices, not just the UI). Bing's
+  // query syntax has no way to say "these brands plus anything else" in
+  // one search, so checking "Other stores" just drops the brand-list
+  // suffix entirely for an unrestricted search (which naturally already
+  // includes the 4 brands among its results) rather than trying to
+  // combine the two.
+  function fpBuildBingShopUrl(){
+    const term = document.getElementById('shopQueryInput').value.trim() || fpShopSelectedCat;
+    const maxPrice = document.getElementById('shopMaxPrice').value.trim();
+    const includeOther = document.getElementById('shopOtherStoresCheck').checked;
+    const checkedBrands = includeOther ? [] : [...document.querySelectorAll('#shopBrandChecks input[type="checkbox"][value]:checked')]
+      .map(cb => cb.value).filter(Boolean);
+    let q = term;
+    if(maxPrice) q += ` under $${maxPrice}`;
+    if(checkedBrands.length){
+      const queryNames = checkedBrands.map(name => {
+        const b = FP_SHOP_BRANDS.find(x => x.name === name);
+        return b ? b.queryName : name;
+      });
+      q += `: ${queryNames.join(', ')}`;
+    }
+    return `https://www.bing.com/shop?q=${encodeURIComponent(q)}`;
   }
 
   // Builds the bookmarklet: a self-contained function (ES5 -- this has to
@@ -5535,6 +5563,19 @@
   //     price/badge/label (excludes "Starting at"/"Regular"/"Save X%"/
   //     "Available in...", which otherwise looks enough like a name to
   //     false-positive).
+  //   - Bing Shopping (bing.com/shop, opened by the "Search" button's
+  //     combined multi-brand query): li.br-item cards, .br-titlelink for
+  //     url (a real Bing productdetails page, not the raw merchant -- that
+  //     page itself then offers the merchant link(s), same one-extra-click
+  //     pattern every shopping aggregator uses; still a real, specific,
+  //     stable page for that exact product), .br-title for name (can be
+  //     "…"-truncated in Bing's own snippet, not fixable from here), img
+  //     for thumbnail (Bing's own th.bing.com thumbnail proxy, confirmed a
+  //     real product photo, not a placeholder), .br-seller for the brand
+  //     name -- carried through explicitly as `brand` in the payload since
+  //     every item's host is bing.com regardless of which store it's
+  //     actually from, so fpAddShopItem can't derive it from the host the
+  //     way it does for the other four branches.
   function fpShopBookmarkletBulkSrc(){
     const appUrl = location.origin + location.pathname;
     const fn = function(){
@@ -5590,6 +5631,16 @@
           })[0];
           items.push({ name: nameEl ? nameEl.textContent.trim() : '', url: abs(link.getAttribute('href')), image: img ? abs(img.getAttribute('src')||img.getAttribute('data-src')) : '', price: firstPrice(c.textContent) });
         });
+      } else if(/bing\.com$/.test(host)){
+        var bingCards = [].slice.call(document.querySelectorAll('li.br-item'));
+        bingCards.forEach(function(c){
+          var link = c.querySelector('.br-titlelink');
+          var titleEl = c.querySelector('.br-title');
+          var img = c.querySelector('img');
+          var sellerEl = c.querySelector('.br-seller');
+          if(!link || !titleEl) return;
+          items.push({ name: titleEl.textContent.trim(), url: abs(link.getAttribute('href')), image: img ? abs(img.getAttribute('src')) : '', price: firstPrice(c.textContent), brand: sellerEl ? sellerEl.textContent.trim() : '' });
+        });
       }
 
       items = items.filter(function(it){ return it.name && it.url; });
@@ -5598,7 +5649,7 @@
 
       if(!items.length) throw new Error('No results found on this page. If you\'re looking at one item, use "Save This Item" instead.');
 
-      var payload = items.map(function(it){ return { name:it.name, price:it.price, image:it.image, url:it.url, host:location.hostname }; });
+      var payload = items.map(function(it){ return { name:it.name, price:it.price, image:it.image, url:it.url, host:location.hostname, brand:it.brand||'' }; });
       var encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
       var target = 'APP_URL_PLACEHOLDER?shopAddBatch=' + encoded;
       var w = window.open(target, '_blank');
@@ -5614,14 +5665,18 @@
 
   function fpAddShopItem(data){
     const items = fpGetShopItems();
-    const brand = fpShopBrandForHost(data.host);
+    // Bing-sourced items carry an explicit `brand` (scraped per-card,
+    // since every Bing item's host is bing.com regardless of the real
+    // store); items captured directly off a brand's own site derive it
+    // from the host instead, as before.
+    const hostBrand = fpShopBrandForHost(data.host);
     items.unshift({
       id: 'shop-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
       name: data.name || 'Untitled item',
       price: data.price || '',
       image: data.image || '',
       url: data.url || '',
-      brand: brand ? brand.name : (data.host || 'Unknown'),
+      brand: data.brand || (hostBrand ? hostBrand.name : (data.host || 'Unknown')),
       category: fpShopSelectedCat || 'Other',
       addedAt: Date.now(),
     });
@@ -5637,6 +5692,8 @@
     countEl.textContent = items.length;
     const filterCat = document.getElementById('shopFilterCat').value;
     if(filterCat) items = items.filter(it => it.category === filterCat);
+    const maxPrice = parseFloat(document.getElementById('shopFilterMaxPrice').value);
+    if(isFinite(maxPrice)) items = items.filter(it => { const p = parseFloat(it.price); return !isFinite(p) || p <= maxPrice; });
     const sortBy = document.getElementById('shopSortBy').value;
     items = items.slice().sort((a,b)=>{
       if(sortBy==='priceAsc') return (parseFloat(a.price)||0) - (parseFloat(b.price)||0);
@@ -5707,31 +5764,23 @@
         document.querySelectorAll('.shop-chip').forEach(c=>c.classList.remove('active'));
         chip.classList.add('active');
         fpShopSelectedCat = chip.dataset.cat;
-        fpRenderShopBrandLinks();
       });
     });
-    document.getElementById('shopQueryInput').addEventListener('input', fpRenderShopBrandLinks);
-    fpRenderShopBrandLinks();
 
     document.getElementById('shopBookmarklet').href = fpShopBookmarkletSrc();
     document.getElementById('shopBookmarkletBulk').href = fpShopBookmarkletBulkSrc();
 
-    // Clicks the real, already-rendered <a target="_blank"> links rather
-    // than calling window.open() in a loop -- browsers are far more
-    // willing to let a genuine anchor click through their popup blocker
-    // than a script-driven window.open(), especially several in a row.
-    // Even so, a browser's per-click "how many new tabs am I willing to
-    // open" budget is inherently inconsistent (Russ saw 2 tabs once, 1
-    // the next time, same button, same page) -- there's no reliable way
-    // to detect from here how many actually made it through, so rather
-    // than a hover-only tooltip nobody saw, always surface a toast right
-    // when the button is clicked telling them what to do about the rest.
+    // One combined search across every checked brand (plus an optional
+    // price cap), opened as a single Bing Shopping tab -- a single
+    // window.open() from a direct click is never popup-blocked, unlike
+    // the old "open 4 separate retailer tabs at once" approach this
+    // replaced (which the browser only ever let 1-2 of through).
     document.getElementById('shopSearchAllBtn').addEventListener('click', ()=>{
-      document.querySelectorAll('#shopBrandLinks .shop-brand-link').forEach(a => a.click());
-      toast('Opened what your browser allowed. Click any store below for the rest.');
+      window.open(fpBuildBingShopUrl(), '_blank', 'noopener');
     });
 
     document.getElementById('shopFilterCat').addEventListener('change', fpRenderShopItems);
+    document.getElementById('shopFilterMaxPrice').addEventListener('input', fpRenderShopItems);
     document.getElementById('shopSortBy').addEventListener('change', fpRenderShopItems);
     fpRenderShopItems();
 
