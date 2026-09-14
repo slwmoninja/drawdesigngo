@@ -831,7 +831,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+14e39807';
+  const APP_VERSION = '1.0+a2dc946f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1783,6 +1783,19 @@
     });
   }
 
+  // A label that inherits its parent object's rotation by default (see
+  // defaultLabelRot below) reads upside-down once that rotation passes
+  // 90deg either way -- e.g. a chair spun to face the opposite direction
+  // (rot:180) would otherwise show its name and dimensions literally
+  // inverted. Returns the extra 180deg to counter-rotate by so the label
+  // flips back to whichever of the two equivalent orientations is
+  // right-side-up, instead of always rigidly matching the object's exact
+  // angle.
+  function fpUprightLabelRot(rotDeg){
+    const normalized = ((rotDeg||0) % 360 + 360) % 360;
+    return (normalized > 90 && normalized < 270) ? 180 : 0;
+  }
+
   // A name/measurement label the user can drag to reposition (stored as a
   // feet offset from the entity's own center, in its local -- i.e.
   // pre-rotation -- frame, so it stays anchored to the entity wherever that
@@ -2137,12 +2150,18 @@
       notes: [],
       elements: [
         // Perimeter walls: top, right, bottom (right of the kitchen
-        // doorway), the diagonal kitchen-doorway wall, left.
-        { id:1, type:'line', x1:2, y1:2, x2:17.5, y2:2, color:wallColor, heightIn:108 },
-        { id:2, type:'line', x1:17.5, y1:2, x2:17.5, y2:27.1667, color:wallColor, heightIn:108 },
-        { id:3, type:'line', x1:11.0, y1:27.1667, x2:17.5, y2:27.1667, color:wallColor, heightIn:108 },
-        { id:4, type:'line', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:108 },
-        { id:5, type:'line', x1:2, y1:2, x2:2, y2:24.6667, color:wallColor, heightIn:108 },
+        // doorway), the diagonal kitchen-doorway wall, left. hideDims on
+        // all 5 -- every one of them has a window/door/opening sitting on
+        // (or, for id:4, exactly spanning) it, and that fixture's own
+        // label already sits near the same midpoint the wall's own
+        // full-length label would use, so showing both collided badly in
+        // practice (id:4 duplicates its Opening to Kitchen label outright,
+        // same start/end coordinates).
+        { id:1, type:'line', x1:2, y1:2, x2:17.5, y2:2, color:wallColor, heightIn:108, hideDims:true },
+        { id:2, type:'line', x1:17.5, y1:2, x2:17.5, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
+        { id:3, type:'line', x1:11.0, y1:27.1667, x2:17.5, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
+        { id:4, type:'line', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
+        { id:5, type:'line', x1:2, y1:2, x2:2, y2:24.6667, color:wallColor, heightIn:108, hideDims:true },
         // Windows: one 4'3" on the top wall, three 6'0" on the right wall.
         // Labeled "Window" to match the source photo's own "4'3" WINDOW"/
         // "6'0" WINDOW" callouts, not just an unlabeled dimension.
@@ -4243,7 +4262,7 @@
           label.textContent = '';
         }
         label.title = 'Tap to edit name/dimensions, drag to reposition';
-        repositionLabel = fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item), isSelected);
+        repositionLabel = fpWireDraggableLabel(label, item, {x:pw/2, y:pd/2}, item.rot||0, scale, 0, -(item.d/24+0.25), ()=> fpOpenObjectDetailsModal(item), isSelected, fpUprightLabelRot(item.rot||0));
       }
       label.spellcheck = false;
       el.appendChild(label);
