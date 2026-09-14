@@ -420,16 +420,25 @@
     background:var(--accent); border:1.5px solid #0a1512; cursor:pointer; display:none; z-index:2;
   }
   .fp-item.selected:not(.fp-multi-selected) .fp-obj-node{ display:block; }
-  /* Label spin handle -- see fpWireDraggableLabel(). Visibility is set
-     directly in JS (selected furniture objects and walls/lines don't share
-     one common ancestor class to key a CSS rule off of), so no display rule
-     here beyond the resting visual style. */
+  /* Label spin handle -- see fpWireDraggableLabel(). Visibility defaults to
+     JS-set inline display (selected furniture objects and walls/lines
+     don't share one common ancestor class to key a single CSS rule off
+     of), but for furniture specifically, .fp-item.selected below
+     overrides that with !important -- fpSelect()'s lightweight selection
+     path (see its own comment) only toggles the .selected class and
+     doesn't force a full fpRender(), so without this override, clicking a
+     label to select its own object left the handle's stale inline
+     display:none in place until some unrelated later render happened to
+     catch it up. Walls/lines still rely on the plain JS default (their
+     label is a canvas-level sibling of the wall's own <g>, not a
+     descendant of it, so there's no ancestor .selected class to hook). */
   .fp-label-spin-handle{
     position:absolute; left:100%; top:50%; margin-left:.3rem; transform:translateY(-50%);
     width:14px; height:14px; line-height:14px; text-align:center; border-radius:50%;
     background:var(--panel2); border:1px solid var(--warn); color:var(--warn);
     font-size:10px; cursor:grab; z-index:2;
   }
+  .fp-item.selected .fp-label-spin-handle{ display:block !important; }
   .fp-label-spin-handle::before{ content:"\21bb"; }
   .fp-obj-node.nw{ left:0; top:0; } .fp-obj-node.ne{ left:100%; top:0; }
   .fp-obj-node.sw{ left:0; top:100%; } .fp-obj-node.se{ left:100%; top:100%; }
@@ -831,7 +840,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+a2dc946f';
+  const APP_VERSION = '1.0+7075d9dd';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1832,6 +1841,14 @@
     let dragged = false;
     label.addEventListener('pointerdown', (e)=>{
       e.stopPropagation();
+      // This handler is entirely separate from the parent object/element's
+      // own pointerdown (which is what normally calls fpSelect()) -- without
+      // this, clicking directly on a label (rather than the furniture icon
+      // or wall itself) never selected its parent, so the label's own spin
+      // handle (shown only while selected -- see fpSelect() and the CSS
+      // above) could never appear if a label was ever clicked before its
+      // parent's body was.
+      if(!selected) fpSelect(fpIsLineType(item.type) ? 'element' : 'object', item.id);
       fpPushHistory();
       dragged = false;
       const startX=e.clientX, startY=e.clientY;
@@ -2169,10 +2186,8 @@
         { id:7, type:'window', x1:17.5, y1:4, x2:17.5, y2:10, color:wallColor, heightIn:36, label:'Window' },
         { id:8, type:'window', x1:17.5, y1:11.8, x2:17.5, y2:17.8, color:wallColor, heightIn:36, label:'Window' },
         { id:9, type:'window', x1:17.5, y1:19.6, x2:17.5, y2:25.6, color:wallColor, heightIn:36, label:'Window' },
-        // 5'0" pocket door on the left wall -- an "opening" (no drawn door
-        // leaf), the same way a pocket door reads as a plain gap in plan
-        // view once slid open.
-        { id:10, type:'opening', x1:2, y1:9, x2:2, y2:14, color:wallColor, heightIn:80, label:'Pocket Door' },
+        // A regular swing door on the left wall (was a pocket door).
+        { id:10, type:'door', x1:2, y1:9, x2:2, y2:14, color:wallColor, heightIn:80, label:'Door' },
         // The whole diagonal wall is one open doorway to the kitchen, no
         // door leaf -- also an "opening", spanning its full length.
         { id:11, type:'opening', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
