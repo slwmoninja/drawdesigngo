@@ -830,7 +830,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+70e14744';
+  const APP_VERSION = '1.0+ab6d422f';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2104,6 +2104,67 @@
     };
   }
 
+  // Seeded demo project shown only on a device's very first-ever open (see
+  // initFloorPlan()) -- a fully editable, real "Sunroom" floor plan (walls,
+  // windows, a pocket door, an open kitchen doorway, a swing door, and
+  // real furniture) recreated from a hand-drawn plan Russ supplied, using
+  // this app's own real drawing primitives rather than a static image, so
+  // a brand-new user immediately sees what a finished plan looks like and
+  // can freely edit/delete every piece of it. Starting a genuinely new
+  // project afterward still gives the plain blank canvas (fpDefaultState()
+  // above) -- this is a one-time first-impression seed, not the ongoing
+  // "new project" default.
+  //
+  // Coordinates in feet, origin at the room's top-left corner, X right/Y
+  // down (this app's screen-style convention -- see fpBuildDxf's flipY
+  // comment). Room outline is a 5-point shape, not a plain rectangle: the
+  // photo's overall 15'6" x 25'2" rectangle with a diagonal corner cut at
+  // bottom-left for the open kitchen doorway, leaving a 6'6" bottom-right
+  // wall segment for the swing door. Object/line w,d and heightIn are in
+  // inches (matching every other object/line in this app); cx,cy are feet.
+  function fpDemoState(){
+    const wallColor = '#8b8d8e';
+    return {
+      title: 'Project Example',
+      roomLabelSeeded: true,
+      notes: [],
+      elements: [
+        // Perimeter walls: top, right, bottom (right of the kitchen
+        // doorway), the diagonal kitchen-doorway wall, left.
+        { id:1, type:'line', x1:0, y1:0, x2:15.5, y2:0, color:wallColor, heightIn:108 },
+        { id:2, type:'line', x1:15.5, y1:0, x2:15.5, y2:25.1667, color:wallColor, heightIn:108 },
+        { id:3, type:'line', x1:9.0, y1:25.1667, x2:15.5, y2:25.1667, color:wallColor, heightIn:108 },
+        { id:4, type:'line', x1:0, y1:22.6667, x2:9.0, y2:25.1667, color:wallColor, heightIn:108 },
+        { id:5, type:'line', x1:0, y1:0, x2:0, y2:22.6667, color:wallColor, heightIn:108 },
+        // Windows: one 4'3" on the top wall, three 6'0" on the right wall.
+        { id:6, type:'window', x1:10, y1:0, x2:14.25, y2:0, color:wallColor, heightIn:36 },
+        { id:7, type:'window', x1:15.5, y1:2, x2:15.5, y2:8, color:wallColor, heightIn:36 },
+        { id:8, type:'window', x1:15.5, y1:9.8, x2:15.5, y2:15.8, color:wallColor, heightIn:36 },
+        { id:9, type:'window', x1:15.5, y1:17.6, x2:15.5, y2:23.6, color:wallColor, heightIn:36 },
+        // 5'0" pocket door on the left wall -- an "opening" (no drawn door
+        // leaf), the same way a pocket door reads as a plain gap in plan
+        // view once slid open.
+        { id:10, type:'opening', x1:0, y1:7, x2:0, y2:12, color:wallColor, heightIn:80, label:'Pocket Door' },
+        // The whole diagonal wall is one open doorway to the kitchen, no
+        // door leaf -- also an "opening", spanning its full length.
+        { id:11, type:'opening', x1:0, y1:22.6667, x2:9.0, y2:25.1667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
+        // 6'0" swing door, centered in the 6'6" bottom-right wall segment.
+        { id:12, type:'door', x1:9.25, y1:25.1667, x2:15.25, y2:25.1667, color:wallColor, heightIn:80 },
+      ],
+      objects: [
+        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:13, cy:1, rot:0 },
+        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:1.5, cy:0.5, rot:0 },
+        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:5.5, cy:0.667, rot:0 },
+        { id:16, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:4, cy:7, rot:0 },
+        { id:17, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:9, cy:7, rot:0 },
+        { id:18, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:4, cy:11.5, rot:0 },
+        { id:19, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:9, cy:11.5, rot:0 },
+        { id:20, label:'Sofa', w:84, d:37, shape:'rect', icon:'image', img:'./library/photo-3-seater-sofa.png', cx:6.5, cy:16.5, rot:0 },
+        { id:21, label:'Buffet Table', w:54, d:24, shape:'rect', icon:'image', img:'./library/console-table.png', cx:12, cy:24, rot:0 },
+      ],
+    };
+  }
+
   function fpLoad(){
     try{
       const raw = localStorage.getItem(FP_STORAGE_KEY);
@@ -3177,6 +3238,14 @@
   // fpSave() on every real edit. Separate from the file-system backup above,
   // which is about surviving data loss, not organizing multiple plans.
   const FP_PROJECTS_DB = 'floorplanner-projects', FP_PROJECTS_STORE = 'projects', FP_MAX_PROJECTS = 5;
+  // Exempt from the 5-slot cap below (see fpEnforceProjectLimit) -- stays
+  // in Recent Projects as a reference while someone's learning the app,
+  // sinking down the recency-sorted list as real projects get added but
+  // never getting deleted by them, unlike an ordinary project. If the
+  // user works directly in it, it just keeps autosaving under this same
+  // id like normal -- still exempt, still available, no separate "convert
+  // to a real project" step needed.
+  const FP_DEMO_PROJECT_ID = 'demo-project-example';
   const FP_ACTIVE_PROJECT_ID_KEY = 'floorplanner-active-project-id';
   let fpActiveProjectId = null;
   function openFpProjectsDb(){
@@ -3235,7 +3304,7 @@
     return JSON.parse(JSON.stringify(Object.assign({}, fpState, { __idSeq: fpIdSeq })));
   }
   async function fpEnforceProjectLimit(){
-    const list = await fpListProjects();
+    const list = (await fpListProjects()).filter(p => p.id !== FP_DEMO_PROJECT_ID);
     for(const p of list.slice(FP_MAX_PROJECTS)) await fpDeleteProject(p.id); // oldest beyond the cap
   }
 
@@ -4394,31 +4463,23 @@
     // blank, never-renamed project) finds the id this run is about to set
     // below, and just silently resumes it instead.
     const isFirstEverOpen = !fpGetActiveProjectId();
-    fpState = fpLoad();
-    fpActiveProjectId = fpGetActiveProjectId() || fpNewProjectId();
+    fpState = isFirstEverOpen ? fpDemoState() : fpLoad();
+    // The demo gets a fixed id (rather than fpNewProjectId()'s random one)
+    // so every save of it -- now, or after the user edits it later --
+    // reliably resolves back to the same Recent Projects record, which is
+    // what lets fpEnforceProjectLimit() recognize and exempt it by id
+    // rather than needing a separately-stored flag that could drift out
+    // of sync with a plain IndexedDB .put() overwrite.
+    fpActiveProjectId = fpGetActiveProjectId() || (isFirstEverOpen ? FP_DEMO_PROJECT_ID : fpNewProjectId());
     fpSetActiveProjectId(fpActiveProjectId);
     fpEnsureRoomLabel();
     document.getElementById('fpTitle').textContent = fpState.title;
     fpRender();
-    if(isFirstEverOpen){
-      // Prompt for a project name immediately: focus the title field with
-      // its placeholder text selected, so a blinking cursor is ready and the
-      // very first keystroke replaces "Project Title" outright rather
-      // than requiring the user to clear it themselves first. Deferred a
-      // tick -- a focus() call made synchronously during initial page
-      // bootstrap is unreliable in some browsers (silently dropped before
-      // the document itself has taken focus); firing after the current
-      // task/paint settles is the standard fix.
-      setTimeout(()=>{
-        const titleEl = document.getElementById('fpTitle');
-        titleEl.focus();
-        const range = document.createRange();
-        range.selectNodeContents(titleEl);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }, 0);
-    }
+    // Persist the freshly-seeded demo to FP_STORAGE_KEY right away -- fpSave()
+    // normally only runs after an actual edit, so without this, reloading
+    // before touching anything would hit fpLoad()'s "nothing saved yet"
+    // branch on the very next load and lose the demo back to a blank plan.
+    if(isFirstEverOpen) fpSave();
     // Registers the just-loaded plan in Recent Projects even before its
     // first edit, so a fresh install's default/empty plan still shows up.
     fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
