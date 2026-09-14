@@ -811,7 +811,7 @@
     <div class="shop-layout">
       <div class="shop-panel shop-guide">
         <h3>Guided Search</h3>
-        <p class="fp-hint">Real browsers aren't blocked the way an automated search would be, so this opens each store's own search in a new tab, pre-filled -- add a client's exact needs (size, color, style) to the search box below before opening them. Found something good? Use the bookmarklet to bring it back here.</p>
+        <p class="fp-hint">Add details, then search below.</p>
         <div class="shop-cat-chips" id="shopCatChips">
           <button class="btn shop-chip active" type="button" data-cat="Sofas">Sofas</button>
           <button class="btn shop-chip" type="button" data-cat="Chairs">Chairs</button>
@@ -820,12 +820,20 @@
           <button class="btn shop-chip" type="button" data-cat="Other">Other</button>
         </div>
         <input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="Add specifics -- e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">
+        <button class="btn" id="shopSearchAllBtn" type="button" title="If your browser blocks extra tabs, allow pop-ups for this site or click the links below one at a time." style="width:100%; margin-bottom:.5rem; font-weight:700; border-color:var(--accent); color:var(--accent);">Search All 4 at Once</button>
         <div class="shop-brand-links" id="shopBrandLinks"></div>
 
         <div class="shop-bookmarklet-setup">
-          <h4>Bring an item back here</h4>
-          <p class="fp-hint">Drag this button to your bookmarks bar. On any product page you like -- any of the 4 stores, or any other shopping site -- click it to add that item to your list below (name/price/photo/link, read straight off the page you're already on).</p>
-          <a id="shopBookmarklet" class="btn" style="display:inline-block; border-color:var(--accent); color:var(--accent); font-weight:700;" href="#" onclick="return false;" title="Drag me to your bookmarks bar">+ Add to DrawDesignGo</a>
+          <h4>Step 1: Set up once</h4>
+          <p class="fp-hint">Drag both to your bookmarks bar. (Hidden? Ctrl+Shift+B.)</p>
+          <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+            <a id="shopBookmarklet" class="btn" style="display:inline-block; border-color:var(--accent); color:var(--accent); font-weight:700;" href="#" onclick="return false;" title="Drag me to your bookmarks bar">Save This Item</a>
+            <a id="shopBookmarkletBulk" class="btn" style="display:inline-block; border-color:var(--accent); color:var(--accent); font-weight:700;" href="#" onclick="return false;" title="Drag me to your bookmarks bar">Save All Results</a>
+          </div>
+        </div>
+        <div class="shop-bookmarklet-setup">
+          <h4>Step 2: Use while browsing</h4>
+          <p class="fp-hint">One item: <strong>Save This Item</strong>. Many items: <strong>Save All Results</strong>.</p>
         </div>
       </div>
 
@@ -851,7 +859,7 @@
           </div>
         </div>
         <div id="shopItemsGrid" class="shop-items-grid"></div>
-        <p class="fp-hint" id="shopEmptyHint">No items yet -- search above, then use the bookmarklet on something you like.</p>
+        <p class="fp-hint" id="shopEmptyHint">No items yet.</p>
       </div>
     </div>
   </section>
@@ -930,7 +938,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+1e5565d8';
+  const APP_VERSION = '1.0+da63fef4';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5392,6 +5400,7 @@
   function fpShopBookmarkletSrc(){
     const appUrl = location.origin + location.pathname;
     const fn = function(){
+     try{
       function metaContent(sel){ var el = document.querySelector(sel); return el ? (el.getAttribute('content') || el.textContent || '').trim() : ''; }
       function productLD(){
         var scripts = [].slice.call(document.querySelectorAll('script[type="application/ld+json"]'));
@@ -5472,9 +5481,110 @@
         if(m) price = m[0].replace('$','');
       }
       if(!image) image = domGalleryImage();
+      if(!name) throw new Error('Could not find a product name on this page.');
       var payload = { name:name.trim(), price:String(price).replace(/^\$/,'').replace(/,/g,'').trim(), image:image.trim(), url:location.href, host:location.hostname };
       var encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
-      window.open('APP_URL_PLACEHOLDER?shopAdd=' + encoded, '_blank');
+      var target = 'APP_URL_PLACEHOLDER?shopAdd=' + encoded;
+      var w = window.open(target, '_blank');
+      if(!w) location.href = target;
+     }catch(e){
+      alert('DrawDesignGo: could not save this item (' + (e && e.message || e) + '). Make sure you\'re on one item\'s own page, not a search results list -- use "Save All Results" for those.');
+     }
+    };
+    const body = fn.toString().replace('APP_URL_PLACEHOLDER', appUrl);
+    return 'javascript:(' + body + ')();';
+  }
+
+  // Bulk-capture bookmarklet: run on a search-results/category page (many
+  // items at once) rather than a single product page. Search-results pages
+  // don't carry schema.org/JSON-LD product markup the way single-product
+  // pages do, so this can't reuse the layered fallback above -- each
+  // brand's result grid needed its own card selector, found by inspecting
+  // a real live results page per brand (2026-09-14):
+  //   - Ethan Allen: .product-tile cards (same markup the old, since-
+  //     removed server-side Worker parsed), .name-link for name+url,
+  //     .reg-image[data-src] for the thumbnail, .price-sales/.price-
+  //     standard for price.
+  //   - Pottery Barn: .grid-item cards, .product-name a[href] for name+
+  //     url, first <img> for thumbnail, .product-price .amount for price
+  //     (a bare number with no $ -- prefixed on here).
+  //   - Serena & Lily: [class*="ProductTileContainer"] cards (React,
+  //     hashed class suffix -- matched by prefix since the suffix churns
+  //     between deploys), <h5> for name, first a[href*="/products/"] for
+  //     url, first <img> for thumbnail, first $-amount in the card's text
+  //     for price.
+  //   - Restoration Hardware: .productVisible cards, a[href*="/product/
+  //     product.jsp/"] for url, first <img> (src is protocol-relative,
+  //     "//..." -- normalized to https: here), first $-amount for price,
+  //     and for name: the first short text node in the card that isn't a
+  //     price/badge/label (excludes "Starting at"/"Regular"/"Save X%"/
+  //     "Available in...", which otherwise looks enough like a name to
+  //     false-positive).
+  function fpShopBookmarkletBulkSrc(){
+    const appUrl = location.origin + location.pathname;
+    const fn = function(){
+     try{
+      function abs(u){ if(!u) return ''; if(u.slice(0,2)==='//') return location.protocol + u; try{ return new URL(u, location.href).href; }catch(e){ return u; } }
+      function firstPrice(text){ var m = (text||'').match(/\$[\d,]+(?:\.\d{2})?/); return m ? m[0].replace('$','').replace(/,/g,'') : ''; }
+      var items = [];
+      var host = location.hostname.replace(/^www\./,'');
+
+      if(/ethanallen\.com$/.test(host)){
+        var tiles = [].slice.call(document.querySelectorAll('.product-tile'));
+        tiles.forEach(function(t){
+          var nameLink = t.querySelector('.name-link');
+          var img = t.querySelector('.reg-image');
+          var priceEl = t.querySelector('.price-sales') || t.querySelector('.price-standard');
+          if(!nameLink) return;
+          items.push({ name: nameLink.textContent.trim(), url: abs(nameLink.getAttribute('href')), image: img ? abs(img.getAttribute('data-src')||img.getAttribute('src')) : '', price: firstPrice(priceEl ? priceEl.textContent : t.textContent) });
+        });
+      } else if(/potterybarn\.com$/.test(host)){
+        var gridItems = [].slice.call(document.querySelectorAll('.grid-item'));
+        gridItems.forEach(function(g){
+          var nameLink = g.querySelector('.product-name a[href]');
+          var img = g.querySelector('img');
+          var amountEl = g.querySelector('.product-price .amount');
+          if(!nameLink) return;
+          items.push({ name: nameLink.textContent.trim(), url: abs(nameLink.getAttribute('href')), image: img ? abs(img.getAttribute('src')) : '', price: amountEl ? amountEl.textContent.replace(/[^\d.]/g,'') : '' });
+        });
+      } else if(/serenaandlily\.com$/.test(host)){
+        var slCards = [].slice.call(document.querySelectorAll('[class*="ProductTileContainer"]'));
+        slCards.forEach(function(c){
+          var link = c.querySelector('a[href*="/products/"]');
+          var h5 = c.querySelector('h5');
+          var img = c.querySelector('img');
+          if(!link || !h5) return;
+          items.push({ name: h5.textContent.trim(), url: abs(link.getAttribute('href')), image: img ? abs(img.getAttribute('src')) : '', price: firstPrice(c.textContent) });
+        });
+      } else if(/rh\.com$/.test(host)){
+        var rhCards = [].slice.call(document.querySelectorAll('.productVisible'));
+        var noise = /^(save |starting at|regular|available in|sale|clearance)/i;
+        rhCards.forEach(function(c){
+          var link = c.querySelector('a[href*="/product/product.jsp/"]');
+          var img = c.querySelector('img');
+          if(!link) return;
+          var nameEl = [].slice.call(c.querySelectorAll('span,div')).filter(function(e){
+            var t = e.textContent.trim();
+            return e.children.length===0 && t.length>4 && t.length<90 && !/^\$/.test(t) && !noise.test(t);
+          })[0];
+          items.push({ name: nameEl ? nameEl.textContent.trim() : '', url: abs(link.getAttribute('href')), image: img ? abs(img.getAttribute('src')||img.getAttribute('data-src')) : '', price: firstPrice(c.textContent) });
+        });
+      }
+
+      items = items.filter(function(it){ return it.name && it.url; });
+      var seen = {};
+      items = items.filter(function(it){ if(seen[it.url]) return false; seen[it.url]=1; return true; }).slice(0, 60);
+
+      if(!items.length) throw new Error('No results found on this page. If you\'re looking at one item, use "Save This Item" instead.');
+
+      var payload = items.map(function(it){ return { name:it.name, price:it.price, image:it.image, url:it.url, host:location.hostname }; });
+      var encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+      var target = 'APP_URL_PLACEHOLDER?shopAddBatch=' + encoded;
+      var w = window.open(target, '_blank');
+      if(!w) location.href = target;
+     }catch(e){
+      alert('DrawDesignGo: ' + (e && e.message || e));
+     }
     };
     const body = fn.toString().replace('APP_URL_PLACEHOLDER', appUrl);
     return 'javascript:(' + body + ')();';
@@ -5582,16 +5692,27 @@
     fpRenderShopBrandLinks();
 
     document.getElementById('shopBookmarklet').href = fpShopBookmarkletSrc();
+    document.getElementById('shopBookmarkletBulk').href = fpShopBookmarkletBulkSrc();
+
+    // Clicks the real, already-rendered <a target="_blank"> links rather
+    // than calling window.open() in a loop -- browsers are far more
+    // willing to let a genuine anchor click through their popup blocker
+    // than a script-driven window.open(), especially several in a row.
+    document.getElementById('shopSearchAllBtn').addEventListener('click', ()=>{
+      document.querySelectorAll('#shopBrandLinks .shop-brand-link').forEach(a => a.click());
+    });
 
     document.getElementById('shopFilterCat').addEventListener('change', fpRenderShopItems);
     document.getElementById('shopSortBy').addEventListener('change', fpRenderShopItems);
     fpRenderShopItems();
 
-    // Incoming item from the bookmarklet (?shopAdd=<base64 JSON>) -- add
-    // it, switch to the Shop tab, then scrub the param so a reload doesn't
-    // re-add the same item.
+    // Incoming item(s) from a bookmarklet -- add, switch to the Shop tab,
+    // then scrub the param so a reload doesn't re-add the same item(s).
+    // ?shopAdd= is one item (single-product bookmarklet); ?shopAddBatch=
+    // is a JSON array (search-results bookmarklet, many items at once).
     const params = new URLSearchParams(location.search);
     const shopAdd = params.get('shopAdd');
+    const shopAddBatch = params.get('shopAddBatch');
     if(shopAdd){
       try{
         const data = JSON.parse(decodeURIComponent(escape(atob(shopAdd))));
@@ -5600,6 +5721,17 @@
         toast(`Added "${data.name || 'item'}" to your Shop list.`);
       }catch(e){ toast('Could not read that item.', true); }
       params.delete('shopAdd');
+    }
+    if(shopAddBatch){
+      try{
+        const list = JSON.parse(decodeURIComponent(escape(atob(shopAddBatch))));
+        list.forEach(item => fpAddShopItem(item));
+        fpSwitchScreen('shop');
+        toast(`Added ${list.length} item${list.length===1?'':'s'} to your Shop list.`);
+      }catch(e){ toast('Could not read those items.', true); }
+      params.delete('shopAddBatch');
+    }
+    if(shopAdd || shopAddBatch){
       const newUrl = location.pathname + (params.toString() ? '?'+params.toString() : '') + location.hash;
       history.replaceState(null, '', newUrl);
     }
