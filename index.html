@@ -324,6 +324,7 @@
      padding left for the white canvas to breathe against that panel. */
   .fp-canvas-wrap{
     overflow:auto; padding:6px;
+    display:flex; align-items:center; justify-content:center;
   }
   .fp-canvas{
     position:relative; background:#ffffff;
@@ -830,7 +831,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+ab6d422f';
+  const APP_VERSION = '1.0+25204492';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2117,11 +2118,17 @@
   //
   // Coordinates in feet, origin at the room's top-left corner, X right/Y
   // down (this app's screen-style convention -- see fpBuildDxf's flipY
-  // comment). Room outline is a 5-point shape, not a plain rectangle: the
-  // photo's overall 15'6" x 25'2" rectangle with a diagonal corner cut at
-  // bottom-left for the open kitchen doorway, leaving a 6'6" bottom-right
-  // wall segment for the swing door. Object/line w,d and heightIn are in
-  // inches (matching every other object/line in this app); cx,cy are feet.
+  // comment). The whole room is offset +2ft in X and Y from the grid's own
+  // (0,0) -- a room drawn flush against the grid origin left no room for
+  // the "Sunroom" label to sit above it without overlapping the Built-Ins
+  // piece in that same corner; this margin gives the label a clear spot
+  // and keeps the plan from reading as crammed into the workspace's top-
+  // left corner. Room outline is a 5-point shape, not a plain rectangle:
+  // the photo's overall 15'6" x 25'2" rectangle with a diagonal corner cut
+  // at bottom-left for the open kitchen doorway, leaving a 6'6" bottom-
+  // right wall segment for the swing door. Object/line w,d and heightIn
+  // are in inches (matching every other object/line in this app); cx,cy
+  // are feet.
   function fpDemoState(){
     const wallColor = '#8b8d8e';
     return {
@@ -2131,36 +2138,45 @@
       elements: [
         // Perimeter walls: top, right, bottom (right of the kitchen
         // doorway), the diagonal kitchen-doorway wall, left.
-        { id:1, type:'line', x1:0, y1:0, x2:15.5, y2:0, color:wallColor, heightIn:108 },
-        { id:2, type:'line', x1:15.5, y1:0, x2:15.5, y2:25.1667, color:wallColor, heightIn:108 },
-        { id:3, type:'line', x1:9.0, y1:25.1667, x2:15.5, y2:25.1667, color:wallColor, heightIn:108 },
-        { id:4, type:'line', x1:0, y1:22.6667, x2:9.0, y2:25.1667, color:wallColor, heightIn:108 },
-        { id:5, type:'line', x1:0, y1:0, x2:0, y2:22.6667, color:wallColor, heightIn:108 },
+        { id:1, type:'line', x1:2, y1:2, x2:17.5, y2:2, color:wallColor, heightIn:108 },
+        { id:2, type:'line', x1:17.5, y1:2, x2:17.5, y2:27.1667, color:wallColor, heightIn:108 },
+        { id:3, type:'line', x1:11.0, y1:27.1667, x2:17.5, y2:27.1667, color:wallColor, heightIn:108 },
+        { id:4, type:'line', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:108 },
+        { id:5, type:'line', x1:2, y1:2, x2:2, y2:24.6667, color:wallColor, heightIn:108 },
         // Windows: one 4'3" on the top wall, three 6'0" on the right wall.
-        { id:6, type:'window', x1:10, y1:0, x2:14.25, y2:0, color:wallColor, heightIn:36 },
-        { id:7, type:'window', x1:15.5, y1:2, x2:15.5, y2:8, color:wallColor, heightIn:36 },
-        { id:8, type:'window', x1:15.5, y1:9.8, x2:15.5, y2:15.8, color:wallColor, heightIn:36 },
-        { id:9, type:'window', x1:15.5, y1:17.6, x2:15.5, y2:23.6, color:wallColor, heightIn:36 },
+        // Labeled "Window" to match the source photo's own "4'3" WINDOW"/
+        // "6'0" WINDOW" callouts, not just an unlabeled dimension.
+        { id:6, type:'window', x1:12, y1:2, x2:16.25, y2:2, color:wallColor, heightIn:36, label:'Window' },
+        { id:7, type:'window', x1:17.5, y1:4, x2:17.5, y2:10, color:wallColor, heightIn:36, label:'Window' },
+        { id:8, type:'window', x1:17.5, y1:11.8, x2:17.5, y2:17.8, color:wallColor, heightIn:36, label:'Window' },
+        { id:9, type:'window', x1:17.5, y1:19.6, x2:17.5, y2:25.6, color:wallColor, heightIn:36, label:'Window' },
         // 5'0" pocket door on the left wall -- an "opening" (no drawn door
         // leaf), the same way a pocket door reads as a plain gap in plan
         // view once slid open.
-        { id:10, type:'opening', x1:0, y1:7, x2:0, y2:12, color:wallColor, heightIn:80, label:'Pocket Door' },
+        { id:10, type:'opening', x1:2, y1:9, x2:2, y2:14, color:wallColor, heightIn:80, label:'Pocket Door' },
         // The whole diagonal wall is one open doorway to the kitchen, no
         // door leaf -- also an "opening", spanning its full length.
-        { id:11, type:'opening', x1:0, y1:22.6667, x2:9.0, y2:25.1667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
+        { id:11, type:'opening', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
         // 6'0" swing door, centered in the 6'6" bottom-right wall segment.
-        { id:12, type:'door', x1:9.25, y1:25.1667, x2:15.25, y2:25.1667, color:wallColor, heightIn:80 },
+        { id:12, type:'door', x1:11.25, y1:27.1667, x2:17.25, y2:27.1667, color:wallColor, heightIn:80, label:'Door' },
       ],
       objects: [
-        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:13, cy:1, rot:0 },
-        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:1.5, cy:0.5, rot:0 },
-        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:5.5, cy:0.667, rot:0 },
-        { id:16, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:4, cy:7, rot:0 },
-        { id:17, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:9, cy:7, rot:0 },
-        { id:18, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:4, cy:11.5, rot:0 },
-        { id:19, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/photo-armchair.png', cx:9, cy:11.5, rot:0 },
-        { id:20, label:'Sofa', w:84, d:37, shape:'rect', icon:'image', img:'./library/photo-3-seater-sofa.png', cx:6.5, cy:16.5, rot:0 },
-        { id:21, label:'Buffet Table', w:54, d:24, shape:'rect', icon:'image', img:'./library/console-table.png', cx:12, cy:24, rot:0 },
+        // In the top margin, above the wall -- not the app's usual flush-
+        // top-left default position, since Built-Ins sits exactly there.
+        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:9, cy:1, rot:0 },
+        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:3.5, cy:2.5, rot:0 },
+        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:7.5, cy:2.667, rot:0 },
+        // Icon artwork faces down (south, toward the sofa) at rot:0 by
+        // default (confirmed by looking at the actual PNGs) -- the far row
+        // (16/17, furthest from the sofa) keeps that default so it faces
+        // the sofa; the near row (18/19, closest to the sofa) and the sofa
+        // itself get rot:180 to face up (north) toward the fireplace instead.
+        { id:16, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6, cy:9, rot:0 },
+        { id:17, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11, cy:9, rot:0 },
+        { id:18, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6, cy:13.5, rot:180 },
+        { id:19, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11, cy:13.5, rot:180 },
+        { id:20, label:'Sofa', w:84, d:37, shape:'rect', icon:'image', img:'./library/3-seater-sofa.png', cx:8.5, cy:18.5, rot:180 },
+        { id:21, label:'Buffet Table', w:54, d:24, shape:'rect', icon:'image', img:'./library/console-table.png', cx:14, cy:26, rot:0 },
       ],
     };
   }
@@ -2253,6 +2269,32 @@
   // per-item resize/rotate handles (see .fp-multi-selected in the CSS),
   // since a handle set per item would be clutter across several of them.
   function fpIsBulkSelected(){ return fpSelectAllActive || !!(fpMultiSelectedIds && fpMultiSelectedIds.length); }
+
+  // If (kind,id) is part of an active bulk selection (select-all or a
+  // marquee multi-select), returns an origin snapshot of every item in
+  // that selection for a group drag -- otherwise null, meaning "just drag
+  // this one item like normal." Without this, starting a drag by pressing
+  // down on any single selected item would call fpSelect() and silently
+  // collapse a select-all/multi-select down to just that one item, so
+  // only it moved instead of the whole group.
+  function fpBulkDragGroup(kind, id){
+    if(!fpIsBulkSelected() || !fpIsPicked(kind, id)) return null;
+    const ids = fpSelectAllActive
+      ? [...fpState.elements.map(e=>({kind:'element', id:e.id})), ...fpState.objects.map(o=>({kind:'object', id:o.id}))]
+      : fpMultiSelectedIds;
+    return ids.map(({kind,id})=>{
+      const src = kind==='element' ? fpState.elements.find(x=>x.id===id) : fpState.objects.find(x=>x.id===id);
+      if(!src) return null;
+      const isLine = kind==='element' && fpIsLineType(src.type);
+      return { src, isLine, x1:src.x1, y1:src.y1, x2:src.x2, y2:src.y2, cx:src.cx, cy:src.cy };
+    }).filter(Boolean);
+  }
+  function fpMoveDragGroupBy(group, dx, dy){
+    group.forEach(o=>{
+      if(o.isLine){ o.src.x1=fpSnap(o.x1+dx); o.src.y1=fpSnap(o.y1+dy); o.src.x2=fpSnap(o.x2+dx); o.src.y2=fpSnap(o.y2+dy); }
+      else { o.src.cx=fpSnap(o.cx+dx); o.src.cy=fpSnap(o.cy+dy); }
+    });
+  }
 
   // Lightweight selection: toggles the CSS class on existing DOM nodes and
   // drops any stale node-handle layer, instead of a full fpRender() -- so
@@ -3982,7 +4024,8 @@
         if(fpMode!=='select') return;
         if(e.target.closest('.fp-node, .fp-rotate-node')) return;
         e.preventDefault(); e.stopPropagation();
-        fpSelect('element', el.id);
+        const dragGroup = fpBulkDragGroup('element', el.id);
+        if(!dragGroup) fpSelect('element', el.id);
         fpPushHistory();
         // The decorative visible sub-segments above are a static snapshot
         // from this render and won't track a live drag -- show the plain
@@ -3998,6 +4041,17 @@
         const orig = JSON.parse(JSON.stringify(el));
         function onMove(ev){
           const dx = (ev.clientX-startX)/scale, dy = (ev.clientY-startY)/scale;
+          if(dragGroup){
+            // A whole selected group is moving -- the other items' DOM
+            // nodes need a full re-render to follow along live, unlike the
+            // single-item fast path below (fpUpdateShapeAttrs on just this
+            // one shape). canvas itself (#fpCanvas, fetched fresh at the
+            // top of fpRender()) is never replaced, only its children, so
+            // these canvas-bound listeners survive each re-render.
+            fpMoveDragGroupBy(dragGroup, dx, dy);
+            fpRender();
+            return;
+          }
           if(fpIsLineType(el.type)){
             el.x1 = fpSnap(orig.x1+dx); el.y1 = fpSnap(orig.y1+dy);
             el.x2 = fpSnap(orig.x2+dx); el.y2 = fpSnap(orig.y2+dy);
@@ -4056,11 +4110,15 @@
           lineLabel.spellcheck = false;
           lineLabel.textContent = combined || 'Add label';
           lineLabel.title = 'Tap to edit name/length/height, drag to reposition';
-          // Runs more vertical than horizontal (a wall/window/door standing
-          // up-and-down on the plan) default to vertical text so it reads
-          // along the run instead of overlapping a narrow wall sideways.
-          const lineIsVertical = Math.abs(el.y2-el.y1) > Math.abs(el.x2-el.x1);
-          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected, lineIsVertical ? 90 : 0);
+          // Default text angle follows the line's own actual angle (not just
+          // a horizontal/vertical snap) so a diagonal wall's label reads
+          // along that diagonal instead of sitting flat across it --
+          // normalized to +/-90deg so the text is never upside-down
+          // regardless of which end is x1/y1 vs x2/y2.
+          let lineAngleDeg = Math.atan2(el.y2-el.y1, el.x2-el.x1) * 180/Math.PI;
+          if(lineAngleDeg > 90) lineAngleDeg -= 180;
+          if(lineAngleDeg < -90) lineAngleDeg += 180;
+          fpWireDraggableLabel(lineLabel, el, {x:px(midX), y:px(midY)}, 0, scale, 0, -0.5, ()=> fpOpenLineDetailsModal(el), selected, lineAngleDeg);
           canvas.appendChild(lineLabel);
         }
       }
@@ -4262,9 +4320,29 @@
         if(fpMode!=='select') return;
         if(e.target.closest('.fp-rotate-handle, .fp-obj-node, .fp-item-label') || e.target.isContentEditable) return;
         e.preventDefault();
-        fpSelect('object', item.id);
+        const dragGroup = fpBulkDragGroup('object', item.id);
+        if(!dragGroup) fpSelect('object', item.id);
         fpPushHistory();
         const startX = e.clientX, startY = e.clientY, ocx = item.cx, ocy = item.cy;
+        if(dragGroup){
+          // Whole selected group moving together -- canvas-level listeners
+          // (not setPointerCapture on this one `el`), since fpRender()
+          // below recreates every item's DOM node each frame, which would
+          // otherwise drop capture bound to a since-removed node. #fpCanvas
+          // itself is never replaced, only its children, so these survive.
+          function onMoveGroup(ev){
+            fpMoveDragGroupBy(dragGroup, (ev.clientX-startX)/scale, (ev.clientY-startY)/scale);
+            fpRender();
+          }
+          function onUpGroup(){
+            canvas.removeEventListener('pointermove', onMoveGroup);
+            canvas.removeEventListener('pointerup', onUpGroup);
+            fpSave();
+          }
+          canvas.addEventListener('pointermove', onMoveGroup);
+          canvas.addEventListener('pointerup', onUpGroup);
+          return;
+        }
         try{ el.setPointerCapture(e.pointerId); }catch(err){}
         function onMove(ev){
           item.cx = fpSnap(ocx + (ev.clientX-startX)/scale);
