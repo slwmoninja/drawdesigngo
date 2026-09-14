@@ -815,7 +815,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+a69f6dd7';
+  const APP_VERSION = '1.0+b5355901';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1522,6 +1522,14 @@
     }
     return '';
   }
+  // Mirrors just the icon artwork -- never the label div, which is a sibling
+  // of this <svg>, not a child of it, so a name stays readable left-to-right
+  // no matter how the furniture itself is flipped. See the 'e'/'w'/'n'/'s'/
+  // corner resize-node handlers below for how flipW/flipD get set (dragging
+  // a node past the item's own center, to the opposite side).
+  function fpApplyIconFlip(icon, item){
+    icon.style.transform = `scale(${item.flipW?-1:1}, ${item.flipD?-1:1})`;
+  }
 
   function fpAddObjectFromTemplate(tpl, cx, cy){
     fpPushHistory();
@@ -1765,12 +1773,15 @@
   // entity itself moves or rotates) while a plain tap/click still opens its
   // details modal. Shared by furniture objects and structural lines alike.
   function fpWireDraggableLabel(label, item, centerPx, rotDeg, scale, defaultDx, defaultDy, onClick, selected, defaultLabelRot){
-    // The label's own on-screen angle is kept independent of the entity's
-    // rotation -- item.labelRot (default 0) is the ABSOLUTE screen angle the
-    // text is drawn at, so by default (labelRot unset) text stays upright
-    // and readable no matter how far the object/wall itself is turned,
-    // instead of inheriting rotDeg and ending up upside down or sideways.
-    // Subtracting rotDeg here is what cancels out the entity's own rotation.
+    // Default: the label is a DOM child of the object's own rotated element
+    // (see el.appendChild(label) below), so it inherits item.rot for free --
+    // this function just adds defaultLabelRot (usually 0) on top, so turning
+    // the object turns its name with it. Once the user drags the spin
+    // handle, item.labelRot switches to an ABSOLUTE screen angle instead:
+    // subtracting liveRotDeg here cancels the inherited rotation back out,
+    // locking the text at that fixed angle no matter how the object is
+    // rotated afterward -- "manually set" overrides "follows the object"
+    // from then on, it doesn't blend the two.
     function reposition(){
       const dx = item.labelDx!=null ? item.labelDx : defaultDx;
       const dy = item.labelDy!=null ? item.labelDy : defaultDy;
@@ -1781,7 +1792,7 @@
       // angle, not the angle from the last full render. Lines/walls have no
       // .rot field at all, so they fall back to the fixed rotDeg (always 0).
       const liveRotDeg = item.rot!=null ? item.rot : rotDeg;
-      const labelDeg = (item.labelRot!=null ? item.labelRot : (defaultLabelRot||0)) - (liveRotDeg||0);
+      const labelDeg = item.labelRot!=null ? (item.labelRot - (liveRotDeg||0)) : (defaultLabelRot||0);
       Object.assign(label.style, {
         left:(centerPx.x + dx*scale)+'px', top:(centerPx.y + dy*scale)+'px',
         right:'auto', bottom:'auto', marginBottom:'0',
@@ -3991,12 +4002,19 @@
       el.dataset.id = item.id;
       updateObjStyle(el, item);
 
+      // Declared here (not `const` inside the block below) so the resize-
+      // node drag handler further down -- a separate `if(!isLabelType)`
+      // block, not nested inside this one -- can still reach it to live-
+      // update the viewBox/artwork/flip while dragging, instead of only
+      // picking up the resize on the next full fpRender() after pointerup.
+      let icon = null;
       if(!isLabelType){
-        const icon = document.createElementNS(SVG_NS, 'svg');
+        icon = document.createElementNS(SVG_NS, 'svg');
         icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
         icon.setAttribute('preserveAspectRatio', 'none');
         icon.setAttribute('class', 'fp-item-icon');
         icon.innerHTML = fpIconMarkup(item);
+        fpApplyIconFlip(icon, item);
         el.appendChild(icon);
       }
 
@@ -4101,8 +4119,18 @@
         // into a rectangle, or a circle into an oval -- doesn't require
         // dragging a corner at an exact diagonal to avoid nudging the other
         // axis too. All 8 resize the same way otherwise (symmetric about
-        // cx/cy, honoring rotation).
-        const RESIZE_NODES = { nw:{w:1,d:1}, ne:{w:1,d:1}, sw:{w:1,d:1}, se:{w:1,d:1}, n:{d:1}, s:{d:1}, e:{w:1}, w:{w:1} };
+        // cx/cy, honoring rotation). Each node also has a "home" side
+        // (homeSx/homeSy) -- if the cursor crosses over to the OTHER side of
+        // the item's own center on that node's axis (e.g. dragging the east
+        // handle past the west edge), that reads as "flip", not "shrink to
+        // zero and re-grow": item.flipW/flipD toggle on, mirroring just the
+        // icon (fpApplyIconFlip) so a left-facing sectional can become
+        // right-facing without retyping its name backwards.
+        const RESIZE_NODES = {
+          nw:{w:1,d:1,homeSx:-1,homeSy:-1}, ne:{w:1,d:1,homeSx:1,homeSy:-1},
+          sw:{w:1,d:1,homeSx:-1,homeSy:1}, se:{w:1,d:1,homeSx:1,homeSy:1},
+          n:{d:1,homeSy:-1}, s:{d:1,homeSy:1}, e:{w:1,homeSx:1}, w:{w:1,homeSx:-1},
+        };
         Object.keys(RESIZE_NODES).forEach(corner=>{
           const axes = RESIZE_NODES[corner];
           const node = document.createElement('div');
@@ -4120,11 +4148,18 @@
               const mx = (ev.clientX-rect.left)/scale, my = (ev.clientY-rect.top)/scale;
               const dxr = mx-item.cx, dyr = my-item.cy; // feet, relative to center
               const lx = dxr*cr - dyr*sr, ly = dxr*sr + dyr*cr; // feet, in the item's local (unrotated) axes
-              if(axes.w) item.w = Math.max(2, Math.round(Math.abs(lx)*12))*2;
-              if(axes.d) item.d = Math.max(2, Math.round(Math.abs(ly)*12))*2;
+              if(axes.w){
+                item.w = Math.max(2, Math.round(Math.abs(lx)*12))*2;
+                if(lx!==0) item.flipW = Math.sign(lx)!==axes.homeSx;
+              }
+              if(axes.d){
+                item.d = Math.max(2, Math.round(Math.abs(ly)*12))*2;
+                if(ly!==0) item.flipD = Math.sign(ly)!==axes.homeSy;
+              }
               updateObjStyle(el, item);
               icon.setAttribute('viewBox', `0 0 ${item.w} ${item.d}`);
               icon.innerHTML = fpIconMarkup(item);
+              fpApplyIconFlip(icon, item);
             }
             function onUp(){
               node.removeEventListener('pointermove', onMove);
