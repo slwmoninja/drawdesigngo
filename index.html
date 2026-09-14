@@ -203,6 +203,66 @@
   .fp-layout{ display:grid; grid-template-columns:1fr; gap:.9rem; align-items:start; }
   @media (min-width:900px){ .fp-layout{ grid-template-columns:auto 1fr 300px; } }
 
+  /* ---------- Screen tabs (Floor Plan / Shop) -- same visual language as
+     the mode segGroup buttons (Draw/Select) so switching top-level screens
+     reads as the same kind of control, not a different UI system. */
+  .fp-screen-tabs{ display:flex; gap:.4rem; padding:0 1rem .5rem; background:var(--panel); }
+  .fp-screen-tab{
+    padding:.35rem .9rem; border-radius:8px; border:1px solid var(--border); background:var(--bg);
+    color:var(--dim); font-weight:600; font-size:.82rem; cursor:pointer;
+  }
+  .fp-screen-tab.active{ border-color:var(--accent); color:var(--accent); background:rgba(64,208,181,.12); }
+
+  /* ---------- Shop screen ---------- */
+  #shopScreen{ padding:.9rem 1rem; }
+  .shop-layout{ display:grid; grid-template-columns:1fr; gap:1rem; align-items:start; }
+  @media (min-width:900px){ .shop-layout{ grid-template-columns:340px 1fr; } }
+  .shop-panel{ background:var(--panel); border-radius:12px; padding:.9rem 1rem 1.1rem; }
+  .shop-panel h3{ margin:0 0 .3rem; font-size:1rem; }
+  .shop-panel h4{ margin:.9rem 0 .2rem; font-size:.82rem; color:var(--dim); }
+  .shop-cat-chips{ display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; }
+  .shop-chip{ padding:.3rem .7rem; font-size:.78rem; }
+  .shop-brand-links{ display:flex; flex-direction:column; gap:.4rem; margin-top:.5rem; }
+  .shop-brand-link{
+    display:flex; align-items:center; justify-content:space-between; padding:.5rem .7rem;
+    border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text);
+    text-decoration:none; font-size:.84rem; font-weight:600;
+  }
+  .shop-brand-link:hover{ border-color:var(--accent); }
+  .shop-brand-link .fp-hint{ margin:0; font-weight:400; }
+  .shop-bookmarklet-setup{ border-top:1px solid var(--border); margin-top:.9rem; padding-top:.7rem; }
+
+  .shop-results-head{ display:flex; align-items:center; justify-content:space-between; gap:.6rem; flex-wrap:wrap; margin-bottom:.7rem; }
+  .shop-filter-sort{ display:flex; gap:.4rem; }
+  .shop-items-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:.8rem; }
+  .shop-item-card{
+    position:relative; background:var(--panel2); border:1px solid var(--border); border-radius:10px;
+    padding:.6rem; display:flex; flex-direction:column; gap:.35rem;
+  }
+  .shop-item-thumb{
+    width:100%; aspect-ratio:1; border-radius:8px; background:var(--bg); display:flex;
+    align-items:center; justify-content:center; overflow:hidden;
+  }
+  .shop-item-thumb img{ width:100%; height:100%; object-fit:contain; }
+  .shop-item-thumb-missing{
+    width:100%; height:100%; display:flex; align-items:center; justify-content:center;
+    text-align:center; font-size:.75rem; color:var(--dim); padding:.5rem;
+  }
+  .shop-item-name{ font-size:.85rem; font-weight:700; line-height:1.25; }
+  .shop-item-meta{ display:flex; align-items:center; justify-content:space-between; font-size:.76rem; color:var(--dim); }
+  .shop-item-price{ font-weight:700; color:var(--text); }
+  .shop-item-cat-select{ font-size:.72rem; padding:.15rem .3rem; }
+  .shop-item-actions{ display:flex; gap:.4rem; margin-top:.2rem; }
+  .shop-item-actions a{
+    flex:1; text-align:center; padding:.3rem .5rem; border-radius:6px; border:1px solid var(--accent);
+    color:var(--accent); text-decoration:none; font-size:.76rem; font-weight:700;
+  }
+  .shop-item-remove{
+    position:absolute; top:.4rem; right:.4rem; width:1.3rem; height:1.3rem; border-radius:50%; border:none;
+    background:var(--panel); color:var(--dim); cursor:pointer; font-size:.85rem; line-height:1;
+  }
+  .shop-item-remove:hover{ color:var(--danger); }
+
   /* ---------- Favorites: a thin, always-visible rail (left of the canvas on
      desktop, a row above it on narrow screens) so a handful of go-to graphics
      don't require reopening the Objects accordion every time. Populated by
@@ -631,7 +691,12 @@
     </button>
   </div>
 
-  <div class="toolbar fp-toolbar">
+  <div class="fp-screen-tabs" id="fpScreenTabs">
+    <button class="fp-screen-tab active" id="fpTabFloorplan" data-screen="floorplan">Floor Plan</button>
+    <button class="fp-screen-tab" id="fpTabShop" data-screen="shop">Shop</button>
+  </div>
+
+  <div class="toolbar fp-toolbar" id="fpFloorplanToolbar">
         <div class="segGroup" id="fpModeGroup">
           <button class="btn fp-key-btn active" id="fpModeDrawBtn" data-mode="draw" title="Draw new walls or shapes on the grid" style="border-color:var(--accent); color:var(--accent);">&#10024; Draw</button>
         </div>
@@ -741,6 +806,56 @@
     </div>
   </section>
 
+  <!-- ============ SHOP SCREEN ============ -->
+  <section id="shopScreen" hidden>
+    <div class="shop-layout">
+      <div class="shop-panel shop-guide">
+        <h3>Guided Search</h3>
+        <p class="fp-hint">Real browsers aren't blocked the way an automated search would be, so this opens each store's own search in a new tab, pre-filled -- add a client's exact needs (size, color, style) to the search box below before opening them. Found something good? Use the bookmarklet to bring it back here.</p>
+        <div class="shop-cat-chips" id="shopCatChips">
+          <button class="btn shop-chip active" type="button" data-cat="Sofas">Sofas</button>
+          <button class="btn shop-chip" type="button" data-cat="Chairs">Chairs</button>
+          <button class="btn shop-chip" type="button" data-cat="Surfaces">Surfaces</button>
+          <button class="btn shop-chip" type="button" data-cat="Display">Display</button>
+          <button class="btn shop-chip" type="button" data-cat="Other">Other</button>
+        </div>
+        <input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="Add specifics -- e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">
+        <div class="shop-brand-links" id="shopBrandLinks"></div>
+
+        <div class="shop-bookmarklet-setup">
+          <h4>Bring an item back here</h4>
+          <p class="fp-hint">Drag this button to your bookmarks bar. On any product page you like -- any of the 4 stores, or any other shopping site -- click it to add that item to your list below (name/price/photo/link, read straight off the page you're already on).</p>
+          <a id="shopBookmarklet" class="btn" style="display:inline-block; border-color:var(--accent); color:var(--accent); font-weight:700;" href="#" onclick="return false;" title="Drag me to your bookmarks bar">+ Add to DrawDesignGo</a>
+        </div>
+      </div>
+
+      <div class="shop-panel shop-results">
+        <div class="shop-results-head">
+          <h3>Saved Items (<span id="shopItemCount">0</span>)</h3>
+          <div class="shop-filter-sort">
+            <select id="shopFilterCat" class="fp-key-btn">
+              <option value="">All categories</option>
+              <option value="Sofas">Sofas</option>
+              <option value="Chairs">Chairs</option>
+              <option value="Surfaces">Surfaces</option>
+              <option value="Display">Display</option>
+              <option value="Other">Other</option>
+            </select>
+            <select id="shopSortBy" class="fp-key-btn">
+              <option value="addedAt">Newest first</option>
+              <option value="priceAsc">Price: low to high</option>
+              <option value="priceDesc">Price: high to low</option>
+              <option value="name">Name A-Z</option>
+              <option value="brand">Brand</option>
+            </select>
+          </div>
+        </div>
+        <div id="shopItemsGrid" class="shop-items-grid"></div>
+        <p class="fp-hint" id="shopEmptyHint">No items yet -- search above, then use the bookmarklet on something you like.</p>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <div id="fpPrintContainer"></div>
@@ -815,7 +930,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+b5355901';
+  const APP_VERSION = '1.0+1e5565d8';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5208,10 +5323,293 @@
     }catch(e){}
   })();
 
+  // ============================================================
+  // Shop tab -- guided search + bookmarklet capture, not server-side
+  // scraping. Pottery Barn, Restoration Hardware, and Serena & Lily all
+  // return a hard 403 to ANY automated fetch (confirmed directly, even
+  // with a spoofed Googlebot user-agent -- their WAF blocks datacenter/
+  // cloud IPs outright, which is what any serverless proxy would have).
+  // Ethan Allen alone doesn't block automated fetches, but the app's own
+  // JS still can't read that response either -- no Access-Control-Allow-
+  // Origin header, so it's a CORS wall instead. Real, human-driven
+  // browsing hits neither wall (no WAF flag, no cross-origin JS read
+  // involved), so this leans into that instead of fighting it: pre-filled
+  // searches on each store's own real site, opened in new tabs, plus a
+  // bookmarklet that reads whatever product markup is already rendered on
+  // the page you're looking at and hands the result back here.
+  // Per-brand markup notes (which JSON-LD shape each site uses,
+  // image-source quirks, etc.) are documented inline in
+  // fpShopBookmarkletSrc() below if this ever needs touching again.
+  // ============================================================
+  const FP_SHOP_ITEMS_KEY = 'floorplanner-shop-items';
+  function fpGetShopItems(){
+    try{ const raw = localStorage.getItem(FP_SHOP_ITEMS_KEY); return raw ? JSON.parse(raw) : []; }catch(e){ return []; }
+  }
+  function fpSaveShopItems(items){ try{ localStorage.setItem(FP_SHOP_ITEMS_KEY, JSON.stringify(items)); }catch(e){} }
+
+  // One search-URL builder per brand -- each confirmed live (not guessed)
+  // by actually running the search in a real browser session.
+  const FP_SHOP_BRANDS = [
+    { name:'Ethan Allen', host:'ethanallen.com', searchUrl: q => `https://www.ethanallen.com/en_US/search?q=${encodeURIComponent(q)}` },
+    { name:'Pottery Barn', host:'potterybarn.com', searchUrl: q => `https://www.potterybarn.com/search/results.html?words=${encodeURIComponent(q)}` },
+    { name:'Restoration Hardware', host:'rh.com', searchUrl: q => `https://rh.com/us/en/search/results.jsp?Ntt=${encodeURIComponent(q)}` },
+    { name:'Serena & Lily', host:'serenaandlily.com', searchUrl: q => `https://www.serenaandlily.com/search?q=${encodeURIComponent(q)}` },
+  ];
+  function fpShopBrandForHost(host){
+    host = (host||'').replace(/^www\./,'');
+    return FP_SHOP_BRANDS.find(b => host===b.host || host.endsWith('.'+b.host)) || null;
+  }
+
+  let fpShopSelectedCat = 'Sofas';
+
+  function fpRenderShopBrandLinks(){
+    const wrap = document.getElementById('shopBrandLinks');
+    if(!wrap) return;
+    const query = document.getElementById('shopQueryInput').value.trim() || fpShopSelectedCat;
+    wrap.innerHTML = '';
+    FP_SHOP_BRANDS.forEach(b=>{
+      const a = document.createElement('a');
+      a.className = 'shop-brand-link';
+      a.href = b.searchUrl(query);
+      a.target = '_blank'; a.rel = 'noopener';
+      a.innerHTML = `<span>Search &quot;${fpEscapeHtml(query)}&quot; at ${fpEscapeHtml(b.name)}</span><span aria-hidden="true">&#8599;</span>`;
+      wrap.appendChild(a);
+    });
+  }
+
+  // Builds the bookmarklet: a self-contained function (ES5 -- this has to
+  // run unmodified on whatever random shopping site's own page, so no
+  // arrow functions/template literals/spread that an older or stricter
+  // site CSP might choke on) that extracts product data via a layered
+  // fallback -- schema.org microdata scoped to the Product itemtype (so it
+  // doesn't grab a breadcrumb's own itemprop="name" instead), then JSON-LD
+  // (handling both a bare Product/ProductGroup and one wrapped in a
+  // top-level @graph array, with price pulled from hasVariant[].offers
+  // when a ProductGroup has no top-level offers of its own), then
+  // OpenGraph meta tags, then a last-resort scan of the page's own H1 and
+  // rendered text for a dollar amount. Ends by opening this app in a new
+  // tab with the result base64-encoded in ?shopAdd=.
+  function fpShopBookmarkletSrc(){
+    const appUrl = location.origin + location.pathname;
+    const fn = function(){
+      function metaContent(sel){ var el = document.querySelector(sel); return el ? (el.getAttribute('content') || el.textContent || '').trim() : ''; }
+      function productLD(){
+        var scripts = [].slice.call(document.querySelectorAll('script[type="application/ld+json"]'));
+        for(var i=0;i<scripts.length;i++){
+          var data;
+          try{ data = JSON.parse(scripts[i].textContent); }catch(e){ continue; }
+          var pool = Array.isArray(data) ? data : (data['@graph'] ? data['@graph'] : [data]);
+          var prod = pool.filter(function(d){ return d && (d['@type']==='Product' || d['@type']==='ProductGroup'); })[0];
+          if(prod) return prod;
+        }
+        return null;
+      }
+      var name='', price='', image='';
+      // Real, large, on-page <img> as a photo candidate -- excludes obvious
+      // logo/icon/sprite/QR/promo images and requires a decent decoded
+      // size so small nav/swatch/badge icons don't win. Used as the
+      // final catch-all fallback below, and (for S&L specifically) tried
+      // before the meta tag -- see the serenaandlily.com branch.
+      function domGalleryImage(){
+        var imgs = [].slice.call(document.querySelectorAll('img')).filter(function(i){
+          return i.naturalWidth>=200 && i.naturalHeight>=200 && !/logo|sprite|icon|qr[-_]|badge|promo/i.test(i.src);
+        });
+        imgs.sort(function(a,b){ return (b.naturalWidth*b.naturalHeight)-(a.naturalWidth*a.naturalHeight); });
+        return imgs[0] ? imgs[0].src : '';
+      }
+      // Found live on Serena & Lily (2026-09-14): og:image and
+      // itemprop="image" both point at an Amplience "swatch set" asset ID
+      // that itself resolves to S&L's own "IMAGE UNAVAILABLE" placeholder
+      // graphic -- a valid, loadable image file, just not a photo of the
+      // product. The real photo lives in a plain rendered <img> (a Scene7
+      // render URL) elsewhere on the page. This is host-scoped rather than
+      // applied to every brand because the opposite trade-off is also
+      // real: on Pottery Barn, "largest on-page image" caught a 3000x3000
+      // QR-code promo graphic instead of the actual (smaller) product
+      // photo, while PB's own og:image was correct. So each brand gets
+      // whichever source is verified-correct for it, not one blanket rule.
+      if(/(^|\.)serenaandlily\.com$/.test(location.hostname)) image = domGalleryImage();
+      var scope = document.querySelector('[itemtype*="schema.org/Product"]');
+      if(scope){
+        var nameEl = scope.querySelector('[itemprop="name"]');
+        var priceEl = scope.querySelector('[itemprop="price"]');
+        var imageEl = scope.querySelector('[itemprop="image"]');
+        name = nameEl ? (nameEl.getAttribute('content') || nameEl.textContent || '').trim() : '';
+        price = priceEl ? (priceEl.getAttribute('content') || priceEl.textContent || '').trim() : '';
+        if(!image) image = imageEl ? (imageEl.getAttribute('content') || imageEl.src || '') : '';
+      }
+      if(!name || !price){
+        var prod = productLD();
+        if(prod){
+          name = name || prod.name || '';
+          if(!image){
+            var img = prod.image;
+            image = (Array.isArray(img) ? img[0] : img) || '';
+          }
+          if(!price){
+            var offers = prod.offers;
+            if(!offers && Array.isArray(prod.hasVariant)){
+              var withOffers = prod.hasVariant.filter(function(v){ return v.offers; })[0];
+              offers = withOffers && withOffers.offers;
+            }
+            if(offers){
+              offers = Array.isArray(offers) ? offers[0] : offers;
+              price = offers.price || offers.lowPrice || '';
+            }
+          }
+        }
+      }
+      if(!name) name = metaContent('meta[property="og:title"]').split('|')[0].trim();
+      if(!image) image = metaContent('meta[property="og:image"]');
+      if(!price) price = metaContent('meta[property="product:price:amount"]');
+      if(!name){
+        var h1 = document.querySelector('h1');
+        name = h1 ? h1.textContent.trim() : (document.title || '').split('|')[0].trim();
+      }
+      if(!price){
+        var bodyText = document.body.innerText || '';
+        var m = bodyText.match(/\$[\d,]+(?:\.\d{2})?/);
+        if(m) price = m[0].replace('$','');
+      }
+      if(!image) image = domGalleryImage();
+      var payload = { name:name.trim(), price:String(price).replace(/^\$/,'').replace(/,/g,'').trim(), image:image.trim(), url:location.href, host:location.hostname };
+      var encoded = encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(payload)))));
+      window.open('APP_URL_PLACEHOLDER?shopAdd=' + encoded, '_blank');
+    };
+    const body = fn.toString().replace('APP_URL_PLACEHOLDER', appUrl);
+    return 'javascript:(' + body + ')();';
+  }
+
+  function fpAddShopItem(data){
+    const items = fpGetShopItems();
+    const brand = fpShopBrandForHost(data.host);
+    items.unshift({
+      id: 'shop-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      name: data.name || 'Untitled item',
+      price: data.price || '',
+      image: data.image || '',
+      url: data.url || '',
+      brand: brand ? brand.name : (data.host || 'Unknown'),
+      category: fpShopSelectedCat || 'Other',
+      addedAt: Date.now(),
+    });
+    fpSaveShopItems(items);
+  }
+
+  function fpRenderShopItems(){
+    const grid = document.getElementById('shopItemsGrid');
+    const countEl = document.getElementById('shopItemCount');
+    const emptyHint = document.getElementById('shopEmptyHint');
+    if(!grid) return;
+    let items = fpGetShopItems();
+    countEl.textContent = items.length;
+    const filterCat = document.getElementById('shopFilterCat').value;
+    if(filterCat) items = items.filter(it => it.category === filterCat);
+    const sortBy = document.getElementById('shopSortBy').value;
+    items = items.slice().sort((a,b)=>{
+      if(sortBy==='priceAsc') return (parseFloat(a.price)||0) - (parseFloat(b.price)||0);
+      if(sortBy==='priceDesc') return (parseFloat(b.price)||0) - (parseFloat(a.price)||0);
+      if(sortBy==='name') return a.name.localeCompare(b.name);
+      if(sortBy==='brand') return a.brand.localeCompare(b.brand);
+      return b.addedAt - a.addedAt;
+    });
+    grid.innerHTML = '';
+    emptyHint.style.display = items.length ? 'none' : '';
+    items.forEach(it=>{
+      const card = document.createElement('div');
+      card.className = 'shop-item-card';
+      const priceNum = parseFloat(it.price);
+      const priceText = isFinite(priceNum) ? ('$' + priceNum.toLocaleString()) : (it.price || '');
+      card.innerHTML = `
+        <button class="shop-item-remove" type="button" title="Remove">&times;</button>
+        <div class="shop-item-thumb">${it.image ? `<img src="${fpEscapeHtml(it.image)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'shop-item-thumb-missing',textContent:'No photo available'}))">` : '<div class="shop-item-thumb-missing">No photo available</div>'}</div>
+        <div class="shop-item-name">${fpEscapeHtml(it.name)}</div>
+        <div class="shop-item-meta">
+          <span>${fpEscapeHtml(it.brand)}</span>
+          <span class="shop-item-price">${fpEscapeHtml(priceText)}</span>
+        </div>
+        <select class="shop-item-cat-select">
+          ${['Sofas','Chairs','Surfaces','Display','Other'].map(c=>`<option value="${c}" ${c===it.category?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <div class="shop-item-actions">
+          <a href="${fpEscapeHtml(it.url)}" target="_blank" rel="noopener">View at ${fpEscapeHtml(it.brand)} &#8599;</a>
+        </div>
+      `;
+      card.querySelector('.shop-item-remove').addEventListener('click', ()=>{
+        fpSaveShopItems(fpGetShopItems().filter(x=>x.id!==it.id));
+        fpRenderShopItems();
+      });
+      card.querySelector('.shop-item-cat-select').addEventListener('change', (e)=>{
+        const all = fpGetShopItems();
+        const found = all.find(x=>x.id===it.id);
+        if(found){ found.category = e.target.value; fpSaveShopItems(all); }
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function fpSwitchScreen(screen){
+    const isShop = screen === 'shop';
+    // Explicit 'none'/'block' -- not the `hidden` attribute, and not
+    // clearing style.display back to '' either. #floorplanScreen has its
+    // own `display:block` rule (id selector) that beats the UA
+    // stylesheet's [hidden]{display:none} on specificity, and clearing an
+    // inline style.display back to '' just falls through to that same
+    // losing cascade rather than actually showing the element -- an
+    // explicit value is the only thing that reliably wins in both
+    // directions.
+    document.getElementById('floorplanScreen').style.display = isShop ? 'none' : 'block';
+    document.getElementById('shopScreen').style.display = isShop ? 'block' : 'none';
+    document.getElementById('fpFloorplanToolbar').style.display = isShop ? 'none' : '';
+    document.getElementById('fpTabFloorplan').classList.toggle('active', !isShop);
+    document.getElementById('fpTabShop').classList.toggle('active', isShop);
+    if(isShop) fpRenderShopItems(); else fpRender();
+  }
+
+  function fpInitShop(){
+    document.getElementById('fpTabFloorplan').addEventListener('click', ()=> fpSwitchScreen('floorplan'));
+    document.getElementById('fpTabShop').addEventListener('click', ()=> fpSwitchScreen('shop'));
+
+    document.querySelectorAll('.shop-chip').forEach(chip=>{
+      chip.addEventListener('click', ()=>{
+        document.querySelectorAll('.shop-chip').forEach(c=>c.classList.remove('active'));
+        chip.classList.add('active');
+        fpShopSelectedCat = chip.dataset.cat;
+        fpRenderShopBrandLinks();
+      });
+    });
+    document.getElementById('shopQueryInput').addEventListener('input', fpRenderShopBrandLinks);
+    fpRenderShopBrandLinks();
+
+    document.getElementById('shopBookmarklet').href = fpShopBookmarkletSrc();
+
+    document.getElementById('shopFilterCat').addEventListener('change', fpRenderShopItems);
+    document.getElementById('shopSortBy').addEventListener('change', fpRenderShopItems);
+    fpRenderShopItems();
+
+    // Incoming item from the bookmarklet (?shopAdd=<base64 JSON>) -- add
+    // it, switch to the Shop tab, then scrub the param so a reload doesn't
+    // re-add the same item.
+    const params = new URLSearchParams(location.search);
+    const shopAdd = params.get('shopAdd');
+    if(shopAdd){
+      try{
+        const data = JSON.parse(decodeURIComponent(escape(atob(shopAdd))));
+        fpAddShopItem(data);
+        fpSwitchScreen('shop');
+        toast(`Added "${data.name || 'item'}" to your Shop list.`);
+      }catch(e){ toast('Could not read that item.', true); }
+      params.delete('shopAdd');
+      const newUrl = location.pathname + (params.toString() ? '?'+params.toString() : '') + location.hash;
+      history.replaceState(null, '', newUrl);
+    }
+  }
+
   // ---------- PWA: bootstrap ----------
   syncInstallUI();
   fpWireDragAutoScroll();
   initFloorPlan(); // reads FP_STORAGE_KEY via fpLoad() -- must run before the empty-state check below
+  fpInitShop();
   maybeOfferFpAutoRestore(); // resolves "restore your data?" first (Step 7a) if warranted, then itself chains into maybeShowInstallPrompt()
   checkForUpdate();
   document.addEventListener('visibilitychange', ()=>{
