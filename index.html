@@ -831,7 +831,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+25204492';
+  const APP_VERSION = '1.0+14e39807';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -4561,6 +4561,16 @@
     // Registers the just-loaded plan in Recent Projects even before its
     // first edit, so a fresh install's default/empty plan still shows up.
     fpPutProject({ id:fpActiveProjectId, name:fpState.title, savedAt:Date.now(), state:fpProjectSnapshot() });
+    // Backfill the demo into Recent Projects for an existing user too (not
+    // just a brand-new install) -- handy as a standing reference/test
+    // fixture, reachable via Toolbox > Projects, without resetting their
+    // actual active project to see it. Doesn't touch fpState/
+    // fpActiveProjectId; only adds the record if it isn't already there.
+    if(!isFirstEverOpen){
+      fpGetProject(FP_DEMO_PROJECT_ID).then(existing=>{
+        if(!existing) fpPutProject({ id:FP_DEMO_PROJECT_ID, name:'Project Example', savedAt:Date.now(), state:Object.assign({}, fpDemoState(), { __idSeq:100 }) });
+      });
+    }
 
     document.getElementById('fpTitle').addEventListener('blur', (e)=>{
       fpState.title = e.target.textContent.trim() || 'Project Title';
