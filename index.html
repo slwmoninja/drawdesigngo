@@ -324,7 +324,7 @@
      padding left for the white canvas to breathe against that panel. */
   .fp-canvas-wrap{
     overflow:auto; padding:6px;
-    display:flex; align-items:center; justify-content:center;
+    display:flex; align-items:center; justify-content:flex-start;
   }
   .fp-canvas{
     position:relative; background:#ffffff;
@@ -840,7 +840,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+7075d9dd';
+  const APP_VERSION = '1.0+730fa07d';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -4136,7 +4136,15 @@
         const dims = (fpGetShowDimensions() && !el.hideDims) ? `${fpFormatFeetIn(lenFt)} × ${fpFormatFeetIn(heightIn/12)}` : '';
         const nameText = (fpGetShowLabels() && !el.hideName && hasLineLabel) ? el.label : '';
         const combined = [nameText, dims && `(${dims})`].filter(Boolean).join(' ');
-        const showPlaceholder = fpGetShowLabels() && !el.hideName && selected && !combined;
+        // Deliberately NOT gated on !el.hideName: this placeholder is the
+        // only click target that reopens fpOpenLineDetailsModal once nothing
+        // else is showing. If hideName suppressed it too, a wall/opening/
+        // window/door with both name and dimensions hidden would have no way
+        // back into its own editor (short of the harder-to-discover
+        // dblclick) -- selecting it is already an explicit user action, so
+        // showing "Add label" here doesn't violate the hide-name intent for
+        // the plan's normal (unselected) appearance.
+        const showPlaceholder = fpGetShowLabels() && selected && !combined;
         if(combined || showPlaceholder){
           const midX = (el.x1+el.x2)/2, midY = (el.y1+el.y2)/2;
           const lineLabel = document.createElement('div');
@@ -4267,7 +4275,9 @@
           label.className = 'fp-item-label';
           label.style.display = '';
           label.textContent = combined;
-        } else if(fpGetShowLabels() && !item.hideName && isSelected){
+        } else if(fpGetShowLabels() && isSelected){
+          // Not gated on !item.hideName -- see the matching comment on the
+          // line-type placeholder above; same bug, same fix.
           label.className = 'fp-item-label placeholder';
           label.style.display = '';
           label.textContent = 'Add label';
