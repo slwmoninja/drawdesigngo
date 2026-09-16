@@ -840,7 +840,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+730fa07d';
+  const APP_VERSION = '1.0+6db9f994';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3955,15 +3955,16 @@
   function fpRender(){
     const canvas = document.getElementById('fpCanvas');
     const wrap = document.getElementById('fpCanvasWrap');
-    // Auto-fit: shrink so the grid fits the available width on narrow
-    // screens (never scales UP past real size on wide ones), on top of
-    // which the zoom buttons apply a manual multiplier. Recomputed on every
-    // render, which also covers resize/orientation change since those call
+    // Auto-fit: scale the grid to fill the available width, shrinking on
+    // narrow screens and stretching on wide ones (rather than leaving the
+    // canvas at native size with dead space beside it), on top of which the
+    // zoom buttons apply a manual multiplier. Recomputed on every render,
+    // which also covers resize/orientation change since those call
     // fpRender() too.
     const gridSize = fpComputeGridSize();
     const naturalW = gridSize.w * FP_SCALE;
     const availW = wrap ? wrap.clientWidth - 80 : 0; // minus 40px padding each side
-    const autoFit = (availW > 0) ? Math.min(1, availW/naturalW) : 1;
+    const autoFit = (availW > 0) ? availW/naturalW : 1;
     const scale = FP_SCALE * autoFit * fpZoomMultiplier;
     fpLiveScale = scale;
     const zoomLabel = document.getElementById('fpZoomLabel');
