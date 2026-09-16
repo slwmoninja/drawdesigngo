@@ -848,7 +848,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+032f5926';
+  const APP_VERSION = '1.0+689db2bb';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3661,8 +3661,12 @@
     let n = 1;
     for(let r=0;r<rows;r++){
       for(let c=0;c<cols;c++){
-        const label = fpSvgEl('text', { x:c*pageW+6, y:r*pageH+16, class:'fp-page-num' });
-        label.textContent = 'Page '+n;
+        // Bottom-left of the page's own cell -- clamped to contentH for a
+        // partial last row, so the label never lands below the visible
+        // canvas (which is sized to content, not to full page multiples).
+        const y = Math.min((r+1)*pageH, contentH) - 6;
+        const label = fpSvgEl('text', { x:c*pageW+6, y, class:'fp-page-num' });
+        label.textContent = 'Pg.'+n;
         svg.appendChild(label);
         n++;
       }
