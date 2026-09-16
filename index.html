@@ -848,7 +848,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+cb6d8fd9';
+  const APP_VERSION = '1.0+89abcd7d';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2262,10 +2262,21 @@
   // Grid always starts at (0,0) and grows only in +X/+Y to cover whatever's
   // actually on the plan -- see fpElementBounds/fpObjectBoundsFeet below
   // (shared with the export code, which needs the same bounding-box math).
+  // Furthest point a live drag (line/shape draw, object move, edge-scroll --
+  // see fpGrowLiveCanvas below) has reached, on top of the committed
+  // elements/objects bounds fpComputeGridSize() otherwise measures. Without
+  // this, the canvas only grows once a drag commits and fpRender() re-runs,
+  // so edge-scrolling into the wrap's fresh space (fpEdgeScrollTick) reveals
+  // nothing new -- there's no more canvas there yet. Reset to 0 at the top
+  // of every fpRender(), since a render always follows a drag's end (commit
+  // or cancel).
+  let fpLiveDragExtentX = 0, fpLiveDragExtentY = 0;
   function fpComputeGridSize(){
     let maxX=0, maxY=0;
     fpState.elements.forEach(el=>{ const b=fpElementBounds(el); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
     fpState.objects.forEach(o=>{ const b=fpObjectBoundsFeet(o); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
+    maxX = Math.max(maxX, fpLiveDragExtentX);
+    maxY = Math.max(maxY, fpLiveDragExtentY);
     return {
       w: Math.max(FP_GRID_MIN_W, Math.ceil(maxX + FP_GRID_PAD)),
       h: Math.max(FP_GRID_MIN_H, Math.ceil(maxY + FP_GRID_PAD)),
@@ -3828,6 +3839,31 @@
   let fpEdgeScrollClient = null; // {x,y} in viewport coords, or null before the first move/after disarm
   let fpEdgeScrollRefresh = null; // re-runs the drag's own onMove at the last pointer pos, so a stationary cursor still keeps extending it as the canvas scrolls underneath
   let fpEdgeScrollRaf = null;
+  // Grows the actual canvas/svg pixel size (not just the in-memory grid
+  // model) to keep pace with a live drag that's reached the wrap's edge --
+  // called from fpEdgeScrollTick below, right where it's about to scroll
+  // the wrap, so there's genuinely new canvas revealed rather than just
+  // scrolling toward the same fixed edge forever. Only grows, never shrinks
+  // (a drag that backs off shouldn't visibly shrink the canvas out from
+  // under it); fpRender()'s reset of fpLiveDragExtentX/Y is what actually
+  // shrinks back to the committed content's real bounds once the drag ends.
+  function fpGrowLiveCanvas(clientX, clientY){
+    const canvas = document.getElementById('fpCanvas');
+    const svg = canvas && canvas.querySelector('svg.fp-svg:not(.fp-page-grid)');
+    if(!canvas || !svg || !fpLiveScale) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = (clientX-rect.left)/fpLiveScale, my = (clientY-rect.top)/fpLiveScale;
+    if(mx<=fpLiveDragExtentX && my<=fpLiveDragExtentY) return;
+    fpLiveDragExtentX = Math.max(fpLiveDragExtentX, mx);
+    fpLiveDragExtentY = Math.max(fpLiveDragExtentY, my);
+    const gridSize = fpComputeGridSize();
+    const wrap = document.getElementById('fpCanvasWrap');
+    const availW = wrap ? wrap.clientWidth-80 : 0;
+    const w = Math.max(gridSize.w*fpLiveScale, availW), d = gridSize.h*fpLiveScale;
+    canvas.style.width = w+'px'; canvas.style.height = d+'px';
+    svg.setAttribute('width', w); svg.setAttribute('height', d);
+    fpApplyGridBackground(canvas, fpLiveScale);
+  }
   function fpEdgeScrollTick(){
     if(!fpEdgeScrollArmed){ fpEdgeScrollRaf = null; return; }
     if(fpEdgeScrollClient){
@@ -3840,6 +3876,7 @@
       if(y-r.top < FP_EDGE_SCROLL_PX) dy = -FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,y-r.top)/FP_EDGE_SCROLL_PX);
       else if(r.bottom-y < FP_EDGE_SCROLL_PX) dy = FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,r.bottom-y)/FP_EDGE_SCROLL_PX);
       if(dx || dy){
+        fpGrowLiveCanvas(x, y);
         wrap.scrollBy(dx, dy);
         if(fpEdgeScrollRefresh) fpEdgeScrollRefresh({ clientX:x, clientY:y });
       }
@@ -4094,6 +4131,7 @@
   }
 
   function fpRender(){
+    fpLiveDragExtentX = 0; fpLiveDragExtentY = 0;
     const canvas = document.getElementById('fpCanvas');
     const wrap = document.getElementById('fpCanvasWrap');
     // Auto-fit: shrink so the grid fits the available width on narrow
