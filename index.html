@@ -848,7 +848,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+689db2bb';
+  const APP_VERSION = '1.0+cb6d8fd9';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -3750,12 +3750,13 @@
           h.setAttribute('cx', px(mx)); h.setAttribute('cy', px(my));
         }
         function up(){
-          h.removeEventListener('pointermove', move);
-          h.removeEventListener('pointerup', up);
+          h.removeEventListener('pointermove', dragEdge.move);
+          h.removeEventListener('pointerup', dragEdge.up);
           fpSave(); fpRender();
         }
-        h.addEventListener('pointermove', move);
-        h.addEventListener('pointerup', up);
+        const dragEdge = fpDragWithEdgeScroll(move, up);
+        h.addEventListener('pointermove', dragEdge.move);
+        h.addEventListener('pointerup', dragEdge.up);
       });
       return h;
     }
@@ -3812,6 +3813,47 @@
       layer.appendChild(rh);
     }
     svg.appendChild(layer);
+  }
+
+  // Edge-scrolling .fp-canvas-wrap during an in-canvas drag (drawing a line/
+  // shape, moving or resizing a wall/object, dragging a room label...): once
+  // the pointer nears the wrap's own edge, auto-scroll it so the drag can
+  // keep going past whatever's currently visible -- mirrors fpDragScrollTick
+  // below for a library-item drag, but scrolls the wrap itself (both axes),
+  // not the page, since that's the scrollable ancestor for a plan bigger
+  // than the visible workspace. fpDragWithEdgeScroll wraps a drag's own
+  // onMove/onUp pair so every call site below only needs one extra line.
+  const FP_EDGE_SCROLL_PX = 56, FP_EDGE_SCROLL_MAX_PX = 16;
+  let fpEdgeScrollArmed = false; // true for the whole drag, from arm to disarm -- separate from fpEdgeScrollClient (which starts null and stays that way until the first move), so the loop below doesn't mistake "no position reported yet" for "drag over" and kill itself before ever seeing one
+  let fpEdgeScrollClient = null; // {x,y} in viewport coords, or null before the first move/after disarm
+  let fpEdgeScrollRefresh = null; // re-runs the drag's own onMove at the last pointer pos, so a stationary cursor still keeps extending it as the canvas scrolls underneath
+  let fpEdgeScrollRaf = null;
+  function fpEdgeScrollTick(){
+    if(!fpEdgeScrollArmed){ fpEdgeScrollRaf = null; return; }
+    if(fpEdgeScrollClient){
+      const wrap = document.getElementById('fpCanvasWrap');
+      const r = wrap.getBoundingClientRect();
+      const { x, y } = fpEdgeScrollClient;
+      let dx = 0, dy = 0;
+      if(x-r.left < FP_EDGE_SCROLL_PX) dx = -FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,x-r.left)/FP_EDGE_SCROLL_PX);
+      else if(r.right-x < FP_EDGE_SCROLL_PX) dx = FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,r.right-x)/FP_EDGE_SCROLL_PX);
+      if(y-r.top < FP_EDGE_SCROLL_PX) dy = -FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,y-r.top)/FP_EDGE_SCROLL_PX);
+      else if(r.bottom-y < FP_EDGE_SCROLL_PX) dy = FP_EDGE_SCROLL_MAX_PX*(1-Math.max(0,r.bottom-y)/FP_EDGE_SCROLL_PX);
+      if(dx || dy){
+        wrap.scrollBy(dx, dy);
+        if(fpEdgeScrollRefresh) fpEdgeScrollRefresh({ clientX:x, clientY:y });
+      }
+    }
+    fpEdgeScrollRaf = requestAnimationFrame(fpEdgeScrollTick);
+  }
+  function fpDragWithEdgeScroll(onMove, onUp){
+    fpEdgeScrollArmed = true;
+    fpEdgeScrollRefresh = onMove;
+    if(fpEdgeScrollRaf==null) fpEdgeScrollRaf = requestAnimationFrame(fpEdgeScrollTick);
+    return {
+      move(ev){ fpEdgeScrollClient = { x:ev.clientX, y:ev.clientY }; onMove(ev); },
+      up(ev){ fpEdgeScrollArmed = false; fpEdgeScrollClient = null; fpEdgeScrollRefresh = null; onUp(ev); },
+    };
   }
 
   // Wires whole-canvas interaction for the current mode. Uses property
@@ -3953,14 +3995,24 @@
         const lengthHint = document.createElement('div');
         lengthHint.className = 'fp-draw-length-hint';
         canvas.appendChild(lengthHint);
-        canvas.onpointermove = (e)=>{
+        function updateLinePreview(e){
           const [mx,my] = feetFromEvent(e);
           previewLine.setAttribute('x2', px(mx)); previewLine.setAttribute('y2', px(my));
           const lengthFt = Math.hypot(mx-fpDrawPending.x1, my-fpDrawPending.y1);
           lengthHint.textContent = fpFormatFeetIn(lengthFt);
           lengthHint.style.left = (px((fpDrawPending.x1+mx)/2))+'px';
           lengthHint.style.top = (px((fpDrawPending.y1+my)/2))+'px';
+        }
+        canvas.onpointermove = (e)=>{
+          updateLinePreview(e);
+          fpEdgeScrollClient = { x:e.clientX, y:e.clientY };
         };
+        // Armed for as long as the second point is pending (there's no single
+        // pointerup to hang this off of -- placement is two separate clicks,
+        // not one held drag), disarmed at commit/cancel below.
+        fpEdgeScrollArmed = true;
+        fpEdgeScrollRefresh = updateLinePreview;
+        if(fpEdgeScrollRaf==null) fpEdgeScrollRaf = requestAnimationFrame(fpEdgeScrollTick);
       }
       canvas.onpointerdown = (e)=> fpArmLongPressMarquee(e, ()=>{}); // line tools have no drag behavior of their own to fall back to -- just arms the long press
       canvas.onclick = (e)=>{
@@ -3972,6 +4024,7 @@
         } else {
           const start = fpDrawPending;
           fpDrawPending = null;
+          fpEdgeScrollArmed = false; fpEdgeScrollClient = null; fpEdgeScrollRefresh = null;
           if(Math.hypot(mx-start.x1, my-start.y1) >= FP_GRID_STEP){
             fpPushHistory();
             fpState.elements.push({ id:fpIdSeq++, type:fpDrawTool, x1:start.x1, y1:start.y1, x2:mx, y2:my, color:'#8b8d8e', heightIn:FP_DEFAULT_HEIGHT_IN[fpDrawTool]||96 });
@@ -4011,8 +4064,8 @@
         }
       }
       function onUp(ev){
-        canvas.removeEventListener('pointermove', onMove);
-        canvas.removeEventListener('pointerup', onUp);
+        canvas.removeEventListener('pointermove', dragEdge.move);
+        canvas.removeEventListener('pointerup', dragEdge.up);
         const [mx,my] = feetFromEvent(ev);
         if(isCircle){
           const r = Math.max(FP_GRID_STEP, fpSnap(Math.hypot(mx-sx,my-sy)));
@@ -4033,8 +4086,9 @@
         }
         fpRender();
       }
-      canvas.addEventListener('pointermove', onMove);
-      canvas.addEventListener('pointerup', onUp);
+      const dragEdge = fpDragWithEdgeScroll(onMove, onUp);
+      canvas.addEventListener('pointermove', dragEdge.move);
+      canvas.addEventListener('pointerup', dragEdge.up);
     }
     canvas.onpointerdown = (e)=> fpArmLongPressMarquee(e, ()=> fpBeginShapeDrag(e));
   }
@@ -4189,12 +4243,13 @@
           fpUpdateShapeAttrs(shape, el, px);
         }
         function onUp(){
-          canvas.removeEventListener('pointermove', onMove);
-          canvas.removeEventListener('pointerup', onUp);
+          canvas.removeEventListener('pointermove', dragEdge.move);
+          canvas.removeEventListener('pointerup', dragEdge.up);
           fpSave(); fpRender();
         }
-        canvas.addEventListener('pointermove', onMove);
-        canvas.addEventListener('pointerup', onUp);
+        const dragEdge = fpDragWithEdgeScroll(onMove, onUp);
+        canvas.addEventListener('pointermove', dragEdge.move);
+        canvas.addEventListener('pointerup', dragEdge.up);
       });
       // Double-click a wall opens the same name/length editor as tapping
       // its dimension label -- that label only shows up once a name's set
@@ -4341,13 +4396,14 @@
             updateObjStyle(el, item);
           }
           function onUp(){
-            label.removeEventListener('pointermove', onMove);
-            label.removeEventListener('pointerup', onUp);
+            label.removeEventListener('pointermove', dragEdge.move);
+            label.removeEventListener('pointerup', dragEdge.up);
             if(labelDragged){ fpSave(); fpRender(); }
             else{ fpHistory.pop(); document.getElementById('fpUndoBtn').disabled = fpHistory.length===0; }
           }
-          label.addEventListener('pointermove', onMove);
-          label.addEventListener('pointerup', onUp);
+          const dragEdge = fpDragWithEdgeScroll(onMove, onUp);
+          label.addEventListener('pointermove', dragEdge.move);
+          label.addEventListener('pointerup', dragEdge.up);
         });
         label.addEventListener('click', (e)=>{ e.stopPropagation(); if(!labelDragged) fpOpenRoomLabelModal(item); });
       } else {
@@ -4442,12 +4498,13 @@
               fpApplyIconFlip(icon, item);
             }
             function onUp(){
-              node.removeEventListener('pointermove', onMove);
-              node.removeEventListener('pointerup', onUp);
+              node.removeEventListener('pointermove', dragEdge.move);
+              node.removeEventListener('pointerup', dragEdge.up);
               fpSave(); fpRender();
             }
-            node.addEventListener('pointermove', onMove);
-            node.addEventListener('pointerup', onUp);
+            const dragEdge = fpDragWithEdgeScroll(onMove, onUp);
+            node.addEventListener('pointermove', dragEdge.move);
+            node.addEventListener('pointerup', dragEdge.up);
           });
           el.appendChild(node);
         });
@@ -4473,12 +4530,13 @@
             fpRender();
           }
           function onUpGroup(){
-            canvas.removeEventListener('pointermove', onMoveGroup);
-            canvas.removeEventListener('pointerup', onUpGroup);
+            canvas.removeEventListener('pointermove', dragEdgeGroup.move);
+            canvas.removeEventListener('pointerup', dragEdgeGroup.up);
             fpSave();
           }
-          canvas.addEventListener('pointermove', onMoveGroup);
-          canvas.addEventListener('pointerup', onUpGroup);
+          const dragEdgeGroup = fpDragWithEdgeScroll(onMoveGroup, onUpGroup);
+          canvas.addEventListener('pointermove', dragEdgeGroup.move);
+          canvas.addEventListener('pointerup', dragEdgeGroup.up);
           return;
         }
         try{ el.setPointerCapture(e.pointerId); }catch(err){}
@@ -4488,12 +4546,13 @@
           updateObjStyle(el, item);
         }
         function onUp(){
-          el.removeEventListener('pointermove', onMove);
-          el.removeEventListener('pointerup', onUp);
+          el.removeEventListener('pointermove', dragEdge.move);
+          el.removeEventListener('pointerup', dragEdge.up);
           fpSave();
         }
-        el.addEventListener('pointermove', onMove);
-        el.addEventListener('pointerup', onUp);
+        const dragEdge = fpDragWithEdgeScroll(onMove, onUp);
+        el.addEventListener('pointermove', dragEdge.move);
+        el.addEventListener('pointerup', dragEdge.up);
       });
       // Double-click anywhere on the shape itself opens the same name/
       // dimensions editor as tapping its caption below -- the caption is
@@ -4670,6 +4729,7 @@
   function fpSetMode(mode){
     fpMode = mode;
     fpDrawPending = null;
+    fpEdgeScrollArmed = false; fpEdgeScrollClient = null; fpEdgeScrollRefresh = null;
     fpSetDeleteMode(false); // also calls fpSyncToolActiveUI(), now that fpMode is up to date
     fpRender();
   }
@@ -4771,6 +4831,7 @@
     document.getElementById('fpDrawToolSelect').addEventListener('change', (e)=>{
       fpDrawTool = e.target.value;
       fpDrawPending = null;
+      fpEdgeScrollArmed = false; fpEdgeScrollClient = null; fpEdgeScrollRefresh = null;
       fpSyncToolActiveUI();
       fpRender();
     });
@@ -4943,7 +5004,7 @@
     });
 
     document.addEventListener('keydown', (e)=>{
-      if(e.key==='Escape' && fpDrawPending){ fpDrawPending = null; fpRender(); return; }
+      if(e.key==='Escape' && fpDrawPending){ fpDrawPending = null; fpEdgeScrollArmed = false; fpEdgeScrollClient = null; fpEdgeScrollRefresh = null; fpRender(); return; }
       if(e.key==='Escape' && fpDeleteModeActive){ fpSetDeleteMode(false); return; }
       const typing = document.activeElement.tagName==='INPUT' || document.activeElement.isContentEditable;
       if((e.key==='Delete'||e.key==='Backspace') && fpSelectedId!==null && !typing){
