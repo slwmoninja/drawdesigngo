@@ -345,6 +345,12 @@
   }
   #fpDeleteBtn.active{ border-color:var(--danger); color:var(--danger); background:rgba(201,55,86,.12); }
   .fp-svg{ position:absolute; left:0; top:0; pointer-events:none; }
+  /* Print/PDF page-break preview: very faint so it reads as a background
+     guide, never competes with the actual floor plan drawn on top of it. */
+  .fp-page-grid text{
+    font:600 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    fill:rgba(140,144,150,.5);
+  }
   .fp-el{ pointer-events:auto; }
   .fp-el .fp-el-shape{ cursor:grab; }
   .fp-el.selected .fp-el-shape{ stroke:var(--accent) !important; }
@@ -737,6 +743,8 @@
             <button class="btn fp-zoom-btn" id="fpGridToggle" title="Show or hide the grid lines">Grid</button>
             <button class="btn fp-zoom-btn" id="fpLabelsToggle" title="Show or hide furniture/wall labels">Labels</button>
             <button class="btn fp-zoom-btn" id="fpDimensionsToggle" title="Show or hide dimensions in labels">Dimensions</button>
+            <button class="btn fp-zoom-btn" id="fpLandscapeToggle" title="Toggle print/PDF page orientation between landscape and portrait">Landscape</button>
+            <button class="btn fp-zoom-btn" id="fpBordersToggle" title="Show or hide print page borders and page numbers (only the page number ever prints)">Borders</button>
             <button class="btn fp-zoom-btn" id="fpSaveAsBtn" title="Save the current plan as an image, PDF, CAD file, or project file">Save as&hellip;</button>
           </div>
         </div>
@@ -840,7 +848,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+90a05664';
+  const APP_VERSION = '1.0+032f5926';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2667,6 +2675,11 @@
     clone.style.boxShadow = 'none';
     clone.querySelectorAll('.fp-node, .fp-rotate-node, .fp-marquee').forEach(n=>n.remove());
     clone.querySelectorAll('.fp-item-label.placeholder').forEach(n=>n.remove());
+    // Page-break border lines are an on-screen editing reference only -- the
+    // physical sheet edge IS the border once actually printed -- but the
+    // page number itself needs to survive into the export so printed sheets
+    // can still be reassembled in order.
+    clone.querySelectorAll('.fp-page-border-line').forEach(n=>n.remove());
     clone.querySelectorAll('.selected').forEach(n=>n.classList.remove('selected'));
     clone.querySelectorAll('.fp-multi-selected').forEach(n=>n.classList.remove('fp-multi-selected'));
     // Nested <svg> (the walls layer, each furniture icon) silently vanish
@@ -3586,6 +3599,76 @@
   const FP_SHOW_DIMS_KEY = 'floorplanner-show-dimensions';
   function fpGetShowDimensions(){ try{ return localStorage.getItem(FP_SHOW_DIMS_KEY) !== '0'; }catch(e){ return true; } }
   function fpSetShowDimensions(show){ try{ localStorage.setItem(FP_SHOW_DIMS_KEY, show ? '1' : '0'); }catch(e){} }
+  const FP_LANDSCAPE_KEY = 'floorplanner-landscape';
+  function fpGetLandscape(){ try{ return localStorage.getItem(FP_LANDSCAPE_KEY) !== '0'; }catch(e){ return true; } }
+  function fpSetLandscape(landscape){
+    try{ localStorage.setItem(FP_LANDSCAPE_KEY, landscape ? '1' : '0'); }catch(e){}
+    fpApplyPrintOrientation(landscape);
+  }
+  // The static @page rule in <style> only covers the landscape default --
+  // switching the toggle overrides it via a second, later <style> (CSS
+  // cascade order, not specificity, decides which @page wins), so an actual
+  // browser print/PDF export (see fpExportPdf) matches whatever orientation
+  // the on-screen page-break guides below are already showing.
+  function fpApplyPrintOrientation(landscape){
+    if(landscape==null) landscape = fpGetLandscape();
+    let style = document.getElementById('fpPrintPageSize');
+    if(!style){ style = document.createElement('style'); style.id = 'fpPrintPageSize'; document.head.appendChild(style); }
+    style.textContent = `@page{ size: ${landscape ? 'landscape' : 'portrait'}; }`;
+  }
+  const FP_SHOW_BORDERS_KEY = 'floorplanner-show-page-borders';
+  function fpGetShowBorders(){ try{ return localStorage.getItem(FP_SHOW_BORDERS_KEY) !== '0'; }catch(e){ return true; } }
+  function fpSetShowBorders(show){ try{ localStorage.setItem(FP_SHOW_BORDERS_KEY, show ? '1' : '0'); }catch(e){} }
+  // Print page size in real-world feet, at a standard 1/4" = 1'-0" floor-plan
+  // scale -- so the on-screen page-break guides (see fpRenderPageGrid) line
+  // up with where a US Letter sheet would actually cut the plan.
+  const FP_PAGE_SCALE_FT_PER_IN = 4;
+  const FP_PAGE_W_IN = 8.5, FP_PAGE_H_IN = 11; // US Letter, portrait dimensions
+  function fpPageSizeFt(){
+    const landscape = fpGetLandscape();
+    const wIn = landscape ? FP_PAGE_H_IN : FP_PAGE_W_IN;
+    const hIn = landscape ? FP_PAGE_W_IN : FP_PAGE_H_IN;
+    return { w: wIn*FP_PAGE_SCALE_FT_PER_IN, h: hIn*FP_PAGE_SCALE_FT_PER_IN };
+  }
+  // Page-break guides for printing/PDF export: faint dotted lines at every
+  // page edge plus a page number per cell, numbered left-to-right then down
+  // (the order the sheets would read in if printed and laid out). Sized to
+  // the plan's own content footprint (contentW x contentH), not the wider
+  // on-screen canvas that fills leftover workspace width -- that extra
+  // screen space isn't part of what actually prints, so it shouldn't be
+  // carved into phantom pages. The Borders toggle hides this whole overlay
+  // on screen; the border lines specifically (.fp-page-border-line) are also
+  // stripped back out of exports/print by fpCaptureFullCanvasRaster, since
+  // they're only an editing reference -- the physical page edge IS the
+  // border once actually printed, but the page number still needs to print
+  // so sheets can be reassembled in order.
+  function fpRenderPageGrid(canvas, contentW, contentH, scale){
+    if(!fpGetShowBorders()) return;
+    const pageFt = fpPageSizeFt();
+    const pageW = pageFt.w*scale, pageH = pageFt.h*scale;
+    if(!(pageW>0) || !(pageH>0) || !(contentW>0) || !(contentH>0)) return;
+    const cols = Math.max(1, Math.ceil(contentW/pageW)), rows = Math.max(1, Math.ceil(contentH/pageH));
+    const svg = fpSvgEl('svg', { width:contentW, height:contentH, class:'fp-svg fp-page-grid' });
+    const lineColor = 'rgba(138,143,152,.2)';
+    for(let i=1;i<cols;i++){
+      const x = i*pageW;
+      svg.appendChild(fpSvgEl('line', { x1:x, y1:0, x2:x, y2:contentH, stroke:lineColor, 'stroke-width':1, 'stroke-dasharray':'4 4', class:'fp-page-border-line' }));
+    }
+    for(let j=1;j<rows;j++){
+      const y = j*pageH;
+      svg.appendChild(fpSvgEl('line', { x1:0, y1:y, x2:contentW, y2:y, stroke:lineColor, 'stroke-width':1, 'stroke-dasharray':'4 4', class:'fp-page-border-line' }));
+    }
+    let n = 1;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const label = fpSvgEl('text', { x:c*pageW+6, y:r*pageH+16, class:'fp-page-num' });
+        label.textContent = 'Page '+n;
+        svg.appendChild(label);
+        n++;
+      }
+    }
+    canvas.appendChild(svg);
+  }
 
   function fpApplyGridBackground(canvas, scale){
     if(!fpGetShowGrid()){ canvas.style.backgroundImage = 'none'; return; }
@@ -3974,7 +4057,8 @@
     // element itself as extra blank grid squares -- physically extending the
     // usable floor, not stretching the existing room's pixels/zoom level.
     // Height is left alone: only the right edge is meant to fill.
-    const w = Math.max(gridSize.w * scale, availW), d = gridSize.h * scale;
+    const contentW = gridSize.w * scale, contentH = gridSize.h * scale;
+    const w = Math.max(contentW, availW), d = contentH;
     canvas.style.width = w+'px'; canvas.style.height = d+'px';
     fpApplyGridBackground(canvas, scale);
     canvas.classList.toggle('fp-draw-mode', fpMode==='draw');
@@ -4481,6 +4565,7 @@
       }catch(err){}
     };
 
+    fpRenderPageGrid(canvas, contentW, contentH, scale);
     fpWireCanvasInteraction(canvas, svg, px, scale);
     fpRenderSidePanels();
   }
@@ -4828,6 +4913,22 @@
       const show = !fpGetShowDimensions();
       fpSetShowDimensions(show);
       dimensionsToggleBtn.classList.toggle('active', show);
+      fpRender();
+    });
+    const landscapeToggleBtn = document.getElementById('fpLandscapeToggle');
+    landscapeToggleBtn.classList.toggle('active', fpGetLandscape());
+    landscapeToggleBtn.addEventListener('click', ()=>{
+      const landscape = !fpGetLandscape();
+      fpSetLandscape(landscape);
+      landscapeToggleBtn.classList.toggle('active', landscape);
+      fpRender();
+    });
+    const bordersToggleBtn = document.getElementById('fpBordersToggle');
+    bordersToggleBtn.classList.toggle('active', fpGetShowBorders());
+    bordersToggleBtn.addEventListener('click', ()=>{
+      const show = !fpGetShowBorders();
+      fpSetShowBorders(show);
+      bordersToggleBtn.classList.toggle('active', show);
       fpRender();
     });
     document.getElementById('fpSaveAsBtn').addEventListener('click', ()=> fpOpenExportModal());
@@ -5526,6 +5627,7 @@
 
   // ---------- PWA: bootstrap ----------
   syncInstallUI();
+  fpApplyPrintOrientation();
   fpWireDragAutoScroll();
   initFloorPlan(); // reads FP_STORAGE_KEY via fpLoad() -- must run before the empty-state check below
   fpInitShop();
