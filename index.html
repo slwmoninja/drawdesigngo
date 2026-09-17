@@ -264,6 +264,13 @@
   .modal.fs-modal{
     max-width:1100px; height:88vh; max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
   }
+  .fs-header{
+    display:flex; align-items:center; justify-content:space-between; gap:.6rem;
+    padding-right:2.1rem; margin-bottom:.7rem; flex:none;
+  }
+  .fs-header h3{ margin:0; }
+  .fs-header-actions{ display:flex; gap:.5rem; flex:none; }
+  .fs-header-actions .btn{ font-size:.76rem; padding:.35rem .6rem; }
   .fs-filters{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem; flex:none; }
   .fs-filters select, .fs-filters input[type="text"]{
     background:var(--panel2); border:1px solid var(--border); color:var(--text);
@@ -941,7 +948,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+eb6f93ff';
+  const APP_VERSION = '1.0+abaec2a4';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -961,7 +968,6 @@
     document.body.appendChild(wrap);
     function close(){ wrap.remove(); }
     wrap.querySelector('.modal-close').addEventListener('click', close);
-    wrap.querySelector('.modal-backdrop').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) close(); });
     return wrap;
   }
 
@@ -981,7 +987,6 @@
       wrap.querySelector('#fpConfirmYes').addEventListener('click', ()=>{ finish(true); wrap.remove(); });
       wrap.querySelector('#fpConfirmNo').addEventListener('click', ()=>{ finish(false); wrap.remove(); });
       wrap.querySelector('.modal-close').addEventListener('click', ()=>finish(false));
-      wrap.querySelector('.modal-backdrop').addEventListener('click', (e)=>{ if(e.target===e.currentTarget) finish(false); });
     });
   }
 
@@ -5862,6 +5867,44 @@
     return new Set(fsGetShoppingList().map(it => it.link));
   }
 
+  // All rows with a checked box right now -- both already-in-list rows
+  // (persisted, shown checked+disabled) and ones freshly ticked in this
+  // still-open modal but not yet added. Backs both the Export and Clear all
+  // header actions, which act on "anything checked" regardless of filters.
+  function fsGetAllChecked(){
+    const links = new Set([...fsInListLinks(), ...fsSelected]);
+    return FS_DATA.filter(r => links.has(r.link));
+  }
+
+  function fsCsvField(v){
+    const s = (v==null ? '' : String(v));
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+
+  async function fsExportChecked(){
+    const rows = fsGetAllChecked();
+    if(!rows.length){ toast('No items checked to export.', true); return; }
+    const header = ['Store','Room','Type','Name','Price Range','Link'];
+    const lines = [header.join(',')].concat(rows.map(r =>
+      [r.store, r.room, r.type, r.name, r.priceRange, r.link].map(fsCsvField).join(',')
+    ));
+    const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv'});
+    const stamp = new Date().toISOString().slice(0,10);
+    const ok = await fpSaveBlobWithPicker(blob, `furniture-sourcing-${stamp}.csv`, 'CSV spreadsheet (opens in Excel)', {'text/csv':['.csv']});
+    if(ok) toast(`Exported ${rows.length} item${rows.length===1?'':'s'}.`);
+  }
+
+  async function fsClearAllChecked(wrap){
+    const n = fsGetAllChecked().length;
+    if(!n){ toast('No items checked to clear.', true); return; }
+    const ok = await fpConfirmModal(`Remove all ${n} checked item${n===1?'':'s'} from the shopping list? This can't be undone.`, 'Clear all');
+    if(!ok) return;
+    fsSaveShoppingList([]);
+    fsSelected.clear();
+    fsRenderRows(wrap);
+    toast('Cleared.');
+  }
+
   function fsRenderRows(wrap){
     const rows = fsApplyFiltersAndSort(wrap);
     wrap.querySelector('#fsCount').textContent = `${rows.length} of ${FS_DATA.length} items`;
@@ -5907,7 +5950,13 @@
     backdrop.innerHTML =
       '<div class="modal fs-modal">' +
         '<button class="modal-close" aria-label="Close">&#10005;</button>' +
-        '<h3>Furniture sourcing list</h3>' +
+        '<div class="fs-header">' +
+          '<h3>Furniture sourcing list</h3>' +
+          '<div class="fs-header-actions">' +
+            '<button class="btn" id="fsExportBtn" type="button">Export</button>' +
+            '<button class="btn" id="fsClearAllBtn" type="button">Clear all</button>' +
+          '</div>' +
+        '</div>' +
         '<div class="fs-filters">' +
           `<select id="fsFilterStore"><option value="">All stores</option>${fsUniqueValues('store').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
           `<select id="fsFilterRoom"><option value="">All rooms</option>${fsUniqueValues('room').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
@@ -5938,7 +5987,6 @@
     const wrap = backdrop;
     function close(){ backdrop.remove(); }
     wrap.querySelector('.modal-close').addEventListener('click', close);
-    wrap.addEventListener('click', (e)=>{ if(e.target===wrap) close(); });
 
     wrap.querySelectorAll('.fs-filters select, .fs-filters input').forEach(el => {
       el.addEventListener('input', () => fsRenderRows(wrap));
@@ -5967,6 +6015,8 @@
       fsSelected.clear();
       fsRenderRows(wrap);
     });
+    wrap.querySelector('#fsExportBtn').addEventListener('click', fsExportChecked);
+    wrap.querySelector('#fsClearAllBtn').addEventListener('click', () => fsClearAllChecked(wrap));
 
     fsRenderRows(wrap);
   }
