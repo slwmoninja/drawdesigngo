@@ -987,7 +987,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+f5f7829a';
+  const APP_VERSION = '1.0+f570a8bf';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -2365,11 +2365,12 @@
         // with the top window's dimension callout further right on the
         // same wall.
         { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:3, cy:1.917, rot:0 },
-        // Shifted right/down off the corner Sunroom now occupies -- flush
-        // against the wall corner like the room's other fixtures collided
-        // with the label sitting that close above.
-        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:6.0, cy:3.5, rot:0 },
-        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:10.0, cy:3.667, rot:0 },
+        // Pushed down off the corner Sunroom now occupies -- a label's text
+        // renders well above its own nominal cy (not just half its own
+        // depth above it), so verify actual rendered clearance in-browser
+        // (see fpDemoState's callers) rather than trusting the feet math.
+        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:6.0, cy:5.0, rot:0 },
+        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:10.0, cy:5.167, rot:0 },
         // Icon artwork faces down (south, toward the sofa) at rot:0 by
         // default (confirmed by looking at the actual PNGs) -- the far row
         // (16/17, furthest from the sofa) keeps that default so it faces
