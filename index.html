@@ -205,8 +205,12 @@
 
   /* ---------- Shop search modal (opened via the header's Search icon,
      see fpOpenShopModal()) -- reuses the generic openModal() shell. */
-  .shop-brand-checks{ display:flex; flex-direction:column; gap:.35rem; margin:.6rem 0; }
+  .shop-brand-checks{ display:grid; grid-template-columns:1fr 1fr; gap:.35rem .75rem; margin:.6rem 0; }
+  .shop-brand-checks .shop-check-other{
+    grid-column:1 / -1; margin-top:.15rem; padding-top:.4rem; border-top:1px solid var(--border);
+  }
   .shop-check{ display:flex; align-items:center; gap:.45rem; font-size:.84rem; font-weight:600; cursor:pointer; }
+  .shop-section-heading{ margin:0 0 .3rem; font-size:.86rem; font-weight:800; color:var(--text); }
   .shop-check input{ width:1rem; height:1rem; accent-color:var(--accent); }
   .shop-price-row{ margin:.8rem 0; }
   .shop-price-row label{ display:block; font-size:.84rem; font-weight:600; margin-bottom:.3rem; }
@@ -275,14 +279,22 @@
     border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; z-index:1;
   }
   .fs-table thead th.fs-th-check{ cursor:default; width:1.6rem; }
+  .fs-table thead th.fs-th-thumb{ cursor:default; width:2.8rem; }
   .fs-table thead th .fs-sort-arrow{ opacity:.5; font-size:.68rem; margin-left:.15rem; }
   .fs-table tbody td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); vertical-align:top; }
   .fs-table tbody tr:hover{ background:var(--panel2); }
   .fs-table tbody tr.fs-row-checked{ background:rgba(15,156,134,.1); }
+  .fs-table tbody tr.fs-row-inlist{ background:var(--panel2); }
+  .fs-table tbody tr.fs-row-inlist td{ opacity:.6; }
   .fs-table td.fs-td-check{ width:1.6rem; }
+  .fs-table td.fs-td-thumb{ width:2.8rem; }
+  .fs-table td.fs-td-thumb img{
+    width:2.4rem; height:2.4rem; object-fit:cover; border-radius:6px; display:block; background:var(--panel);
+  }
   .fs-table td.fs-td-link a{ color:var(--accent); text-decoration:none; }
   .fs-table td.fs-td-link a:hover{ text-decoration:underline; }
   .fs-table input[type="checkbox"]{ width:1rem; height:1rem; accent-color:var(--accent); }
+  .fs-table input[type="checkbox"]:disabled{ accent-color:var(--dim); cursor:not-allowed; opacity:.7; }
   .fs-footer{
     flex:none; display:flex; align-items:center; gap:.7rem; margin-top:.6rem; padding-top:.6rem;
     border-top:1px solid var(--border);
@@ -929,7 +941,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+5114648e';
+  const APP_VERSION = '1.0+eb6f93ff';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5846,13 +5858,22 @@
     return rows;
   }
 
+  function fsInListLinks(){
+    return new Set(fsGetShoppingList().map(it => it.link));
+  }
+
   function fsRenderRows(wrap){
     const rows = fsApplyFiltersAndSort(wrap);
     wrap.querySelector('#fsCount').textContent = `${rows.length} of ${FS_DATA.length} items`;
+    const inListLinks = fsInListLinks();
     const tbody = wrap.querySelector('#fsTableBody');
-    tbody.innerHTML = rows.map(r => `
-      <tr class="${fsSelected.has(r.link) ? 'fs-row-checked' : ''}" data-link="${fpEscapeHtml(r.link)}">
-        <td class="fs-td-check"><input type="checkbox" ${fsSelected.has(r.link) ? 'checked' : ''}></td>
+    tbody.innerHTML = rows.map(r => {
+      const inList = inListLinks.has(r.link);
+      const checked = inList || fsSelected.has(r.link);
+      return `
+      <tr class="${inList ? 'fs-row-inlist' : (checked ? 'fs-row-checked' : '')}" data-link="${fpEscapeHtml(r.link)}">
+        <td class="fs-td-check"><input type="checkbox" ${checked ? 'checked' : ''} ${inList ? 'disabled title="Already in your shopping list -- remove it from Shop to uncheck"' : ''}></td>
+        <td class="fs-td-thumb"><img src="${fpEscapeHtml(r.img)}" alt="" loading="lazy" onerror="this.style.visibility=&quot;hidden&quot;"></td>
         <td>${fpEscapeHtml(r.store)}</td>
         <td>${fpEscapeHtml(r.room)}</td>
         <td>${fpEscapeHtml(r.type)}</td>
@@ -5860,7 +5881,8 @@
         <td>${fpEscapeHtml(r.priceRange)}</td>
         <td class="fs-td-link"><a href="${fpEscapeHtml(r.link)}" target="_blank" rel="noopener">Open&#8599;</a></td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
     tbody.querySelectorAll('tr').forEach(tr => {
       tr.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
         const link = tr.dataset.link;
@@ -5897,6 +5919,7 @@
         '<p class="fs-count" id="fsCount"></p>' +
         '<div class="fs-table-wrap"><table class="fs-table"><thead><tr>' +
           '<th class="fs-th-check"></th>' +
+          '<th class="fs-th-thumb"></th>' +
           '<th data-key="store">Store<span class="fs-sort-arrow"></span></th>' +
           '<th data-key="room">Room<span class="fs-sort-arrow"></span></th>' +
           '<th data-key="type">Type<span class="fs-sort-arrow"></span></th>' +
@@ -5996,11 +6019,11 @@
   function fpOpenShopModal(){
     const wrap = openModal('Shop',
       '<div class="shop-list-section">' + fpRenderShopListCardsHtml() + '</div>' +
-      '<p class="fp-hint">Search across top furniture retailers.</p>' +
+      '<p class="shop-section-heading">New Online Search</p>' +
       '<input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">' +
       '<div class="shop-brand-checks" id="shopBrandChecks">' +
         FP_SHOP_BRANDS.map(b => `<label class="shop-check"><input type="checkbox" value="${b.name}" checked>${b.name}</label>`).join('') +
-        '<label class="shop-check"><input type="checkbox" id="shopOtherStoresCheck">Other stores</label>' +
+        '<label class="shop-check shop-check-other"><input type="checkbox" id="shopOtherStoresCheck">Other stores</label>' +
       '</div>' +
       '<div class="shop-price-row">' +
         '<label for="shopMaxPrice">Up to <span id="shopMaxPriceVal">No limit</span></label>' +
