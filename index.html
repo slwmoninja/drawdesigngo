@@ -6,8 +6,8 @@
 <title>DrawDesignGo — Grid-based floor plan editor</title>
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="./manifest.json">
-<link rel="icon" href="./icon-192.png?v=1e2652ec">
-<link rel="apple-touch-icon" href="./icon-192.png?v=1e2652ec">
+<link rel="icon" href="./icon-192.png?v=4b1f5a66">
+<link rel="apple-touch-icon" href="./icon-192.png?v=4b1f5a66">
 <style>
   :root{
     --bg:#ffffff; --panel:#f6f7f9; --panel2:#eceef1; --border:#dde1e6;
@@ -38,8 +38,18 @@
   }
   header .headerTop{ display:flex; align-items:center; gap:.6rem; }
   header h1{ margin:0; line-height:0; display:flex; align-items:center; gap:.6rem; flex:none; }
+  /* Column holding the wordmark + tagline, as a flex sibling of the round
+     icon. Nesting the tagline in here (not as h1's own sibling) means its
+     tiny margin-top to the wordmark is independent of h1's align-items --
+     safe to center/top/bottom-align the icon against the whole column
+     without ever reintroducing a phantom gap above the tagline. */
+  header .header-textcol{ display:flex; flex-direction:column; }
   header h1 img{ height:2.38rem; width:auto; display:block; border-radius:6px; } /* 30% smaller than the original 3.4rem, to free up header space */
   header h1 .header-mark{ height:4.19rem; width:4.19rem; border-radius:50%; flex:none; } /* 30% smaller than the original 5.98rem */
+  header .header-tagline{
+    margin:.1rem 0 0; font-size:.66rem; font-weight:600; letter-spacing:.03em;
+    color:var(--dim); line-height:1;
+  }
   header .spacer{flex:1;}
   @media (max-width:899px){
     /* Below the desktop breakpoint, the wordmark logo alone is wide enough
@@ -269,15 +279,38 @@
     padding-right:2.1rem; margin-bottom:.7rem; flex:none;
   }
   .fs-header h3{ margin:0; }
-  .fs-header-actions{ display:flex; gap:.5rem; flex:none; }
+  .fs-header-actions{ display:flex; align-items:center; gap:.6rem; flex:none; }
   .fs-header-actions .btn{ font-size:.76rem; padding:.35rem .6rem; }
-  .fs-filters{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem; flex:none; }
-  .fs-filters select, .fs-filters input[type="text"]{
+  .fs-header-actions .fs-selected-count{ font-size:.78rem; font-weight:600; color:var(--dim); white-space:nowrap; }
+  .fs-header-actions .btn-primary:disabled{ opacity:.45; cursor:not-allowed; }
+  .fs-filters{ display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem; flex:none; }
+  .fs-filters input[type="text"]{
     background:var(--panel2); border:1px solid var(--border); color:var(--text);
     border-radius:6px; padding:.35rem .5rem; font-size:.78rem;
   }
   .fs-filters input[type="text"]{ flex:1; min-width:140px; }
   .fs-filters .btn{ font-size:.76rem; padding:.35rem .6rem; }
+  .fs-clear-filters-btn{
+    flex:none; background:none; border:1px solid transparent; color:var(--dim); cursor:pointer;
+    width:1.9rem; height:1.9rem; display:flex; align-items:center; justify-content:center;
+    border-radius:6px; font-size:.85rem; padding:0;
+  }
+  .fs-clear-filters-btn:hover{ background:var(--panel2); color:var(--text); }
+  .fs-filter-dd{ flex:none; }
+  .fs-filter-dd .fs-filter-dd-btn{
+    font-size:.78rem; padding:.35rem 1.5rem .35rem .6rem; text-align:left; position:relative;
+    min-width:7rem; max-width:11rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .fs-filter-dd .fs-filter-dd-btn::after{
+    content:'\25be'; position:absolute; right:.55rem; top:50%; transform:translateY(-50%);
+    opacity:.6; font-size:.7rem;
+  }
+  .fs-filter-dd-menu.fs-filter-dd-menu{ max-height:15rem; overflow:auto; min-width:11rem; }
+  .fs-filter-dd-item{ font-weight:500; }
+  .fs-filter-dd-item input{ accent-color:var(--accent); }
+  .fs-price-filter{ display:flex; align-items:center; gap:.5rem; flex:1; min-width:210px; }
+  .fs-price-filter .fs-price-label{ font-size:.78rem; white-space:nowrap; }
+  .fs-price-filter input[type="range"]{ flex:1; accent-color:var(--accent); }
   .fs-count{ font-size:.74rem; color:var(--dim); margin:0 0 .4rem; flex:none; }
   .fs-table-wrap{ flex:1; overflow:auto; border:1px solid var(--border); border-radius:8px; }
   .fs-table{ width:100%; border-collapse:collapse; font-size:.78rem; }
@@ -730,7 +763,13 @@
 
 <header>
   <div class="headerTop">
-    <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
+    <h1>
+      <img class="header-mark" src="./icon-512.png" alt="">
+      <span class="header-textcol">
+        <img class="header-wordmark" src="./sb-designer-wordmark.png" alt="SB Designer">
+        <span class="header-tagline">Draw.Design.Go!</span>
+      </span>
+    </h1>
     <div class="spacer"></div>
     <button class="btn topbar-icon-btn" id="fpTabSpreadsheet" title="Furniture sourcing list">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
@@ -948,7 +987,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+abaec2a4';
+  const APP_VERSION = '1.0+f5f7829a';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1681,7 +1720,7 @@
   const FP_IMAGE_DEFAULT_EDGE_IN = 16.8; // in -- longer side of a freshly-uploaded image (30% smaller than the original 24in default); resizable afterward like any object. The seeded SBI logo below is sized independently, deliberately larger.
   const FP_IMAGE_MAX_EDGE_PX = 900; // downscale uploads so a phone photo doesn't balloon storage for what's ultimately a small icon
   const FP_SBI_LOGO_SEED = { id:'seed-sbi-logo', label:'Simply Beautiful Interiors', img:'./SBI_Logo_transparent.png', w:36, d:7.05 };
-  const FP_BEADS_SEED = { id:'seed-beads', label:'Beads & Buttons', img:'./SBI_Logo_mini.jpg', w:16.8, d:12.6 };
+  const FP_BEADS_SEED = { id:'seed-beads', label:'Dots', img:'./SBI_Logo_mini.jpg', w:16.8, d:12.6 };
   function fpGetImageLibrary(){
     let list;
     try{
@@ -1704,8 +1743,13 @@
     }
     // One-time seed for the beads-and-buttons sample graphic on a library
     // that already existed (in localStorage) before this entry was added.
-    if(!list.find(x=>x.id==='seed-beads')){
+    const beadsLib = list.find(x=>x.id==='seed-beads');
+    if(!beadsLib){
       list.push(Object.assign({}, FP_BEADS_SEED));
+      fpSaveImageLibrary(list);
+    }else if(beadsLib.label !== FP_BEADS_SEED.label){
+      // Self-heal the label for libraries seeded before this entry was renamed.
+      beadsLib.label = FP_BEADS_SEED.label;
       fpSaveImageLibrary(list);
     }
     return list;
@@ -1719,6 +1763,7 @@
   // reference back into FP_LIBRARY/the image library) so a favorite still
   // renders correctly even if the source upload is later removed.
   const FP_FAVORITES_KEY = 'floorplanner-favorites';
+  const FP_FAVORITES_SEEDED_KEY = 'floorplanner-favorites-seeded';
   function fpGetFavorites(){
     let list;
     try{
@@ -1726,11 +1771,21 @@
       if(raw) list = JSON.parse(raw);
     }catch(e){}
     if(!Array.isArray(list)) list = [];
-    // One-time seed: the beads-and-buttons sample graphic (see FP_BEADS_SEED
-    // above) ships pre-favorited so the new Favorites rail isn't empty on
-    // first load, and self-heals back in if a user somehow lost it.
-    if(!list.find(f=>f.img===FP_BEADS_SEED.img)){
-      list.unshift(Object.assign({ shape:'rect', icon:'image' }, FP_BEADS_SEED));
+    let seeded = false;
+    try{ seeded = localStorage.getItem(FP_FAVORITES_SEEDED_KEY) === '1'; }catch(e){}
+    const beadsFav = list.find(f=>f.img===FP_BEADS_SEED.img);
+    // One-time seed: the "Dots" sample graphic (see FP_BEADS_SEED above)
+    // ships pre-favorited so the new Favorites rail isn't empty on first
+    // load. Gated on FP_FAVORITES_SEEDED_KEY (not just "is it in the list
+    // right now") so that once seeded, a user un-favoriting it later sticks
+    // instead of it silently reappearing on the next render/reload.
+    if(!seeded){
+      if(!beadsFav) list.unshift(Object.assign({ shape:'rect', icon:'image' }, FP_BEADS_SEED));
+      try{ localStorage.setItem(FP_FAVORITES_SEEDED_KEY, '1'); }catch(e){}
+      fpSaveFavorites(list);
+    }else if(beadsFav && beadsFav.label !== FP_BEADS_SEED.label){
+      // Self-heal the label for favorites seeded before this entry was renamed.
+      beadsFav.label = FP_BEADS_SEED.label;
       fpSaveFavorites(list);
     }
     return list;
@@ -2254,12 +2309,16 @@
   //
   // Coordinates in feet, origin at the room's top-left corner, X right/Y
   // down (this app's screen-style convention -- see fpBuildDxf's flipY
-  // comment). The whole room is offset +2ft in X and Y from the grid's own
-  // (0,0) -- a room drawn flush against the grid origin left no room for
-  // the "Sunroom" label to sit above it without overlapping the Built-Ins
-  // piece in that same corner; this margin gives the label a clear spot
-  // and keeps the plan from reading as crammed into the workspace's top-
-  // left corner. Room outline is a 5-point shape, not a plain rectangle:
+  // comment). The room is offset +2.5ft in X and Y from the grid's own
+  // (0,0) -- half of one major/darker grid line's 5ft spacing, tight
+  // against the workspace's top-left margin without touching it. The
+  // "Sunroom" label sits 1.5ft (3 minor 0.5ft grid squares) from the top
+  // and left edges, and left-justified above the room (its left edge
+  // roughly lines up with the left wall) rather than centered, so it
+  // shares no horizontal space with the top window's own dimension
+  // callout (further right along the same wall) -- that's what was
+  // actually causing the two to visually collide, not insufficient
+  // vertical clearance above the wall. Room outline is a 5-point shape, not a plain rectangle:
   // the photo's overall 15'6" x 25'2" rectangle with a diagonal corner cut
   // at bottom-left for the open kitchen doorway, leaving a 6'6" bottom-
   // right wall segment for the swing door. Object/line w,d and heightIn
@@ -2280,43 +2339,48 @@
         // full-length label would use, so showing both collided badly in
         // practice (id:4 duplicates its Opening to Kitchen label outright,
         // same start/end coordinates).
-        { id:1, type:'line', x1:2, y1:2, x2:17.5, y2:2, color:wallColor, heightIn:108, hideDims:true },
-        { id:2, type:'line', x1:17.5, y1:2, x2:17.5, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
-        { id:3, type:'line', x1:11.0, y1:27.1667, x2:17.5, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
-        { id:4, type:'line', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:108, hideDims:true },
-        { id:5, type:'line', x1:2, y1:2, x2:2, y2:24.6667, color:wallColor, heightIn:108, hideDims:true },
+        { id:1, type:'line', x1:2.5, y1:2.5, x2:18.0, y2:2.5, color:wallColor, heightIn:108, hideDims:true },
+        { id:2, type:'line', x1:18.0, y1:2.5, x2:18.0, y2:27.6667, color:wallColor, heightIn:108, hideDims:true },
+        { id:3, type:'line', x1:11.5, y1:27.6667, x2:18.0, y2:27.6667, color:wallColor, heightIn:108, hideDims:true },
+        { id:4, type:'line', x1:2.5, y1:25.1667, x2:11.5, y2:27.6667, color:wallColor, heightIn:108, hideDims:true },
+        { id:5, type:'line', x1:2.5, y1:2.5, x2:2.5, y2:25.1667, color:wallColor, heightIn:108, hideDims:true },
         // Windows: one 4'3" on the top wall, three 6'0" on the right wall.
         // Labeled "Window" to match the source photo's own "4'3" WINDOW"/
         // "6'0" WINDOW" callouts, not just an unlabeled dimension.
-        { id:6, type:'window', x1:12, y1:2, x2:16.25, y2:2, color:wallColor, heightIn:36, label:'Window' },
-        { id:7, type:'window', x1:17.5, y1:4, x2:17.5, y2:10, color:wallColor, heightIn:36, label:'Window' },
-        { id:8, type:'window', x1:17.5, y1:11.8, x2:17.5, y2:17.8, color:wallColor, heightIn:36, label:'Window' },
-        { id:9, type:'window', x1:17.5, y1:19.6, x2:17.5, y2:25.6, color:wallColor, heightIn:36, label:'Window' },
+        { id:6, type:'window', x1:12.5, y1:2.5, x2:16.75, y2:2.5, color:wallColor, heightIn:36, label:'Window' },
+        { id:7, type:'window', x1:18.0, y1:4.5, x2:18.0, y2:10.5, color:wallColor, heightIn:36, label:'Window' },
+        { id:8, type:'window', x1:18.0, y1:12.3, x2:18.0, y2:18.3, color:wallColor, heightIn:36, label:'Window' },
+        { id:9, type:'window', x1:18.0, y1:20.1, x2:18.0, y2:26.1, color:wallColor, heightIn:36, label:'Window' },
         // A regular swing door on the left wall (was a pocket door).
-        { id:10, type:'door', x1:2, y1:9, x2:2, y2:14, color:wallColor, heightIn:80, label:'Door' },
+        { id:10, type:'door', x1:2.5, y1:9.5, x2:2.5, y2:14.5, color:wallColor, heightIn:80, label:'Door' },
         // The whole diagonal wall is one open doorway to the kitchen, no
         // door leaf -- also an "opening", spanning its full length.
-        { id:11, type:'opening', x1:2, y1:24.6667, x2:11.0, y2:27.1667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
+        { id:11, type:'opening', x1:2.5, y1:25.1667, x2:11.5, y2:27.6667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
         // 6'0" swing door, centered in the 6'6" bottom-right wall segment.
-        { id:12, type:'door', x1:11.25, y1:27.1667, x2:17.25, y2:27.1667, color:wallColor, heightIn:80, label:'Door' },
+        { id:12, type:'door', x1:11.75, y1:27.6667, x2:17.75, y2:27.6667, color:wallColor, heightIn:80, label:'Door' },
       ],
       objects: [
-        // In the top margin, above the wall -- not the app's usual flush-
-        // top-left default position, since Built-Ins sits exactly there.
-        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:9, cy:1, rot:0 },
-        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:3.5, cy:2.5, rot:0 },
-        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:7.5, cy:2.667, rot:0 },
+        // 1.5ft (3 minor grid squares) from the top and left edges, and
+        // left-justified above the room so it shares no horizontal space
+        // with the top window's dimension callout further right on the
+        // same wall.
+        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:3, cy:1.917, rot:0 },
+        // Shifted right/down off the corner Sunroom now occupies -- flush
+        // against the wall corner like the room's other fixtures collided
+        // with the label sitting that close above.
+        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:6.0, cy:3.5, rot:0 },
+        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:10.0, cy:3.667, rot:0 },
         // Icon artwork faces down (south, toward the sofa) at rot:0 by
         // default (confirmed by looking at the actual PNGs) -- the far row
         // (16/17, furthest from the sofa) keeps that default so it faces
         // the sofa; the near row (18/19, closest to the sofa) and the sofa
         // itself get rot:180 to face up (north) toward the fireplace instead.
-        { id:16, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6, cy:9, rot:0 },
-        { id:17, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11, cy:9, rot:0 },
-        { id:18, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6, cy:13.5, rot:180 },
-        { id:19, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11, cy:13.5, rot:180 },
-        { id:20, label:'Sofa', w:84, d:37, shape:'rect', icon:'image', img:'./library/3-seater-sofa.png', cx:8.5, cy:18.5, rot:180 },
-        { id:21, label:'Buffet Table', w:54, d:24, shape:'rect', icon:'image', img:'./library/console-table.png', cx:14, cy:26, rot:0 },
+        { id:16, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6.5, cy:9.5, rot:0 },
+        { id:17, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11.5, cy:9.5, rot:0 },
+        { id:18, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:6.5, cy:14.0, rot:180 },
+        { id:19, label:'Armchair', w:30, d:33, shape:'rect', icon:'image', img:'./library/armchair.png', cx:11.5, cy:14.0, rot:180 },
+        { id:20, label:'Sofa', w:84, d:37, shape:'rect', icon:'image', img:'./library/3-seater-sofa.png', cx:9.0, cy:19.0, rot:180 },
+        { id:21, label:'Buffet Table', w:54, d:24, shape:'rect', icon:'image', img:'./library/console-table.png', cx:14.5, cy:26.5, rot:0 },
       ],
     };
   }
@@ -5795,8 +5859,8 @@
   // (see fpOpenShopModal() below).
   // ============================================================
   const FS_SHOPPING_LIST_KEY = 'ddgShoppingList';
-  const FS_PRICE_RANGE_ORDER = ['$0-250','$250-500','$500-1,000','$1,000-1,500','$1,500-2,000','$2,000-3,000','$3,000-5,000','$5,000+'];
   let FS_DATA = null; // populated on first open of either modal, from furniture-data.json
+  let FS_PRICE_MAX = 5000; // recomputed from the real data in fsLoadData(); backs the "Up to $X" slider
   let fsSortKey = 'type', fsSortDir = 1;
   const fsSelected = new Set(); // link -> selected, for the currently-open spreadsheet modal
 
@@ -5810,6 +5874,8 @@
       cols.forEach((c,i) => o[c] = r[i]);
       return o;
     });
+    const maxLow = FS_DATA.reduce((m,r) => Math.max(m, r.priceLow||0), 0);
+    FS_PRICE_MAX = Math.max(500, Math.ceil(maxLow/500)*500);
     return FS_DATA;
   }
 
@@ -5841,17 +5907,23 @@
     return [...new Set(FS_DATA.map(r => r[key]))].sort();
   }
 
+  // Reads which boxes are checked directly from a filter dropdown's menu --
+  // no separate JS-side selection state to keep in sync with the DOM.
+  function fsCheckedValues(wrap, menuId){
+    return new Set([...wrap.querySelectorAll('#'+menuId+' input:checked')].map(cb => cb.value));
+  }
+
   function fsApplyFiltersAndSort(wrap){
-    const store = wrap.querySelector('#fsFilterStore').value;
-    const room = wrap.querySelector('#fsFilterRoom').value;
-    const type = wrap.querySelector('#fsFilterType').value;
-    const range = wrap.querySelector('#fsFilterRange').value;
+    const stores = fsCheckedValues(wrap, 'fsStoreDdMenu');
+    const rooms = fsCheckedValues(wrap, 'fsRoomDdMenu');
+    const types = fsCheckedValues(wrap, 'fsTypeDdMenu');
+    const maxPrice = +wrap.querySelector('#fsMaxPrice').value;
     const q = wrap.querySelector('#fsFilterSearch').value.trim().toLowerCase();
     let rows = FS_DATA.filter(r =>
-      (!store || r.store === store) &&
-      (!room || r.room === room) &&
-      (!type || r.type === type) &&
-      (!range || r.priceRange === range) &&
+      (stores.size===0 || stores.has(r.store)) &&
+      (rooms.size===0 || rooms.has(r.room)) &&
+      (types.size===0 || types.has(r.type)) &&
+      (r.priceLow==null || r.priceLow <= maxPrice) &&
       (!q || r.name.toLowerCase().includes(q))
     );
     rows.sort((a,b) => {
@@ -5861,6 +5933,43 @@
       return av < bv ? -fsSortDir : av > bv ? fsSortDir : 0;
     });
     return rows;
+  }
+
+  // Multi-select "Store"/"Room"/"Type" dropdowns -- a checkbox list inside
+  // the existing .fp-opening-dd shell (see the Toolbox/Opening tool menus)
+  // rather than a native <select>, since a user may want several stores at
+  // once (e.g. West Elm + Pottery Barn).
+  function fsFilterDdHtml(prefix, allLabel, values){
+    return (
+      `<div class="fp-opening-dd fs-filter-dd" id="fs${prefix}Dd">` +
+        `<button type="button" class="btn fs-filter-dd-btn" id="fs${prefix}DdBtn">${fpEscapeHtml(allLabel)}</button>` +
+        `<div class="fp-opening-dd-menu fs-filter-dd-menu" id="fs${prefix}DdMenu" hidden>` +
+          values.map(v => `<label class="fp-opening-dd-item fs-filter-dd-item"><input type="checkbox" value="${fpEscapeHtml(v)}">${fpEscapeHtml(v)}</label>`).join('') +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function fsSyncFilterDdLabel(wrap, prefix, allLabel, plural){
+    const checked = [...wrap.querySelectorAll('#fs'+prefix+'DdMenu input:checked')];
+    wrap.querySelector('#fs'+prefix+'DdBtn').textContent =
+      checked.length===0 ? allLabel : checked.length===1 ? checked[0].value : `${checked.length} ${plural}`;
+  }
+
+  function fsWireFilterDd(wrap, prefix, allLabel, plural){
+    const btn = wrap.querySelector('#fs'+prefix+'DdBtn');
+    const menu = wrap.querySelector('#fs'+prefix+'DdMenu');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wrap.querySelectorAll('.fs-filter-dd-menu').forEach(m => { if(m!==menu) m.hidden = true; });
+      menu.hidden = !menu.hidden;
+    });
+    menu.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        fsSyncFilterDdLabel(wrap, prefix, allLabel, plural);
+        fsRenderRows(wrap);
+      });
+    });
   }
 
   function fsInListLinks(){
@@ -5884,10 +5993,20 @@
   async function fsExportChecked(){
     const rows = fsGetAllChecked();
     if(!rows.length){ toast('No items checked to export.', true); return; }
-    const header = ['Store','Room','Type','Name','Price Range','Link'];
-    const lines = [header.join(',')].concat(rows.map(r =>
-      [r.store, r.room, r.type, r.name, r.priceRange, r.link].map(fsCsvField).join(',')
-    ));
+    const header = ['Store','Room','Type','Name','Price Range','Price','Thumbnail','Link'];
+    const lines = [header.join(',')].concat(rows.map(r => [
+      fsCsvField(r.store),
+      fsCsvField(r.room),
+      fsCsvField(r.type),
+      fsCsvField(r.name),
+      fsCsvField(r.priceRange),
+      fsCsvField(r.priceLow),
+      fsCsvField(r.img),
+      // =HYPERLINK(...) -- Excel evaluates a leading "=" in a CSV cell as a
+      // formula on open, so this renders as a clickable link straight to the
+      // seller's page rather than plain unlinked URL text.
+      fsCsvField(`=HYPERLINK("${r.link}","Open")`)
+    ].join(',')));
     const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv'});
     const stamp = new Date().toISOString().slice(0,10);
     const ok = await fpSaveBlobWithPicker(blob, `furniture-sourcing-${stamp}.csv`, 'CSV spreadsheet (opens in Excel)', {'text/csv':['.csv']});
@@ -5953,17 +6072,22 @@
         '<div class="fs-header">' +
           '<h3>Furniture sourcing list</h3>' +
           '<div class="fs-header-actions">' +
+            '<span class="fs-selected-count" id="fsSelectedCount">0 selected</span>' +
+            '<button class="btn btn-primary" id="fsAddBtn" type="button" disabled>Add to shopping list</button>' +
             '<button class="btn" id="fsExportBtn" type="button">Export</button>' +
             '<button class="btn" id="fsClearAllBtn" type="button">Clear all</button>' +
           '</div>' +
         '</div>' +
         '<div class="fs-filters">' +
-          `<select id="fsFilterStore"><option value="">All stores</option>${fsUniqueValues('store').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
-          `<select id="fsFilterRoom"><option value="">All rooms</option>${fsUniqueValues('room').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
-          `<select id="fsFilterType"><option value="">All types</option>${fsUniqueValues('type').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
-          `<select id="fsFilterRange"><option value="">All prices</option>${FS_PRICE_RANGE_ORDER.map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
+          '<button class="fs-clear-filters-btn" id="fsClearFilters" type="button" title="Clear filters">&#10005;</button>' +
+          fsFilterDdHtml('Store', 'All stores', fsUniqueValues('store')) +
+          fsFilterDdHtml('Room', 'All rooms', fsUniqueValues('room')) +
+          fsFilterDdHtml('Type', 'All types', fsUniqueValues('type')) +
+          '<div class="fs-price-filter">' +
+            '<span class="fs-price-label">Up to <b id="fsMaxPriceVal"></b></span>' +
+            `<input type="range" id="fsMaxPrice" min="0" max="${FS_PRICE_MAX}" step="100" value="${FS_PRICE_MAX}">` +
+          '</div>' +
           '<input type="text" id="fsFilterSearch" placeholder="Search name&hellip;">' +
-          '<button class="btn" id="fsClearFilters" type="button">Clear</button>' +
         '</div>' +
         '<p class="fs-count" id="fsCount"></p>' +
         '<div class="fs-table-wrap"><table class="fs-table"><thead><tr>' +
@@ -5977,10 +6101,7 @@
           '<th></th>' +
         '</tr></thead><tbody id="fsTableBody"></tbody></table></div>' +
         '<div class="fs-footer">' +
-          '<span class="fs-selected-count" id="fsSelectedCount">0 selected</span>' +
           '<span class="fs-toast" id="fsToast"></span>' +
-          '<div class="spacer"></div>' +
-          '<button class="btn btn-primary" id="fsAddBtn" type="button" disabled>Add to shopping list</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(backdrop);
@@ -5988,12 +6109,32 @@
     function close(){ backdrop.remove(); }
     wrap.querySelector('.modal-close').addEventListener('click', close);
 
-    wrap.querySelectorAll('.fs-filters select, .fs-filters input').forEach(el => {
-      el.addEventListener('input', () => fsRenderRows(wrap));
+    ['Store','Room','Type'].forEach(prefix => {
+      const plural = prefix.toLowerCase()+'s';
+      fsWireFilterDd(wrap, prefix, `All ${plural}`, plural);
     });
+    wrap.addEventListener('click', (e) => {
+      wrap.querySelectorAll('.fs-filter-dd').forEach(dd => {
+        if(!dd.contains(e.target)){ const m = dd.querySelector('.fs-filter-dd-menu'); if(m) m.hidden = true; }
+      });
+    });
+    const priceSlider = wrap.querySelector('#fsMaxPrice');
+    const priceVal = wrap.querySelector('#fsMaxPriceVal');
+    function syncPriceLabel(){
+      priceVal.textContent = (+priceSlider.value) >= FS_PRICE_MAX ? 'No limit' : ('$' + (+priceSlider.value).toLocaleString());
+    }
+    priceSlider.addEventListener('input', () => { syncPriceLabel(); fsRenderRows(wrap); });
+    syncPriceLabel();
+    wrap.querySelector('#fsFilterSearch').addEventListener('input', () => fsRenderRows(wrap));
     wrap.querySelector('#fsClearFilters').addEventListener('click', () => {
-      wrap.querySelectorAll('.fs-filters select').forEach(el => el.value = '');
+      wrap.querySelectorAll('.fs-filter-dd-menu input[type="checkbox"]').forEach(cb => { cb.checked = false; });
       wrap.querySelector('#fsFilterSearch').value = '';
+      priceSlider.value = FS_PRICE_MAX;
+      syncPriceLabel();
+      ['Store','Room','Type'].forEach(prefix => {
+        const plural = prefix.toLowerCase()+'s';
+        fsSyncFilterDdLabel(wrap, prefix, `All ${plural}`, plural);
+      });
       fsRenderRows(wrap);
     });
     wrap.querySelectorAll('.fs-table thead th[data-key]').forEach(th => {
