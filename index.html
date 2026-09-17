@@ -215,6 +215,83 @@
   .shop-sort-row label{ font-size:.84rem; font-weight:600; white-space:nowrap; }
   .shop-sort-row select{ flex:1; }
 
+  /* ---------- Shopping list cards (top of the Shop modal, opened via the
+     header's $ icon) -- items checked off the sourcing spreadsheet, see
+     fpOpenShopModal()/fpRenderShopListCards(). */
+  .shop-list-hint{ margin:0 0 .6rem; font-size:.8rem; color:var(--dim); }
+  .shop-list-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));
+    gap:.6rem; margin:0 0 1rem;
+  }
+  .shop-card{
+    position:relative; text-align:left; background:var(--panel2); border:1px solid var(--border);
+    border-radius:10px; padding:0; cursor:pointer; overflow:hidden; display:flex; flex-direction:column;
+  }
+  .shop-card:hover{ border-color:var(--accent); }
+  .shop-card .shop-card-thumb{
+    width:100%; aspect-ratio:1/1; object-fit:cover; background:var(--panel); display:block;
+  }
+  .shop-card .shop-card-body{ padding:.45rem .55rem .55rem; }
+  .shop-card .shop-card-price{ font-size:.72rem; font-weight:700; color:var(--accent); }
+  .shop-card .shop-card-name{
+    font-size:.78rem; font-weight:600; margin:.15rem 0; line-height:1.25;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .shop-card .shop-card-meta{ font-size:.68rem; color:var(--dim); }
+  .shop-card .shop-card-remove{
+    position:absolute; top:.3rem; right:.3rem; width:1.4rem; height:1.4rem; border-radius:50%;
+    background:rgba(0,0,0,.55); color:#fff; border:none; font-size:.75rem; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:1;
+  }
+  .shop-card .shop-card-remove:hover{ background:rgba(0,0,0,.8); }
+  .shop-list-divider{ border:none; border-top:1px solid var(--border); margin:0 0 1rem; }
+  .topbar-icon-btn{ position:relative; }
+  .topbar-icon-badge{
+    position:absolute; top:.05rem; right:.05rem; min-width:1.05rem; height:1.05rem; padding:0 .25rem;
+    border-radius:999px; background:var(--accent); color:#0a1512; font-size:.62rem; font-weight:800;
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .topbar-icon-badge.hidden{ display:none; }
+
+  /* ---------- Furniture sourcing spreadsheet modal (opened via the header's
+     grid icon, see fpOpenSpreadsheetModal()) -- reuses the generic
+     modal-backdrop shell but with its own much wider, taller panel since it
+     hosts a ~1500-row filterable table rather than a short form. */
+  .modal.fs-modal{
+    max-width:1100px; height:88vh; max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .fs-filters{ display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem; flex:none; }
+  .fs-filters select, .fs-filters input[type="text"]{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:.35rem .5rem; font-size:.78rem;
+  }
+  .fs-filters input[type="text"]{ flex:1; min-width:140px; }
+  .fs-filters .btn{ font-size:.76rem; padding:.35rem .6rem; }
+  .fs-count{ font-size:.74rem; color:var(--dim); margin:0 0 .4rem; flex:none; }
+  .fs-table-wrap{ flex:1; overflow:auto; border:1px solid var(--border); border-radius:8px; }
+  .fs-table{ width:100%; border-collapse:collapse; font-size:.78rem; }
+  .fs-table thead th{
+    position:sticky; top:0; background:var(--panel2); text-align:left; padding:.4rem .5rem;
+    border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; z-index:1;
+  }
+  .fs-table thead th.fs-th-check{ cursor:default; width:1.6rem; }
+  .fs-table thead th .fs-sort-arrow{ opacity:.5; font-size:.68rem; margin-left:.15rem; }
+  .fs-table tbody td{ padding:.35rem .5rem; border-bottom:1px solid var(--border); vertical-align:top; }
+  .fs-table tbody tr:hover{ background:var(--panel2); }
+  .fs-table tbody tr.fs-row-checked{ background:rgba(15,156,134,.1); }
+  .fs-table td.fs-td-check{ width:1.6rem; }
+  .fs-table td.fs-td-link a{ color:var(--accent); text-decoration:none; }
+  .fs-table td.fs-td-link a:hover{ text-decoration:underline; }
+  .fs-table input[type="checkbox"]{ width:1rem; height:1rem; accent-color:var(--accent); }
+  .fs-footer{
+    flex:none; display:flex; align-items:center; gap:.7rem; margin-top:.6rem; padding-top:.6rem;
+    border-top:1px solid var(--border);
+  }
+  .fs-footer .fs-selected-count{ font-size:.8rem; font-weight:600; }
+  .fs-footer .btn-primary{ width:auto; padding:.5rem 1rem; }
+  .fs-footer .btn-primary:disabled{ opacity:.45; cursor:not-allowed; }
+  .fs-toast{ font-size:.78rem; color:var(--accent); font-weight:600; }
+
   /* ---------- Favorites: a thin, always-visible rail (left of the canvas on
      desktop, a row above it on narrow screens) so a handful of go-to graphics
      don't require reopening the Objects accordion every time. Populated by
@@ -636,8 +713,12 @@
   <div class="headerTop">
     <h1><img class="header-mark" src="./icon-512.png" alt=""><img class="header-wordmark" src="./ddg-logo.png" alt="DrawDesignGo"></h1>
     <div class="spacer"></div>
+    <button class="btn topbar-icon-btn" id="fpTabSpreadsheet" title="Furniture sourcing list">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    </button>
     <button class="btn topbar-icon-btn" id="fpTabShop" title="Search stores">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="topbar-icon-badge hidden" id="fpShopBadge">0</span>
     </button>
     <button class="topbar-install-btn" id="installBtn" style="display:none;" title="Install DrawDesignGo on this device">Install</button>
     <div class="fp-opening-dd" id="fpToolboxDd">
@@ -848,7 +929,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+89abcd7d';
+  const APP_VERSION = '1.0+5114648e';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -5687,8 +5768,234 @@
     return url;
   }
 
+  // ============================================================
+  // Furniture sourcing spreadsheet -- a wide modal (opened from the header's
+  // grid icon) listing every row of furniture-data.json (built from
+  // furniture_sourcing_masterlist_1.xlsx by scripts/build_furniture_data.py)
+  // with sortable columns, dropdown/text filters, and a checkbox per row.
+  // Checked rows get added to a shopping list persisted in localStorage,
+  // which then renders as clickable cards at the top of the Shop modal
+  // (see fpOpenShopModal() below).
+  // ============================================================
+  const FS_SHOPPING_LIST_KEY = 'ddgShoppingList';
+  const FS_PRICE_RANGE_ORDER = ['$0-250','$250-500','$500-1,000','$1,000-1,500','$1,500-2,000','$2,000-3,000','$3,000-5,000','$5,000+'];
+  let FS_DATA = null; // populated on first open of either modal, from furniture-data.json
+  let fsSortKey = 'type', fsSortDir = 1;
+  const fsSelected = new Set(); // link -> selected, for the currently-open spreadsheet modal
+
+  async function fsLoadData(){
+    if(FS_DATA) return FS_DATA;
+    const res = await fetch('./furniture-data.json');
+    const json = await res.json();
+    const cols = json.columns;
+    FS_DATA = json.rows.map(r => {
+      const o = {};
+      cols.forEach((c,i) => o[c] = r[i]);
+      return o;
+    });
+    return FS_DATA;
+  }
+
+  function fsGetShoppingList(){
+    try{ return JSON.parse(localStorage.getItem(FS_SHOPPING_LIST_KEY) || '[]'); }catch(e){ return []; }
+  }
+  function fsSaveShoppingList(list){
+    try{ localStorage.setItem(FS_SHOPPING_LIST_KEY, JSON.stringify(list)); }catch(e){}
+    fsSyncShopBadge();
+  }
+  function fsAddToShoppingList(items){
+    const list = fsGetShoppingList();
+    const byLink = new Map(list.map(it => [it.link, it]));
+    items.forEach(it => byLink.set(it.link, it));
+    fsSaveShoppingList([...byLink.values()]);
+  }
+  function fsRemoveFromShoppingList(link){
+    fsSaveShoppingList(fsGetShoppingList().filter(it => it.link !== link));
+  }
+  function fsSyncShopBadge(){
+    const badge = document.getElementById('fpShopBadge');
+    if(!badge) return;
+    const n = fsGetShoppingList().length;
+    badge.textContent = n > 99 ? '99+' : String(n);
+    badge.classList.toggle('hidden', n === 0);
+  }
+
+  function fsUniqueValues(key){
+    return [...new Set(FS_DATA.map(r => r[key]))].sort();
+  }
+
+  function fsApplyFiltersAndSort(wrap){
+    const store = wrap.querySelector('#fsFilterStore').value;
+    const room = wrap.querySelector('#fsFilterRoom').value;
+    const type = wrap.querySelector('#fsFilterType').value;
+    const range = wrap.querySelector('#fsFilterRange').value;
+    const q = wrap.querySelector('#fsFilterSearch').value.trim().toLowerCase();
+    let rows = FS_DATA.filter(r =>
+      (!store || r.store === store) &&
+      (!room || r.room === room) &&
+      (!type || r.type === type) &&
+      (!range || r.priceRange === range) &&
+      (!q || r.name.toLowerCase().includes(q))
+    );
+    rows.sort((a,b) => {
+      let av = a[fsSortKey], bv = b[fsSortKey];
+      if(typeof av === 'number' && typeof bv === 'number') return (av-bv) * fsSortDir;
+      av = (av||'').toString().toLowerCase(); bv = (bv||'').toString().toLowerCase();
+      return av < bv ? -fsSortDir : av > bv ? fsSortDir : 0;
+    });
+    return rows;
+  }
+
+  function fsRenderRows(wrap){
+    const rows = fsApplyFiltersAndSort(wrap);
+    wrap.querySelector('#fsCount').textContent = `${rows.length} of ${FS_DATA.length} items`;
+    const tbody = wrap.querySelector('#fsTableBody');
+    tbody.innerHTML = rows.map(r => `
+      <tr class="${fsSelected.has(r.link) ? 'fs-row-checked' : ''}" data-link="${fpEscapeHtml(r.link)}">
+        <td class="fs-td-check"><input type="checkbox" ${fsSelected.has(r.link) ? 'checked' : ''}></td>
+        <td>${fpEscapeHtml(r.store)}</td>
+        <td>${fpEscapeHtml(r.room)}</td>
+        <td>${fpEscapeHtml(r.type)}</td>
+        <td>${fpEscapeHtml(r.name)}</td>
+        <td>${fpEscapeHtml(r.priceRange)}</td>
+        <td class="fs-td-link"><a href="${fpEscapeHtml(r.link)}" target="_blank" rel="noopener">Open&#8599;</a></td>
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+        const link = tr.dataset.link;
+        if(e.target.checked) fsSelected.add(link); else fsSelected.delete(link);
+        tr.classList.toggle('fs-row-checked', e.target.checked);
+        fsSyncFooter(wrap);
+      });
+    });
+    fsSyncFooter(wrap);
+  }
+
+  function fsSyncFooter(wrap){
+    wrap.querySelector('#fsSelectedCount').textContent = `${fsSelected.size} selected`;
+    wrap.querySelector('#fsAddBtn').disabled = fsSelected.size === 0;
+  }
+
+  async function fpOpenSpreadsheetModal(){
+    await fsLoadData();
+    fsSelected.clear();
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML =
+      '<div class="modal fs-modal">' +
+        '<button class="modal-close" aria-label="Close">&#10005;</button>' +
+        '<h3>Furniture sourcing list</h3>' +
+        '<div class="fs-filters">' +
+          `<select id="fsFilterStore"><option value="">All stores</option>${fsUniqueValues('store').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
+          `<select id="fsFilterRoom"><option value="">All rooms</option>${fsUniqueValues('room').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
+          `<select id="fsFilterType"><option value="">All types</option>${fsUniqueValues('type').map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
+          `<select id="fsFilterRange"><option value="">All prices</option>${FS_PRICE_RANGE_ORDER.map(v=>`<option>${fpEscapeHtml(v)}</option>`).join('')}</select>` +
+          '<input type="text" id="fsFilterSearch" placeholder="Search name&hellip;">' +
+          '<button class="btn" id="fsClearFilters" type="button">Clear</button>' +
+        '</div>' +
+        '<p class="fs-count" id="fsCount"></p>' +
+        '<div class="fs-table-wrap"><table class="fs-table"><thead><tr>' +
+          '<th class="fs-th-check"></th>' +
+          '<th data-key="store">Store<span class="fs-sort-arrow"></span></th>' +
+          '<th data-key="room">Room<span class="fs-sort-arrow"></span></th>' +
+          '<th data-key="type">Type<span class="fs-sort-arrow"></span></th>' +
+          '<th data-key="name">Name<span class="fs-sort-arrow"></span></th>' +
+          '<th data-key="priceLow">Price Range<span class="fs-sort-arrow"></span></th>' +
+          '<th></th>' +
+        '</tr></thead><tbody id="fsTableBody"></tbody></table></div>' +
+        '<div class="fs-footer">' +
+          '<span class="fs-selected-count" id="fsSelectedCount">0 selected</span>' +
+          '<span class="fs-toast" id="fsToast"></span>' +
+          '<div class="spacer"></div>' +
+          '<button class="btn btn-primary" id="fsAddBtn" type="button" disabled>Add to shopping list</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    const wrap = backdrop;
+    function close(){ backdrop.remove(); }
+    wrap.querySelector('.modal-close').addEventListener('click', close);
+    wrap.addEventListener('click', (e)=>{ if(e.target===wrap) close(); });
+
+    wrap.querySelectorAll('.fs-filters select, .fs-filters input').forEach(el => {
+      el.addEventListener('input', () => fsRenderRows(wrap));
+    });
+    wrap.querySelector('#fsClearFilters').addEventListener('click', () => {
+      wrap.querySelectorAll('.fs-filters select').forEach(el => el.value = '');
+      wrap.querySelector('#fsFilterSearch').value = '';
+      fsRenderRows(wrap);
+    });
+    wrap.querySelectorAll('.fs-table thead th[data-key]').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        if(fsSortKey === key) fsSortDir *= -1; else { fsSortKey = key; fsSortDir = 1; }
+        wrap.querySelectorAll('.fs-sort-arrow').forEach(a => a.textContent = '');
+        th.querySelector('.fs-sort-arrow').textContent = fsSortDir === 1 ? '▲' : '▼';
+        fsRenderRows(wrap);
+      });
+    });
+    wrap.querySelector('#fsAddBtn').addEventListener('click', () => {
+      const items = FS_DATA.filter(r => fsSelected.has(r.link))
+        .map(r => ({ store:r.store, type:r.type, name:r.name, priceRange:r.priceRange, img:r.img, link:r.link }));
+      fsAddToShoppingList(items);
+      const toast = wrap.querySelector('#fsToast');
+      toast.textContent = `Added ${items.length} item${items.length===1?'':'s'} to your shopping list`;
+      setTimeout(() => { if(toast.textContent.startsWith('Added')) toast.textContent = ''; }, 3000);
+      fsSelected.clear();
+      fsRenderRows(wrap);
+    });
+
+    fsRenderRows(wrap);
+  }
+
+  // ============================================================
+  // Shop -- opened from the header's $ icon. Shows the shopping list built
+  // from the sourcing spreadsheet as clickable cards, plus (below it) the
+  // combined-retailer Bing search built from FP_SHOP_BRANDS.
+  // ============================================================
+  function fpRenderShopListCardsHtml(){
+    const list = fsGetShoppingList();
+    if(!list.length){
+      return '<p class="shop-list-hint">Check items in the furniture sourcing list (grid icon, top right) to see them here.</p>';
+    }
+    return '<div class="shop-list-grid" id="shopListGrid">' +
+      list.map(it => `
+        <div class="shop-card" data-link="${fpEscapeHtml(it.link)}">
+          <button class="shop-card-remove" data-remove="${fpEscapeHtml(it.link)}" title="Remove" type="button">&#10005;</button>
+          <img class="shop-card-thumb" src="${fpEscapeHtml(it.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div class="shop-card-body">
+            <div class="shop-card-price">${fpEscapeHtml(it.priceRange||'')}</div>
+            <div class="shop-card-name">${fpEscapeHtml(it.name)}</div>
+            <div class="shop-card-meta">${fpEscapeHtml(it.type)} &middot; ${fpEscapeHtml(it.store)}</div>
+          </div>
+        </div>
+      `).join('') +
+    '</div><hr class="shop-list-divider">';
+  }
+
+  function fpWireShopListCards(wrap){
+    const grid = wrap.querySelector('#shopListGrid');
+    if(!grid) return;
+    grid.querySelectorAll('.shop-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        if(e.target.closest('[data-remove]')) return;
+        window.open(card.dataset.link, '_blank', 'noopener');
+      });
+    });
+    grid.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fsRemoveFromShoppingList(btn.dataset.remove);
+        const wrapEl = wrap.querySelector('.shop-list-section');
+        wrapEl.innerHTML = fpRenderShopListCardsHtml();
+        fpWireShopListCards(wrap);
+      });
+    });
+  }
+
   function fpOpenShopModal(){
-    const wrap = openModal('Search',
+    const wrap = openModal('Shop',
+      '<div class="shop-list-section">' + fpRenderShopListCardsHtml() + '</div>' +
       '<p class="fp-hint">Search across top furniture retailers.</p>' +
       '<input type="text" id="shopQueryInput" class="fp-detail-input" style="width:100%; margin:.5rem 0;" placeholder="e.g. &quot;84 inch sofa&quot;, &quot;blue velvet chair&quot;">' +
       '<div class="shop-brand-checks" id="shopBrandChecks">' +
@@ -5713,6 +6020,7 @@
       '</div>' +
       '<button class="btn" id="shopSearchAllBtn" type="button" style="width:100%; margin:.5rem 0; font-weight:700; border-color:var(--accent); color:var(--accent);">Search</button>'
     );
+    fpWireShopListCards(wrap);
     const priceSlider = wrap.querySelector('#shopMaxPrice');
     const priceVal = wrap.querySelector('#shopMaxPriceVal');
     function syncPriceLabel(){ priceVal.textContent = (+priceSlider.value) >= 10000 ? 'No limit' : ('$' + priceSlider.value); }
@@ -5726,6 +6034,8 @@
 
   function fpInitShop(){
     document.getElementById('fpTabShop').addEventListener('click', fpOpenShopModal);
+    document.getElementById('fpTabSpreadsheet').addEventListener('click', fpOpenSpreadsheetModal);
+    fsSyncShopBadge();
   }
 
   // ---------- PWA: bootstrap ----------
