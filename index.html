@@ -987,7 +987,7 @@
   // commit (derived from a content hash of index.html/manifest.json/icons) --
   // never hand-bumped, so it always reflects what's actually deployed and can
   // be used to confirm a reload picked up the latest push.
-  const APP_VERSION = '1.0+f570a8bf';
+  const APP_VERSION = '1.0+9239dbe4';
 
   // ---------- PWA: generic centered popup ----------
   // Reused for install/uninstall steps, the About panel (this single-screen
@@ -1982,8 +1982,22 @@
     // rotated afterward -- "manually set" overrides "follows the object"
     // from then on, it doesn't blend the two.
     function reposition(){
-      const dx = item.labelDx!=null ? item.labelDx : defaultDx;
-      const dy = item.labelDy!=null ? item.labelDy : defaultDy;
+      let dx = item.labelDx!=null ? item.labelDx : defaultDx;
+      let dy = item.labelDy!=null ? item.labelDy : defaultDy;
+      // Line/wall labels (unlike furniture objects) aren't nested inside a
+      // rotated parent element, so this default offset is applied in plain
+      // screen X/Y -- fine for a horizontal wall (dy=-0.5 clears upward),
+      // but for a vertical or diagonal wall "up" runs alongside the line
+      // instead of away from it, leaving the label sitting right on top of
+      // (rather than beside) the line it's describing. Only the untouched
+      // default needs this: once a user drags a custom offset, the drag
+      // math above already stores it in this same unrotated frame.
+      if(item.labelDx==null && item.labelDy==null && fpIsLineType(item.type) && defaultLabelRot){
+        const rad = defaultLabelRot*Math.PI/180;
+        const rdx = dx*Math.cos(rad) - dy*Math.sin(rad);
+        const rdy = dx*Math.sin(rad) + dy*Math.cos(rad);
+        dx = rdx; dy = rdy;
+      }
       // Furniture objects always carry their own live item.rot -- read it
       // fresh here (rather than the rotDeg snapshot from when this label was
       // created) so a call to this same reposition() from the object's own
@@ -2357,20 +2371,24 @@
         // door leaf -- also an "opening", spanning its full length.
         { id:11, type:'opening', x1:2.5, y1:25.1667, x2:11.5, y2:27.6667, color:wallColor, heightIn:80, label:'Opening to Kitchen' },
         // 6'0" swing door, centered in the 6'6" bottom-right wall segment.
-        { id:12, type:'door', x1:11.75, y1:27.6667, x2:17.75, y2:27.6667, color:wallColor, heightIn:80, label:'Door' },
+        // labelDy pushes its label below the wall (outside the room) instead
+        // of the default above-the-line placement, which put it right on
+        // top of the Buffet Table sitting against this same wall.
+        { id:12, type:'door', x1:11.75, y1:27.6667, x2:17.75, y2:27.6667, color:wallColor, heightIn:80, label:'Door', labelDx:0, labelDy:1.5 },
       ],
       objects: [
         // 1.5ft (3 minor grid squares) from the top and left edges, and
         // left-justified above the room so it shares no horizontal space
         // with the top window's dimension callout further right on the
         // same wall.
-        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:3, cy:1.917, rot:0 },
-        // Pushed down off the corner Sunroom now occupies -- a label's text
-        // renders well above its own nominal cy (not just half its own
-        // depth above it), so verify actual rendered clearance in-browser
-        // (see fpDemoState's callers) rather than trusting the feet math.
-        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:6.0, cy:5.0, rot:0 },
-        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:10.0, cy:5.167, rot:0 },
+        { id:13, type:'label', label:'Sunroom', w:36, d:10, shape:'rect', icon:'plain', img:null, cx:1.427, cy:1.791, rot:0 },
+        // Icons stay flush against the top wall like every other wall-
+        // mounted piece; only their default ABOVE-icon label placement
+        // collided with Sunroom sitting right above that same wall, so
+        // labelDx/labelDy explicitly re-anchor just the label below the
+        // icon instead (into the empty space before the armchair row).
+        { id:14, label:'Built-Ins', w:36, d:12, shape:'rect', icon:'image', img:'./library/bookshelf.png', cx:4.0, cy:3.0, rot:0, labelDx:0, labelDy:2.0 },
+        { id:15, label:'Fireplace', w:60, d:16, shape:'rect', icon:'image', img:'./library/wm-linear-electric-fireplace.png', cx:10.0, cy:3.167, rot:0, labelDx:0, labelDy:2.0 },
         // Icon artwork faces down (south, toward the sofa) at rot:0 by
         // default (confirmed by looking at the actual PNGs) -- the far row
         // (16/17, furthest from the sofa) keeps that default so it faces
@@ -6002,10 +6020,15 @@
       fsCsvField(r.name),
       fsCsvField(r.priceRange),
       fsCsvField(r.priceLow),
-      fsCsvField(r.img),
-      // =HYPERLINK(...) -- Excel evaluates a leading "=" in a CSV cell as a
-      // formula on open, so this renders as a clickable link straight to the
-      // seller's page rather than plain unlinked URL text.
+      // =IMAGE(...) -- Excel (Microsoft 365) and Google Sheets both evaluate
+      // a leading "=" in a CSV cell as a formula on open, rendering an
+      // actual embedded thumbnail rather than a plain image-URL string.
+      // Falls back to a #NAME? error in older, non-365 desktop Excel, which
+      // has no IMAGE() function -- there's no way to embed a real raster
+      // image in a plain-text CSV that every Excel version can open.
+      fsCsvField(`=IMAGE("${r.img}")`),
+      // =HYPERLINK(...) -- same leading-"=" formula trick, for a clickable
+      // link straight to the seller's page rather than plain unlinked text.
       fsCsvField(`=HYPERLINK("${r.link}","Open")`)
     ].join(',')));
     const blob = new Blob(['﻿' + lines.join('\r\n')], {type:'text/csv'});
